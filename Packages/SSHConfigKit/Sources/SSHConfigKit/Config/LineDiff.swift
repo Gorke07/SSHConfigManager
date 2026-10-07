@@ -5,6 +5,8 @@ public struct DiffLine: Equatable, Sendable {
     /// 1-based line numbers; nil when the line does not exist on that side.
     public let oldNumber: Int?
     public let newNumber: Int?
+    /// True only for the last line of text that does NOT end with "\n" (and is non-empty).
+    public let missingNewline: Bool
 }
 
 public struct DiffHunk: Equatable, Sendable {
@@ -20,6 +22,11 @@ public struct DiffHunk: Equatable, Sendable {
 /// LCS-based line diff. Common prefix/suffix are trimmed first, so the quadratic
 /// table only covers the edited region (edits in this app are local).
 public enum LineDiff {
+    private struct LineInfo: Equatable, Sendable {
+        let text: String
+        let missingNewline: Bool
+    }
+
     public static func lines(old: String, new: String) -> [DiffLine] {
         let a = split(old)
         let b = split(new)
@@ -44,8 +51,8 @@ public enum LineDiff {
         var result: [DiffLine] = []
         var oldNo = 1
         var newNo = 1
-        func context(_ text: String) {
-            result.append(DiffLine(kind: .context, text: text, oldNumber: oldNo, newNumber: newNo))
+        func context(_ line: LineInfo) {
+            result.append(DiffLine(kind: .context, text: line.text, oldNumber: oldNo, newNumber: newNo, missingNewline: line.missingNewline))
             oldNo += 1
             newNo += 1
         }
@@ -57,10 +64,10 @@ public enum LineDiff {
             if i < n && j < m && same(am[i], bm[j]) {
                 context(am[i]); i += 1; j += 1
             } else if i < n && (j == m || dp[i + 1][j] >= dp[i][j + 1]) {
-                result.append(DiffLine(kind: .removed, text: am[i], oldNumber: oldNo, newNumber: nil))
+                result.append(DiffLine(kind: .removed, text: am[i].text, oldNumber: oldNo, newNumber: nil, missingNewline: am[i].missingNewline))
                 oldNo += 1; i += 1
             } else {
-                result.append(DiffLine(kind: .added, text: bm[j], oldNumber: nil, newNumber: newNo))
+                result.append(DiffLine(kind: .added, text: bm[j].text, oldNumber: nil, newNumber: newNo, missingNewline: bm[j].missingNewline))
                 newNo += 1; j += 1
             }
         }
@@ -100,13 +107,19 @@ public enum LineDiff {
         }
     }
 
-    private static func split(_ text: String) -> [String] {
+    private static func split(_ text: String) -> [LineInfo] {
         var parts = text.utf8
             .split(separator: UInt8(ascii: "\n"), omittingEmptySubsequences: false)
             .map { String(decoding: $0, as: UTF8.self) }
-        if parts.last == "" { parts.removeLast() }
-        return parts
+        let endsWithNewline = parts.last == ""
+        if endsWithNewline { parts.removeLast() }
+
+        return parts.enumerated().map { (i, text) in
+            LineInfo(text: text, missingNewline: !endsWithNewline && i == parts.count - 1)
+        }
     }
 
-    private static func same(_ a: String, _ b: String) -> Bool { a.utf8.elementsEqual(b.utf8) }
+    private static func same(_ a: LineInfo, _ b: LineInfo) -> Bool {
+        a.text.utf8.elementsEqual(b.text.utf8) && a.missingNewline == b.missingNewline
+    }
 }
