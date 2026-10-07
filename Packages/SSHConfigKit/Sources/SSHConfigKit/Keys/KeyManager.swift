@@ -23,6 +23,8 @@ public enum KeyManagerError: Error, Equatable, Sendable {
     case fileExists(String)
     /// ssh-keygen refuses passphrases shorter than five bytes.
     case passphraseTooShort
+    /// askpass hands the passphrase over as one line, so it is cut at the first line break.
+    case invalidPassphrase
     case wrongPassphrase
     case noAgent
     case timedOut
@@ -52,7 +54,15 @@ public struct KeyManager: Sendable {
     }
 
     public static func isValidPassphrase(_ passphrase: String) -> Bool {
-        passphrase.isEmpty || passphrase.utf8.count >= minimumPassphraseLength
+        passphrase.isEmpty || (passphrase.utf8.count >= minimumPassphraseLength && !Self.hasLineBreak(passphrase))
+    }
+
+    private static func hasLineBreak(_ text: String) -> Bool {
+        text.unicodeScalars.contains { $0 == "\n" || $0 == "\r" }
+    }
+
+    public static func passphraseError(_ passphrase: String) -> KeyManagerError {
+        hasLineBreak(passphrase) ? .invalidPassphrase : .passphraseTooShort
     }
 
     /// Never overwrites: fails if the key or its `.pub` exists. Creates the directory (0700) if needed.
@@ -61,7 +71,7 @@ public struct KeyManager: Sendable {
         for path in [url.path, url.path + ".pub"] where fm.fileExists(atPath: path) {
             throw KeyManagerError.fileExists(path)
         }
-        guard Self.isValidPassphrase(passphrase) else { throw KeyManagerError.passphraseTooShort }
+        guard Self.isValidPassphrase(passphrase) else { throw Self.passphraseError(passphrase) }
         let directory = url.deletingLastPathComponent()
         if !fm.fileExists(atPath: directory.path) {
             try fm.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
@@ -71,7 +81,7 @@ public struct KeyManager: Sendable {
     }
 
     public func changePassphrase(at url: URL, old: String, new: String) async throws {
-        guard Self.isValidPassphrase(new) else { throw KeyManagerError.passphraseTooShort }
+        guard Self.isValidPassphrase(new) else { throw Self.passphraseError(new) }
         let result = try await run("ssh-keygen", ["-p", "-f", url.path, "-P", old, "-N", new])
         if result.exitCode != 0 && result.stderr.contains("incorrect passphrase") { throw KeyManagerError.wrongPassphrase }
         try check(result)

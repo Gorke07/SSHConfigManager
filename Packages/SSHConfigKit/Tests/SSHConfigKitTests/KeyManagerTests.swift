@@ -47,6 +47,21 @@ struct KeyManagerTests {
         #expect(KeyManager.isValidPassphrase("") && KeyManager.isValidPassphrase("abcde") && !KeyManager.isValidPassphrase("abcd"))
     }
 
+    @Test func passphrasesWithLineBreaksAreRejected() async throws {
+        let tmp = try TempDir()
+        for bad in ["abcde\nfghij", "abcde\rfghij", "abcde\r\nfghij"] {
+            #expect(!KeyManager.isValidPassphrase(bad))
+            await #expect(throws: KeyManagerError.invalidPassphrase) {
+                try await manager(tmp).generate(type: .ed25519, at: tmp.url.appending(path: "k"), comment: "c", passphrase: bad)
+            }
+            await #expect(throws: KeyManagerError.invalidPassphrase) {
+                try await manager(tmp).changePassphrase(at: tmp.url.appending(path: "k"), old: "", new: bad)
+            }
+        }
+        #expect(!FileManager.default.fileExists(atPath: tmp.url.appending(path: "k").path))
+        #expect(KeyManager.isValidPassphrase("with space and tab\t"))
+    }
+
     @Test func nextAvailableNameSkipsPrivateAndPublicFiles() throws {
         let tmp = try TempDir()
         #expect(KeyManager.nextAvailableURL(fileName: "id_ed25519", in: tmp.url).lastPathComponent == "id_ed25519")

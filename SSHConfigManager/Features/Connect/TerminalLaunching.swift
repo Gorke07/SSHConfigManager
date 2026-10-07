@@ -51,7 +51,10 @@ enum AppleScriptBuilder {
 enum GhosttyArguments {
     /// `open -na Ghostty.app --args -e /usr/bin/ssh …` (verified with Ghostty 1.2.2; `-n` opens a new instance).
     static func openArguments(for request: LaunchRequest) -> [String] {
-        ["-na", "Ghostty.app", "--args", "-e", request.program] + request.sshArguments
+        // Only ssh keeps its old argv. Other programs (ssh-copy-id) print a result the user must be able to
+        // read: --wait-after-command keeps the window open until a keypress (Ghostty 1.2.2 docs).
+        let wait = request.program == "/usr/bin/ssh" ? [] : ["--wait-after-command=true"]
+        return ["-na", "Ghostty.app", "--args"] + wait + ["-e", request.program] + request.sshArguments
     }
 }
 
