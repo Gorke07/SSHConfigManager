@@ -162,9 +162,10 @@ final class AppModel {
     var savedConnectableHosts: [SavedHost] { savedHosts.hosts }
 
     /// An editable, non-pattern host that is not in the saved file yet (new or renamed):
-    /// Connect and Test are off until it is saved.
+    /// Connect and Test are off until it is saved. Not while the file changed on disk: the banner
+    /// explains that, and Save would only hit the conflict sheet.
     func isUnsavedHost(_ item: SidebarItem) -> Bool {
-        guard case .host = item,
+        guard !store.externalChangePending, case .host = item,
               let entry = SidebarBuilder.hostEntry(for: item, in: store.document), !entry.isPattern else { return false }
         return savedAlias(entry.alias) == nil
     }
@@ -197,14 +198,14 @@ final class AppModel {
     @discardableResult
     func connect(alias requested: String) -> Connector.Outcome {
         guard let alias = savedAlias(requested) else {
-            AppLog.error(.connect, LaunchError.failed("not in the saved file"))
+            AppLog.info(.connect, LaunchError.failed("not in the saved file"))
             errorMessage = String(localized: "connect.notSaved")
             return .failed(.failed("not in the saved file"))
         }
         let builder = commandBuilder
         let request = LaunchRequest(sshArguments: builder.sshArguments(alias: alias), shellCommand: builder.shellCommand(alias: alias))
         guard !request.shellCommand.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7F }) else {
-            AppLog.error(.connect, LaunchError.failed("control character"))
+            AppLog.info(.connect, LaunchError.failed("control character"))
             errorMessage = String(localized: "connect.invalidCommand")
             return .failed(.failed("control character"))
         }
@@ -215,14 +216,14 @@ final class AppModel {
     @discardableResult
     func uploadKey(publicKey: URL, alias requested: String) -> Connector.Outcome {
         guard let alias = savedAlias(requested) else {
-            AppLog.error(.connect, LaunchError.failed("not in the saved file"))
+            AppLog.info(.connect, LaunchError.failed("not in the saved file"))
             errorMessage = String(localized: "connect.notSaved")
             return .failed(.failed("not in the saved file"))
         }
         let arguments = ["-i", publicKey.path] + commandBuilder.configArguments + ["--", alias]
         let shellCommand = (["ssh-copy-id"] + arguments.map(SSHCommandBuilder.shellQuote)).joined(separator: " ")
         guard !shellCommand.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7F }) else {
-            AppLog.error(.connect, LaunchError.failed("control character"))
+            AppLog.info(.connect, LaunchError.failed("control character"))
             errorMessage = String(localized: "connect.invalidCommand")
             return .failed(.failed("control character"))
         }

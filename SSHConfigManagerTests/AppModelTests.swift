@@ -341,4 +341,15 @@ struct AppModelTests {
         #expect(!model.isUnsavedHost(.host(alias: "*", occurrence: 0)))
         #expect(!model.isUnsavedHost(.match(index: 0)))
     }
+
+    @Test func noSaveHintWhileAnExternalChangeIsPending() async throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host saved\n  HostName 10.0.0.1\n")
+        let added = try HostCommands.addHost(to: model.store)
+        #expect(model.isUnsavedHost(added))
+        try tmp.file(".ssh/config", "Host saved\n  HostName 10.0.0.2\n")
+        await #expect(throws: ConfigStoreError.conflict) { try await model.store.save() }
+        #expect(model.store.externalChangePending)
+        #expect(!model.isUnsavedHost(added))
+    }
 }

@@ -38,6 +38,7 @@ final class LoginItemToggle {
             try item.setEnabled(on)
             errorMessage = nil
         } catch {
+            AppLog.error(.settings, error)
             let detail = error.localizedDescription
             errorMessage = String(localized: "settings.launchAtLogin.failed \(detail)")
         }

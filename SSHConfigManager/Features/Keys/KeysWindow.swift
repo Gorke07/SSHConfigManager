@@ -107,7 +107,7 @@ struct KeysWindow: View {
         }
         .alert(
             String(localized: "keys.notice.title"),
-            isPresented: Binding(get: { sheet == nil && keys.notice != nil },
+            isPresented: Binding(get: { sheet == nil && keys.errorMessage == nil && keys.notice != nil },
                                  set: { if !$0 { keys.notice = nil; keys.noticeIsAutomationDenied = false } })
         ) {
             if keys.noticeIsAutomationDenied {

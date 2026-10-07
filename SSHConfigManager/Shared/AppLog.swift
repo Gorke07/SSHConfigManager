@@ -5,7 +5,7 @@ import os
 /// private; passphrases, key contents and process arguments/environment are never passed here.
 enum AppLog {
     enum Category: String {
-        case save, connect, knownHosts, keys, backups
+        case save, connect, knownHosts, keys, backups, settings
     }
 
     private static let subsystem = Bundle.main.bundleIdentifier ?? "tr.com.mess.SSHConfigManager"
@@ -14,6 +14,13 @@ enum AppLog {
         let (kind, detail) = describe(error)
         Logger(subsystem: subsystem, category: category.rawValue)
             .error("\(kind, privacy: .public): \(detail, privacy: .private)")
+    }
+
+    /// A refusal caused by the user's own decision (not a failure): same public/private split, `.info` level.
+    static func info(_ category: Category, _ error: any Error) {
+        let (kind, detail) = describe(error)
+        Logger(subsystem: subsystem, category: category.rawValue)
+            .info("\(kind, privacy: .public): \(detail, privacy: .private)")
     }
 
     /// Public kind and private detail. The kind never contains an error payload: enums give `Type.case`,
