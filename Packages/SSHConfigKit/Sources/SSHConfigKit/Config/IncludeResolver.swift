@@ -3,6 +3,11 @@ import Foundation
 public struct IncludedHost: Identifiable, Equatable, Sendable {
     public let file: URL
     public let entry: HostEntry
+
+    public init(file: URL, entry: HostEntry) {
+        self.file = file
+        self.entry = entry
+    }
     public var id: String { "\(file.path)#\(entry.headerLine)" }
 }
 

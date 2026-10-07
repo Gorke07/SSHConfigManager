@@ -7,6 +7,14 @@ public struct DiffLine: Equatable, Sendable {
     public let newNumber: Int?
     /// True only for the last line of text that does NOT end with "\n" (and is non-empty).
     public let missingNewline: Bool
+
+    public init(kind: Kind, text: String, oldNumber: Int?, newNumber: Int?, missingNewline: Bool) {
+        self.kind = kind
+        self.text = text
+        self.oldNumber = oldNumber
+        self.newNumber = newNumber
+        self.missingNewline = missingNewline
+    }
 }
 
 public struct DiffHunk: Equatable, Sendable {
@@ -16,12 +24,24 @@ public struct DiffHunk: Equatable, Sendable {
     public let newCount: Int
     public let lines: [DiffLine]
 
+    public init(oldStart: Int, oldCount: Int, newStart: Int, newCount: Int, lines: [DiffLine]) {
+        self.oldStart = oldStart
+        self.oldCount = oldCount
+        self.newStart = newStart
+        self.newCount = newCount
+        self.lines = lines
+    }
+
     public var header: String { "@@ -\(oldStart),\(oldCount) +\(newStart),\(newCount) @@" }
 }
 
 /// LCS-based line diff. Common prefix/suffix are trimmed first, so the quadratic
 /// table only covers the edited region (edits in this app are local).
 public enum LineDiff {
+    /// Above this many LCS cells the middle region is not aligned with a table; equal lines are
+    /// still matched greedily, everything else is emitted as "removed, then added".
+    public static let maxTableCells = 4_000_000
+
     private struct LineInfo: Equatable, Sendable {
         let text: String
         let missingNewline: Bool
@@ -41,10 +61,14 @@ public enum LineDiff {
         let bm = Array(b[prefix..<(b.count - suffix)])
         let n = am.count
         let m = bm.count
-        var dp = Array(repeating: Array(repeating: 0, count: m + 1), count: n + 1)
-        for i in stride(from: n - 1, through: 0, by: -1) {
-            for j in stride(from: m - 1, through: 0, by: -1) {
-                dp[i][j] = same(am[i], bm[j]) ? dp[i + 1][j + 1] + 1 : max(dp[i + 1][j], dp[i][j + 1])
+        let useTable = n * m <= maxTableCells
+        var dp: [[Int]] = []
+        if useTable {
+            dp = Array(repeating: Array(repeating: 0, count: m + 1), count: n + 1)
+            for i in stride(from: n - 1, through: 0, by: -1) {
+                for j in stride(from: m - 1, through: 0, by: -1) {
+                    dp[i][j] = same(am[i], bm[j]) ? dp[i + 1][j + 1] + 1 : max(dp[i + 1][j], dp[i][j + 1])
+                }
             }
         }
 
@@ -63,7 +87,7 @@ public enum LineDiff {
         while i < n || j < m {
             if i < n && j < m && same(am[i], bm[j]) {
                 context(am[i]); i += 1; j += 1
-            } else if i < n && (j == m || dp[i + 1][j] >= dp[i][j + 1]) {
+            } else if i < n && (j == m || !useTable || dp[i + 1][j] >= dp[i][j + 1]) {
                 result.append(DiffLine(kind: .removed, text: am[i].text, oldNumber: oldNo, newNumber: nil, missingNewline: am[i].missingNewline))
                 oldNo += 1; i += 1
             } else {

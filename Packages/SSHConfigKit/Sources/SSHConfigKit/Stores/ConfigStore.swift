@@ -44,7 +44,8 @@ public final class ConfigStore {
     public private(set) var isWatching = false
 
     @ObservationIgnored private var diskFingerprint: FileFingerprint?
-    @ObservationIgnored private let writer: SafeFileWriter
+    @ObservationIgnored private var writer: SafeFileWriter
+    @ObservationIgnored private let watchForChanges: Bool
     @ObservationIgnored private let validator: ConfigValidator
     @ObservationIgnored private let includeResolver: IncludeResolver
     @ObservationIgnored private var watcher: FileWatcher?
@@ -59,10 +60,20 @@ public final class ConfigStore {
     ) {
         self.fileURL = fileURL
         self.writer = writer
+        self.watchForChanges = watchForChanges
         self.validator = validator
         self.includeResolver = includeResolver
         load()
         if watchForChanges { startWatching() }
+    }
+
+    /// Number of backups kept per save, or nil when the writer makes no backups.
+    public var backupKeep: Int? { writer.backups?.keep }
+
+    public func setBackupKeep(_ keep: Int) {
+        guard var backups = writer.backups else { return }
+        backups.keep = max(keep, 1)
+        writer = SafeFileWriter(backups: backups)
     }
 
     public var hasUnsavedChanges: Bool {
@@ -105,6 +116,7 @@ public final class ConfigStore {
             }
         }
         load()
+        if watchForChanges && !isWatching { startWatching() }
     }
 
     /// Applies an edit atomically: if `edit` throws, `document` is unchanged.
@@ -112,8 +124,11 @@ public final class ConfigStore {
         guard loadState == .loaded else { throw ConfigStoreError.notEditable }
         var copy = document
         try edit(&copy)
+        let includesChanged = copy.includes.map(\.paths) != document.includes.map(\.paths)
         document = copy
-        includedHosts = includeResolver.includedHosts(of: document, rootFile: fileURL)
+        if includesChanged {
+            includedHosts = includeResolver.includedHosts(of: document, rootFile: fileURL)
+        }
     }
 
     /// Reloads from disk (also clears `externalChangePending`).

@@ -3,6 +3,12 @@ public struct HostDirective: Equatable, Sendable {
     public let key: String
     /// Display value (see `ValueFormatter.display`).
     public let value: String
+
+    public init(line: Int, key: String, value: String) {
+        self.line = line
+        self.key = key
+        self.value = value
+    }
 }
 
 public struct HostEntry: Identifiable, Equatable, Sendable {
@@ -10,6 +16,12 @@ public struct HostEntry: Identifiable, Equatable, Sendable {
     public let headerLine: Int
     public let patterns: [String]
     public let directives: [HostDirective]
+
+    public init(headerLine: Int, patterns: [String], directives: [HostDirective]) {
+        self.headerLine = headerLine
+        self.patterns = patterns
+        self.directives = directives
+    }
 
     public var id: Int { headerLine }
     public var alias: String { patterns.first ?? "" }
@@ -32,6 +44,12 @@ public struct MatchEntry: Equatable, Sendable {
     public let criteria: String
     /// Raw text of the block (header through its last owned non-blank line).
     public let text: String
+
+    public init(headerLine: Int, criteria: String, text: String) {
+        self.headerLine = headerLine
+        self.criteria = criteria
+        self.text = text
+    }
 }
 
 public struct IncludeDirective: Equatable, Sendable {
