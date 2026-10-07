@@ -100,7 +100,7 @@ final class AppModel {
         let outcome = Connector(choice: settings.terminal, isInstalled: terminalInstalled, makeLauncher: launcherFactory).connect(request)
         switch outcome {
         case .launched:
-            break
+            errorMessage = nil
         case .fellBack(let from):
             let name = from.displayName
             errorMessage = String(localized: "connect.fellBack \(name)")

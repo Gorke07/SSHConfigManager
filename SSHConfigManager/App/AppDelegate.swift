@@ -61,6 +61,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let defaults = UserDefaults(suiteName: suite)!
         UserDefaults().removePersistentDomain(forName: suite)
         return AppModel(settings: AppSettings(defaults: defaults, homeDirectory: home),
-                        backupRoot: home.appending(path: "Backups"))
+                        backupRoot: home.appending(path: "Backups"),
+                        launcherFactory: { _ in NoOpLauncher() },
+                        isTerminalInstalled: { _ in false })
     }
+}
+
+/// Used by the test host so UI driven during tests can never open a real terminal.
+private struct NoOpLauncher: TerminalLaunching {
+    func launch(_ request: LaunchRequest) throws {}
 }

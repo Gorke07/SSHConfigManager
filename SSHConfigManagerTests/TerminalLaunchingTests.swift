@@ -79,6 +79,7 @@ struct TerminalLaunchingTests {
         #expect(app.connectableAlias(for: .match(index: 0)) == nil)
         #expect(app.connectableAliases == ["web"])
 
+        app.errorMessage = "stale fallback message"
         #expect(app.connect(alias: "web") == .launched(.terminal))
         #expect(launcher.requests.first?.shellCommand == "ssh -- web")
         #expect(app.errorMessage == nil)
@@ -86,6 +87,18 @@ struct TerminalLaunchingTests {
         launcher.error = .automationDenied
         #expect(app.connect(alias: "web") == .failed(.automationDenied))
         #expect(app.automationDenied)
+    }
+
+    @Test func controlCharactersInAliasAreRejectedBeforeLaunching() throws {
+        let tmp = try TempDir()
+        let launcher = RecordingLauncher()
+        let app = makeTestModel(tmp, config: "Host x\n", launcher: launcher)
+        for alias in ["a\nrm -rf ~", "a\u{1B}x"] {
+            app.errorMessage = nil
+            #expect(app.connect(alias: alias) == .failed(.failed("control character")))
+            #expect(launcher.requests.isEmpty)
+            #expect(app.errorMessage == String(localized: "connect.invalidCommand"))
+        }
     }
 
     @Test func customConfigUsesDashF() throws {
