@@ -7,6 +7,7 @@ struct SettingsView: View {
     @State private var importing = false
     @State private var pendingPath: String?
     @State private var invalidMessage: String?
+    @State private var loginItem = LoginItemToggle(item: MainAppLoginItem())
 
     var body: some View {
         Form {
@@ -26,6 +27,23 @@ struct SettingsView: View {
                     Text(String(localized: "settings.configFile.customNote"))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                }
+            }
+
+            Section(String(localized: "settings.connection")) {
+                Picker(String(localized: "settings.terminal"), selection: Binding(
+                    get: { model.settings.terminal },
+                    set: { model.settings.setTerminal($0) }
+                )) {
+                    ForEach(TerminalChoice.allCases, id: \.self) { choice in
+                        let name = choice.displayName
+                        Text(verbatim: model.isTerminalInstalled(choice) ? name : String(localized: "settings.terminal.notInstalled \(name)"))
+                            .tag(choice)
+                    }
+                }
+                Toggle(String(localized: "settings.launchAtLogin"), isOn: Binding(get: { loginItem.isOn }, set: { loginItem.set($0) }))
+                if let message = loginItem.errorMessage {
+                    Text(message).font(.footnote).foregroundStyle(.red)
                 }
             }
 

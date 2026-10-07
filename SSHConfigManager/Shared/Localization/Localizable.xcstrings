@@ -764,6 +764,41 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yedekleri Göster…" } }
       }
     },
+    "settings.connection" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connection" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bağlantı" } }
+      }
+    },
+    "settings.terminal" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Terminal" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Terminal" } }
+      }
+    },
+    "settings.terminal.notInstalled %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ (not installed)" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "%@ (yüklü değil)" } }
+      }
+    },
+    "settings.launchAtLogin" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open at Login" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Girişte Aç" } }
+      }
+    },
+    "settings.launchAtLogin.failed %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Could not change the login item: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Giriş öğesi değiştirilemedi: %@" } }
+      }
+    },
     "settings.language" : {
       "extractionState" : "manual",
       "localizations" : {
