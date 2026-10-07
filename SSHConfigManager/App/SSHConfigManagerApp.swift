@@ -11,6 +11,11 @@ struct SSHConfigManagerApp: App {
                 .registersMainWindowOpener(appDelegate)
         }
         .defaultLaunchBehavior(LaunchContext.startsInMenuBar ? .suppressed : .automatic)
+        .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button(String(localized: "about.menu")) { AboutPanel.show() }
+            }
+        }
         Settings {
             SettingsView(model: appDelegate.model)
                 .registersMainWindowOpener(appDelegate)

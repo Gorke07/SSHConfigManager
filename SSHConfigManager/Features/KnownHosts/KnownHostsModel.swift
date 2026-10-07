@@ -113,6 +113,7 @@ final class KnownHostsModel {
             try store.remove(lines: Set(rows.map(\.id)), ifRevision: pendingRevision)
             errorMessage = nil
         } catch {
+            AppLog.error(.knownHosts, error)
             errorMessage = Messages.text(for: error)
         }
         selection = []

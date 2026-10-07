@@ -148,6 +148,20 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu known_hosts dosyası değiştirilemez." } }
       }
     },
+    "about.menu" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "About SSH Config Manager" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "SSH Config Manager Hakkında" } }
+      }
+    },
+    "about.thirdParty" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Third-party software" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Üçüncü parti yazılımlar" } }
+      }
+    },
     "app.title" : {
       "extractionState" : "manual",
       "localizations" : {

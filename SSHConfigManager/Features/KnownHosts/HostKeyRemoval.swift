@@ -71,6 +71,7 @@ extension AppModel {
             if hostKeyRemoval?.id == request.id { hostKeyRemoval = nil }
             return
         } catch {
+            AppLog.error(.knownHosts, error)
             phase = .failed(Messages.text(for: error))
         }
         // Cancelled or replaced while ssh -G was running: drop the late answer.
@@ -102,6 +103,7 @@ extension AppModel {
             try store.remove(lines: Set(entries.map(\.lineIndex)), ifRevision: removal.revision)
             connectionTests.dropResult(for: removal.alias)
         } catch {
+            AppLog.error(.knownHosts, error)
             errorMessage = Messages.text(for: error)
         }
     }

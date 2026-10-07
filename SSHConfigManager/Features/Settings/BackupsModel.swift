@@ -49,6 +49,7 @@ final class BackupsModel {
             errorMessage = nil
         } catch {
             backups = []
+            AppLog.error(.backups, error)
             errorMessage = Messages.text(for: error)
         }
         if let selectedURL, !backups.contains(where: { $0.url == selectedURL }) { self.selectedURL = nil }

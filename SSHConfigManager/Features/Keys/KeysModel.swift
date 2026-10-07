@@ -90,6 +90,7 @@ final class KeysModel {
         let url = app.sshDirectory.appending(path: fileName)
         if let alias {
             do { try app.validateAssignment(toAlias: alias) } catch {
+                AppLog.error(.keys, error)
                 errorMessage = Messages.text(for: error)
                 return false
             }
@@ -98,7 +99,10 @@ final class KeysModel {
         let ok = await perform {
             try await tools.manager.generate(type: type, at: url, comment: comment, passphrase: passphrase)
             if let alias {
-                do { try app.assignIdentityFile(url, toAlias: alias) } catch { assignmentError = Messages.text(for: error) }
+                do { try app.assignIdentityFile(url, toAlias: alias) } catch {
+                    AppLog.error(.keys, error)
+                    assignmentError = Messages.text(for: error)
+                }
             }
         }
         if let assignmentError {
@@ -127,9 +131,11 @@ final class KeysModel {
             notice = app.fallbackNotice
             noticeIsAutomationDenied = false
         case .failed(.automationDenied):
+            AppLog.error(.keys, LaunchError.automationDenied)
             notice = String(localized: "connect.automationDenied.message")
             noticeIsAutomationDenied = true
-        case .failed(.failed):
+        case .failed(.failed(let detail)):
+            AppLog.error(.keys, LaunchError.failed(detail))
             errorMessage = app.errorMessage
         }
         app.errorMessage = savedError
@@ -156,6 +162,7 @@ final class KeysModel {
             let text = try String(contentsOf: url, encoding: .utf8)
             tools.copyToPasteboard(text.trimmingCharacters(in: .whitespacesAndNewlines))
         } catch {
+            AppLog.error(.keys, error)
             errorMessage = Messages.text(for: error)
         }
     }
@@ -187,6 +194,7 @@ final class KeysModel {
             await refresh()
             return true
         } catch {
+            AppLog.error(.keys, error)
             errorMessage = Messages.text(for: error)
             await refresh()   // the operation may have changed files before failing
             return false

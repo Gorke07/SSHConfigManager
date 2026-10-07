@@ -236,8 +236,10 @@ final class AppModel {
             errorMessage = nil
             fallbackNotice = String(localized: "connect.fellBack \(name)")
         case .failed(.automationDenied):
+            AppLog.error(.connect, LaunchError.automationDenied)
             automationDenied = true
         case .failed(.failed(let detail)):
+            AppLog.error(.connect, LaunchError.failed(detail))
             errorMessage = String(localized: "connect.failed \(detail)")
         }
         return outcome

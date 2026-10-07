@@ -116,6 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 } catch {
                     openMainWindow?()
                     NSApp.activate()
+                    AppLog.error(.save, error)
                     model.errorMessage = Messages.text(for: error)
                     sender.reply(toApplicationShouldTerminate: false)
                 }

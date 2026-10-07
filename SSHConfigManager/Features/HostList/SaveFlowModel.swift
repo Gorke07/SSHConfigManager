@@ -98,6 +98,7 @@ final class SaveFlowModel: Identifiable {
             snapshotConflict()
             phase = .conflict
         } catch {
+            AppLog.error(.save, error)
             phase = .failed(Messages.text(for: error))
         }
     }
