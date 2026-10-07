@@ -114,6 +114,8 @@ final class AppModel {
         settings.setConfigPath(path)
         store = makeStore(url, backupManager, Self.backupKind(for: url, home: settings.homeDirectory))
         select(nil)
+        searchText = ""
+        errorMessage = nil
         return .switched
     }
 

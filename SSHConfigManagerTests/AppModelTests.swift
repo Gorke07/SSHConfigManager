@@ -225,4 +225,15 @@ struct AppModelTests {
         #expect(model.editorToken == token)
         #expect(model.editor(for: .host(alias: "a2", occurrence: 0)) === editor)
     }
+
+    @Test func switchingConfigClearsSearchAndError() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n")
+        try tmp.file("other/config", "Host b\n")
+        model.searchText = "a"
+        model.errorMessage = "x"
+        #expect(model.switchConfig(to: tmp.url.appending(path: "other/config").path) == .switched)
+        #expect(model.searchText.isEmpty)
+        #expect(model.errorMessage == nil)
+    }
 }

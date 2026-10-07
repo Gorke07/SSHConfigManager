@@ -547,6 +547,20 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yeniden Yükle" } }
       }
     },
+    "banner.external.reload.confirm.action" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reload and Discard" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yeniden Yükle ve At" } }
+      }
+    },
+    "banner.external.reload.confirm.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reload the file and discard your changes?" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dosya yeniden yüklensin ve değişiklikleriniz atılsın mı?" } }
+      }
+    },
     "banner.external.showDiff" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -573,6 +587,13 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Validating with ssh…" } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "ssh ile doğrulanıyor…" } }
+      }
+    },
+    "save.sshNote" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Validation runs “ssh -G”, which also executes any “Match exec” commands in the file and may look up host names." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Doğrulama “ssh -G” çalıştırır; bu, dosyadaki “Match exec” komutlarını da çalıştırır ve sunucu adlarını sorgulayabilir." } }
       }
     },
     "save.saving" : {
