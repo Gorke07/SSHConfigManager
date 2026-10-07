@@ -62,6 +62,22 @@ struct ConnectionTesterTests {
         #expect(fake.maxConcurrent >= 2)
         #expect(collected.values.sorted() == aliases.sorted())
     }
+
+    @Test func cancelledTestAllReportsNothingAndStopsQueueing() async {
+        let fake = FakeRunner(delay: .milliseconds(300)) { _ in ProcessResult(exitCode: 0, stdout: "", stderr: "", timedOut: false) }
+        let builder = SSHCommandBuilder(configFile: URL(filePath: "/h/.ssh/config"), homeDirectory: URL(filePath: "/h"))
+        let collected = Collected()
+        let task = Task {
+            await ConnectionTester(commandBuilder: builder, runner: fake).testAll((1...10).map { "h\($0)" }, maxConcurrent: 4) { alias, _ in
+                collected.add(alias)
+            }
+        }
+        try? await Task.sleep(for: .milliseconds(50))
+        task.cancel()
+        await task.value
+        #expect(collected.values.isEmpty)
+        #expect(fake.calls.count <= 4)
+    }
 }
 
 private struct FailingRunner: ProcessRunning {

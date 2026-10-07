@@ -93,8 +93,12 @@ public struct ConnectionTester: Sendable {
         await withTaskGroup(of: Void.self) { group in
             var pending = aliases.makeIterator()
             func startNext() {
-                guard let alias = pending.next() else { return }
-                group.addTask { await onResult(alias, await self.test(alias: alias)) }
+                guard !Task.isCancelled, let alias = pending.next() else { return }
+                group.addTask {
+                    let result = await self.test(alias: alias)
+                    // A cancelled run must not report fake failures for hosts it never really tested.
+                    if !Task.isCancelled { await onResult(alias, result) }
+                }
             }
             for _ in 0..<max(maxConcurrent, 1) { startNext() }
             while await group.next() != nil { startNext() }
