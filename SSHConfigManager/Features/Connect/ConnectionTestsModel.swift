@@ -7,6 +7,11 @@ import SSHConfigKit
 @Observable
 final class ConnectionTestsModel {
     private(set) var results: [String: ConnectionTestResult] = [:]
+
+    /// Forgets one alias's last result (e.g. after its known_hosts entry was deleted).
+    func dropResult(for alias: String) {
+        results.removeValue(forKey: alias)
+    }
     private(set) var running: Set<String> = []
     private(set) var isTestingAll = false
 

@@ -52,6 +52,11 @@ struct ConnectionBar: View {
                 if let detail = model.connectionTests.results[alias]?.detail, !detail.isEmpty {
                     Text(verbatim: detail).font(.caption).foregroundStyle(.secondary).lineLimit(1).textSelection(.enabled)
                 }
+                if model.connectionTests.results[alias]?.status == .hostKeyChanged {
+                    Button(String(localized: "action.removeKnownHost")) {
+                        Task { await model.requestHostKeyRemoval(alias: alias) }
+                    }
+                }
             }
             Spacer()
             Button(String(localized: "action.test")) {

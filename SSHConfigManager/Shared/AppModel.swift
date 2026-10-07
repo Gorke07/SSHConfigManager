@@ -22,6 +22,8 @@ final class AppModel {
     private(set) var editorToken = UUID()
     var searchText = ""
     var errorMessage: String?
+    /// The "Delete known_hosts entry…" flow for one alias; drives `HostKeyRemovalSheet`.
+    var hostKeyRemoval: HostKeyRemoval?
     /// Informational: the chosen terminal was unavailable and the connection opened in Terminal.
     var fallbackNotice: String?
     /// The form for the current selection. Owned here (not by the view) so edits that validation

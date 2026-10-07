@@ -79,10 +79,19 @@ enum Messages {
         }
     }
 
+    static func text(for error: HostResolverError) -> String {
+        switch error {
+        case .failed(let detail): String(localized: "hostKeyRemoval.resolveFailed \(detail)")
+        case .timedOut: String(localized: "hostKeyRemoval.resolveTimedOut")
+        case .unparsable: String(localized: "hostKeyRemoval.resolveUnparsable")
+        }
+    }
+
     static func text(for error: any Error) -> String {
         if let error = error as? ConfigStoreError { return text(for: error) }
         if let error = error as? ConfigEditError { return text(for: error) }
         if let error = error as? KnownHostsStoreError { return text(for: error) }
+        if let error = error as? HostResolverError { return text(for: error) }
         let detail = error.localizedDescription
         return String(localized: "error.generic \(detail)")
     }

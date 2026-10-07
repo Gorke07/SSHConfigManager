@@ -73,3 +73,6 @@ Elle denemede gerçek `~/.ssh/known_hosts` kullanılmaz: `defaults write tr.com.
 - [ ] Pencere açıkken dosyaya terminalden satır eklenince liste kendiliğinden yenileniyor.
 - [ ] Dosya yokken pencere hata değil "Henüz known_hosts dosyası yok" gösteriyor.
 - [ ] Koyu tema ve Türkçe arayüz.
+- [ ] Ana pencerede bir host'a sağ tık → "known_hosts Kaydını Sil…" → `ssh -G` sonrası eşleşen kayıtlar (hash'li dahil, `*.…` desenleri hariç) listeleniyor; Sil → yedek alınmış, yalnızca o satırlar gitmiş.
+- [ ] Test sonucu "Host anahtarı değişmiş" iken detaydaki "known_hosts Kaydını Sil…" aynı akışı açıyor; silindikten sonra rozet temizleniyor.
+- [ ] Eşleşen kayıt yoksa denenen adlar (`host` / `[host]:port`) gösteriliyor.

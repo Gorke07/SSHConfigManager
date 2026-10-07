@@ -100,6 +100,9 @@ struct MainWindow: View {
                 saveFlow = nil
             }
         }
+        .sheet(item: Binding(get: { model.hostKeyRemoval }, set: { if $0 == nil { model.cancelHostKeyRemoval() } })) { removal in
+            HostKeyRemovalSheet(model: model, removal: removal)
+        }
         .sheet(isPresented: $showExternalDiff) {
             ExternalDiffSheet(store: model.store) { showExternalDiff = false }
         }

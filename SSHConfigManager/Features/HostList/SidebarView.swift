@@ -82,6 +82,9 @@ struct SidebarView: View {
             Button(String(localized: "action.test")) {
                 Task { await model.connectionTests.test(alias, using: model.commandBuilder) }
             }
+            Button(String(localized: "action.removeKnownHost")) {
+                Task { await model.requestHostKeyRemoval(alias: alias) }
+            }
         }
     }
 

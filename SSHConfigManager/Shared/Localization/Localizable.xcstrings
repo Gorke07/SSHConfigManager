@@ -1218,6 +1218,62 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Opened in Terminal" } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Terminal'de Açıldı" } }
       }
+    },
+    "action.removeKnownHost" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete known_hosts Entry…" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "known_hosts Kaydını Sil…" } }
+      }
+    },
+    "hostKeyRemoval.title %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "known_hosts entries for “%@”" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "“%@” için known_hosts kayıtları" } }
+      }
+    },
+    "hostKeyRemoval.resolving" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Asking ssh which host name and port this host uses…" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "ssh'e bu host'un hangi ad ve portu kullandığı soruluyor…" } }
+      }
+    },
+    "hostKeyRemoval.confirm.message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "These entries will be deleted. A backup is made first." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu kayıtlar silinecek. Önce yedek alınır." } }
+      }
+    },
+    "hostKeyRemoval.nothingFound %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No known_hosts entry matches %@." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "%@ ile eşleşen known_hosts kaydı yok." } }
+      }
+    },
+    "hostKeyRemoval.resolveFailed %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ssh could not resolve this host: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "ssh bu host'u çözümleyemedi: %@" } }
+      }
+    },
+    "hostKeyRemoval.resolveTimedOut" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ssh -G did not answer within 5 seconds." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "ssh -G 5 saniye içinde yanıt vermedi." } }
+      }
+    },
+    "hostKeyRemoval.resolveUnparsable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ssh -G returned output that could not be read." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "ssh -G okunamayan bir çıktı verdi." } }
+      }
     }
   },
   "version" : "1.0"
