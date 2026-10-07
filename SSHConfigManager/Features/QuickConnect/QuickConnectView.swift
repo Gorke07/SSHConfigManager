@@ -7,6 +7,7 @@ struct QuickConnectView: View {
     let dismiss: () -> Void
     let openMainWindow: () -> Void
     let openSettings: () -> Void
+    var openKnownHosts: (() -> Void)? = nil
     @FocusState private var searchFocused: Bool
 
     var body: some View {
@@ -57,6 +58,9 @@ struct QuickConnectView: View {
                 Divider()
                 VStack(alignment: .leading, spacing: 2) {
                     footerButton(String(localized: "quick.openMainWindow")) { openMainWindow(); dismiss() }
+                    if let openKnownHosts {
+                        footerButton(String(localized: "quick.knownHosts")) { openKnownHosts(); dismiss() }
+                    }
                     footerButton(String(localized: "quick.settings")) { openSettings(); dismiss() }
                     footerButton(String(localized: "quick.quit")) {
                         // Close the menu first so the unsaved-changes alert is not left behind it.

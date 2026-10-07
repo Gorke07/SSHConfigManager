@@ -4,6 +4,7 @@ import SwiftUI
 
 struct MainWindow: View {
     @Bindable var model: AppModel
+    @Environment(\.openWindow) private var openWindow
     @State private var saveFlow: SaveFlowModel?
     @State private var showExternalDiff = false
     @State private var confirmSaveWithPending = false
@@ -55,6 +56,13 @@ struct MainWindow: View {
                         Label(String(localized: "toolbar.testAll"), systemImage: "bolt.horizontal.circle")
                     }
                     .disabled(model.connectableAliases.isEmpty)
+                }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    openWindow(id: "knownHosts")
+                } label: {
+                    Label(String(localized: "toolbar.knownHosts"), systemImage: "checkmark.shield")
                 }
             }
             ToolbarItem(placement: .primaryAction) {

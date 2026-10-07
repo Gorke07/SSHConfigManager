@@ -60,3 +60,16 @@ Her sürüm öncesi temiz bir test kullanıcısında veya `~/.ssh/config` yedeğ
 - [ ] Seçili terminal kullanılamayıp Terminal'e düşülünce uyarının başlığı "Terminal'de Açıldı".
 - [ ] Sistem dili Türkçe iken ilk bağlanmadaki Otomasyon izni penceresinin açıklaması Türkçe.
 - [ ] Kaydedilmemiş değişiklik varken menü çubuğundan "Çık" → menü penceresi kapanır, kaydetme uyarısı önde açılır.
+
+## Plan 3 — Known Hosts
+
+Elle denemede gerçek `~/.ssh/known_hosts` kullanılmaz: `defaults write tr.com.mess.SSHConfigManager knownHostsPath /tmp/sshcm-manual/known_hosts` (bitince `defaults delete tr.com.mess.SSHConfigManager knownHostsPath`). Örnek dosya: birkaç düz kayıt, `ssh-keygen -H -f /tmp/sshcm-manual/known_hosts` ile hash'lenmiş bir kopya, bir `@cert-authority` satırı ve bir anlamsız satır.
+
+- [ ] Ana penceredeki araç çubuğundan, menü çubuğunun alt kısmından ve Pencere menüsünden Known Hosts açılıyor; açıkken Dock ikonu görünüyor.
+- [ ] Sütunlar: Host, Port, Anahtar Tipi, Parmak İzi, İşaret. Hash'li kayıt 🔒 "(hash'li kayıt)", anlamsız satır ⚠ ile görünüyor.
+- [ ] Parmak izleri `ssh-keygen -lf /tmp/sshcm-manual/known_hosts` çıktısıyla aynı.
+- [ ] Arama: düz kayıtta alt dize; `ornek.com` / `ornek.com:2222` yazınca hash'li kayıt bulunuyor.
+- [ ] Çoklu seçim + Sil (ya da ⌫) → onay → silindi; Yedekler'de known_hosts yedeği var; diğer satırlar aynı (`diff` ile).
+- [ ] Pencere açıkken dosyaya terminalden satır eklenince liste kendiliğinden yenileniyor.
+- [ ] Dosya yokken pencere hata değil "Henüz known_hosts dosyası yok" gösteriyor.
+- [ ] Koyu tema ve Türkçe arayüz.

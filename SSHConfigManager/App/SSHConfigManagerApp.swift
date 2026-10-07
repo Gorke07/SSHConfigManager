@@ -18,6 +18,10 @@ struct SSHConfigManagerApp: App {
             BackupsView(model: appDelegate.model)
                 .registersMainWindowOpener(appDelegate)
         }
+        Window(String(localized: "knownHosts.title"), id: "knownHosts") {
+            KnownHostsWindow(app: appDelegate.model)
+                .registersMainWindowOpener(appDelegate)
+        }
         MenuBarExtra(isInserted: .constant(!TestEnvironment.isRunningTests)) {
             MenuBarContent(appDelegate: appDelegate)
         } label: {

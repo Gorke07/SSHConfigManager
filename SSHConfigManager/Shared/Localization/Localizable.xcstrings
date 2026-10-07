@@ -1,6 +1,104 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "knownHosts.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Known Hosts" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Known Hosts" } }
+      }
+    },
+    "knownHosts.column.host" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Host" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Host" } }
+      }
+    },
+    "knownHosts.column.port" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Port" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Port" } }
+      }
+    },
+    "knownHosts.column.type" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Key Type" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Anahtar Tipi" } }
+      }
+    },
+    "knownHosts.column.fingerprint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Fingerprint (SHA256)" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Parmak İzi (SHA256)" } }
+      }
+    },
+    "knownHosts.column.marker" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Marker" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "İşaret" } }
+      }
+    },
+    "knownHosts.search.prompt" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Search hosts, or type a host name to find hashed entries" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Host ara ya da hash'li kayıtları bulmak için host adı yaz" } }
+      }
+    },
+    "knownHosts.delete" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Sil" } }
+      }
+    },
+    "knownHosts.delete.confirm.title %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete %@ known_hosts entries?" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "%@ known_hosts kaydı silinsin mi?" } }
+      }
+    },
+    "knownHosts.delete.confirm.message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "A backup is made first. You can restore it from Backups." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Önce yedek alınır. Yedekler ekranından geri yükleyebilirsiniz." } }
+      }
+    },
+    "knownHosts.empty" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No entries" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kayıt yok" } }
+      }
+    },
+    "knownHosts.unparsable.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This line is not understood. It is kept as it is." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu satır anlaşılamadı. Olduğu gibi korunur." } }
+      }
+    },
+    "toolbar.knownHosts" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Known Hosts" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Known Hosts" } }
+      }
+    },
+    "quick.knownHosts" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Known Hosts" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Known Hosts" } }
+      }
+    },
     "knownHosts.hashed" : {
       "extractionState" : "manual",
       "localizations" : {
