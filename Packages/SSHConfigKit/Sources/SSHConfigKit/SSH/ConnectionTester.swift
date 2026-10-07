@@ -27,7 +27,9 @@ public struct ConnectionTestResult: Equatable, Sendable {
 public enum ConnectionClassifier {
     public static func classify(exitCode: Int32, stderr: String, timedOut: Bool) -> ConnectionStatus {
         if timedOut { return .timeout }
-        if exitCode == 0 { return .reachable }
+        // ssh's own failures exit 255; any other code is the remote command's
+        // (GitHub/GitLab exit 1 after successful authentication).
+        if exitCode != 255 { return .reachable }
         let rules: [(String, ConnectionStatus)] = [
             ("REMOTE HOST IDENTIFICATION HAS CHANGED", .hostKeyChanged),
             ("Host key verification failed", .unknownHostKey),

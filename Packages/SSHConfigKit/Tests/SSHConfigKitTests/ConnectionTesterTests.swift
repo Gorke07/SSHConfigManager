@@ -21,7 +21,8 @@ struct ConnectionTesterTests {
         (255, "deploy@10.0.0.1: Permission denied (publickey,password).\r\n", false, .authenticationRequired),
         (255, "Received disconnect from 1.2.3.4 port 22:2: Too many authentication failures\r\n", false, .authenticationRequired),
         (255, "", true, .timeout),
-        (1, "kex_exchange_identification: read: Connection reset by peer\r\n", false, .other),
+        (255, "kex_exchange_identification: read: Connection reset by peer\r\n", false, .other),
+        (1, "PTY allocation request failed\r\nHi user! You've successfully authenticated, but GitHub does not provide shell access.\r\n", false, .reachable),
     ])
     func classification(exitCode: Int32, stderr: String, timedOut: Bool, expected: ConnectionStatus) {
         #expect(ConnectionClassifier.classify(exitCode: exitCode, stderr: stderr, timedOut: timedOut) == expected)
