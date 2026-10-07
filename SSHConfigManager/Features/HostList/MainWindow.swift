@@ -66,6 +66,9 @@ struct MainWindow: View {
                 }
             }
             ToolbarItem(placement: .primaryAction) {
+                Button { openWindow(id: "keys") } label: { Label(String(localized: "toolbar.keys"), systemImage: "key") }
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button {
                     if model.hasPendingFormEdits {
                         confirmSaveWithPending = true

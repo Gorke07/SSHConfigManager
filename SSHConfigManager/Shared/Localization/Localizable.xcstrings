@@ -197,6 +197,307 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "%@ konumunda zaten bir dosya var. Hiçbir şeyin üzerine yazılmadı." } }
       }
     },
+    "keys.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Keys" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Anahtarlar" } }
+      }
+    },
+    "keys.column.name" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Name" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Ad" } }
+      }
+    },
+    "keys.column.type" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Type" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Tip" } }
+      }
+    },
+    "keys.column.fingerprint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Fingerprint (SHA256)" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Parmak İzi (SHA256)" } }
+      }
+    },
+    "keys.column.comment" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Comment" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yorum" } }
+      }
+    },
+    "keys.column.passphrase" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Passphrase" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Parola" } }
+      }
+    },
+    "keys.column.agent" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Agent" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Agent" } }
+      }
+    },
+    "keys.column.usedBy" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Used By" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kullanan" } }
+      }
+    },
+    "keys.passphrase.yes" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Yes" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Var" } }
+      }
+    },
+    "keys.passphrase.no" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "None" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yok" } }
+      }
+    },
+    "keys.passphrase.noHelp" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This private key has no passphrase. Anyone who copies the file can use it." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu özel anahtarın parolası yok. Dosyayı kopyalayan herkes kullanabilir." } }
+      }
+    },
+    "keys.noPrivateKey" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No private key" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Özel anahtar yok" } }
+      }
+    },
+    "keys.agent.loaded" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Loaded" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yüklü" } }
+      }
+    },
+    "keys.agent.unknown" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Agent not reachable" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Agent'a erişilemiyor" } }
+      }
+    },
+    "keys.empty" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No keys found" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Anahtar bulunamadı" } }
+      }
+    },
+    "keys.new" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New Key…" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yeni Anahtar…" } }
+      }
+    },
+    "keys.refresh" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Refresh" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yenile" } }
+      }
+    },
+    "keys.copyPublic" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Copy Public Key" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Public Key'i Kopyala" } }
+      }
+    },
+    "keys.addToAgent" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Add to Agent…" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Agent'a Ekle…" } }
+      }
+    },
+    "keys.upload" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Upload to Server…" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Sunucuya Yükle…" } }
+      }
+    },
+    "keys.changePassphrase" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Change Passphrase…" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Parolayı Değiştir…" } }
+      }
+    },
+    "keys.trash" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Move to Trash…" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Çöp Kutusuna Taşı…" } }
+      }
+    },
+    "keys.trash.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Move this key to the Trash?" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu anahtar çöp kutusuna taşınsın mı?" } }
+      }
+    },
+    "keys.trash.message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The private key and its .pub file are moved to the Trash together." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Özel anahtar ve .pub dosyası birlikte çöp kutusuna taşınır." } }
+      }
+    },
+    "keys.trash.inUse %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "These hosts use this key: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu anahtarı kullanan hostlar: %@" } }
+      }
+    },
+    "keys.form.type" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Type" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Tip" } }
+      }
+    },
+    "keys.form.fileName" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "File name" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dosya adı" } }
+      }
+    },
+    "keys.form.comment" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Comment" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yorum" } }
+      }
+    },
+    "keys.form.passphrase" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Passphrase" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Parola" } }
+      }
+    },
+    "keys.form.passphraseRepeat" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Repeat passphrase" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Parola tekrarı" } }
+      }
+    },
+    "keys.form.passphraseMismatch" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The passphrases do not match." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Parolalar eşleşmiyor." } }
+      }
+    },
+    "keys.form.assign" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Assign to host" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Hosta ata" } }
+      }
+    },
+    "keys.form.assignNone" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "None" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yok" } }
+      }
+    },
+    "keys.form.create" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Create" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Oluştur" } }
+      }
+    },
+    "keys.form.oldPassphrase" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Current passphrase" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Mevcut parola" } }
+      }
+    },
+    "keys.form.newPassphrase" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New passphrase" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yeni parola" } }
+      }
+    },
+    "keys.form.add" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Add" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Ekle" } }
+      }
+    },
+    "keys.form.host" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Host" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Host" } }
+      }
+    },
+    "keys.form.uploadNote" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ssh-copy-id opens in your terminal and may ask for the server password." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "ssh-copy-id terminalinizde açılır ve sunucu parolasını sorabilir." } }
+      }
+    },
+    "keys.form.change" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Change" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Değiştir" } }
+      }
+    },
+    "toolbar.keys" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Keys" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Anahtarlar" } }
+      }
+    },
+    "quick.keys" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Keys" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Anahtarlar" } }
+      }
+    },
+    "keys.upload.noPublicKey" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This key has no .pub file to upload." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu anahtarın yüklenecek .pub dosyası yok." } }
+      }
+    },
     "keys.error.passphraseTooShort" : {
       "extractionState" : "manual",
       "localizations" : {

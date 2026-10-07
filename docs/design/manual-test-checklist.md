@@ -80,3 +80,18 @@ Elle denemede gerçek `~/.ssh/known_hosts` kullanılmaz: `defaults write tr.com.
 - [ ] Ayarlar → known_hosts dosyası: Seç… ile başka dosya seçilince Known Hosts penceresi o dosyayı gösteriyor; "~/.ssh/known_hosts kullan" geri alıyor. Config dosyası seçimi hâlâ çalışıyor.
 - [ ] Not: ssh bir host anahtarını tam silme anında eklerse (çok nadir) eklenen satır kaybolabilir; ssh bir sonraki bağlantıda yeniden sorar.
 - [ ] Pencere açıkken başka bir terminalde `ssh-keygen -R <host> -f /tmp/sshcm-manual/known_hosts` çalıştırınca tablodaki seçim temizleniyor ve Sil yanlış satırı silmiyor.
+
+## Plan 4 — Anahtarlar
+
+Elle denemede gerçek anahtarlarınıza dokunmamak için yeni anahtarları `deneme_` önekiyle oluşturun ve bitince çöp kutusundan silin. "Agent'a ekle" gerçek agent'ınızı ve (`--apple-use-keychain` ile) keychain'inizi kullanır; denedikten sonra `ssh-add -d ~/.ssh/deneme_…` ile çıkarın.
+
+- [ ] Ana penceredeki araç çubuğundan, menü çubuğunun alt kısmından (Known Hosts ile Ayarlar arasında) ve Pencere menüsünden Anahtarlar açılıyor.
+- [ ] Sütunlar: Ad, Tip (ör. ED25519 256), Parmak İzi (`ssh-keygen -lf` ile aynı), Yorum, Parola (parolasızlar ⚠), Agent (`ssh-add -l` ile aynı), Kullanan.
+- [ ] Yeni Anahtar: varsayılan ad çakışınca `_2` öneriyor; parola tekrarı eşleşmezse ya da 1–4 karakterse Oluştur pasif; "Hosta ata" seçilince ana pencerede kaydedilmemiş değişiklik olarak `IdentityFile` ekleniyor, Kaydet ile yazılıyor.
+- [ ] Public Key'i Kopyala: panoda tek satır `ssh-… … yorum`.
+- [ ] Agent'a Ekle: parolalı anahtarda yanlış parola birkaç saniye içinde "Parola doğru değil" diyor; doğru parolada Agent sütunu "Yüklü" oluyor; keychain'e kaydedildiği için sonraki girişte parola sorulmuyor.
+- [ ] Sunucuya Yükle: seçilen terminalde `ssh-copy-id -i … -- host` açılıyor (Ghostty/Terminal/iTerm2).
+- [ ] Parolayı Değiştir: yanlış mevcut parola reddediliyor; boş yeni parola ile parola kaldırılıyor (Parola sütunu ⚠).
+- [ ] Çöp Kutusuna Taşı: kullanan host varsa onay penceresinde listeleniyor; özel anahtar ve .pub birlikte çöp kutusunda.
+- [ ] Agent çalışmıyorken (`SSH_AUTH_SOCK` geçersiz bir oturumda) Agent sütunu "?" gösteriyor ve uygulama donmuyor.
+- [ ] Koyu tema ve Türkçe arayüz.

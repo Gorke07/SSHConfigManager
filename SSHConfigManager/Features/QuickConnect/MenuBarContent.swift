@@ -18,6 +18,11 @@ struct MenuBarContent: View {
                 NSApp.setActivationPolicy(.regular)
                 openWindow(id: "knownHosts")
                 NSApp.activate()
+            },
+            openKeys: {
+                NSApp.setActivationPolicy(.regular)
+                openWindow(id: "keys")
+                NSApp.activate()
             })
             .onAppear { appDelegate.quickConnect.prepareForDisplay() }
     }

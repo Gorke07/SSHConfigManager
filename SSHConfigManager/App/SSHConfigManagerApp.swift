@@ -22,6 +22,10 @@ struct SSHConfigManagerApp: App {
             KnownHostsWindow(app: appDelegate.model)
                 .registersMainWindowOpener(appDelegate)
         }
+        Window(String(localized: "keys.title"), id: "keys") {
+            KeysWindow(app: appDelegate.model)
+                .registersMainWindowOpener(appDelegate)
+        }
         MenuBarExtra(isInserted: .constant(!TestEnvironment.isRunningTests)) {
             MenuBarContent(appDelegate: appDelegate)
         } label: {

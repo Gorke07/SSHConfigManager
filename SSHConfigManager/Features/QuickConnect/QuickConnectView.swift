@@ -8,6 +8,7 @@ struct QuickConnectView: View {
     let openMainWindow: () -> Void
     let openSettings: () -> Void
     var openKnownHosts: (() -> Void)? = nil
+    var openKeys: (() -> Void)? = nil
     @FocusState private var searchFocused: Bool
 
     var body: some View {
@@ -60,6 +61,9 @@ struct QuickConnectView: View {
                     footerButton(String(localized: "quick.openMainWindow")) { openMainWindow(); dismiss() }
                     if let openKnownHosts {
                         footerButton(String(localized: "quick.knownHosts")) { openKnownHosts(); dismiss() }
+                    }
+                    if let openKeys {
+                        footerButton(String(localized: "quick.keys")) { openKeys(); dismiss() }
                     }
                     footerButton(String(localized: "quick.settings")) { openSettings(); dismiss() }
                     footerButton(String(localized: "quick.quit")) {
