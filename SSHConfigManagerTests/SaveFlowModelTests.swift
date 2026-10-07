@@ -122,4 +122,22 @@ struct SaveFlowModelTests {
         #expect(app.store.hasUnsavedChanges)
         #expect(try tmp.read(".ssh/config") == "Host a\n  User u\n")
     }
+
+    @Test func overwriteRefusesNonUTF8Disk() async throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\n  User u\n")
+        try addPort(app)
+        try tmp.file(".ssh/config", "Host a\n  User vim\n")
+        let flow = SaveFlowModel(store: app.store)
+        await flow.prepare()
+        await flow.confirm()
+        #expect(flow.phase == .conflict)
+
+        let url = tmp.url.appending(path: ".ssh/config")
+        let bytes = Data([0x48, 0xFF])
+        try bytes.write(to: url)
+        await flow.overwrite()
+        guard case .failed = flow.phase else { Issue.record("failed bekleniyordu"); return }
+        #expect(try Data(contentsOf: url) == bytes)
+    }
 }

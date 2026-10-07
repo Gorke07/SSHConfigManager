@@ -18,7 +18,8 @@ final class SaveFlowModel: Identifiable {
     let id = UUID()
     let store: ConfigStore
     private(set) var phase: Phase = .preparing
-    private(set) var conflictDiskText = ""
+    /// nil when the disk version is unreadable or not UTF-8.
+    private(set) var conflictDiskText: String?
     private(set) var conflictDiff: [DiffHunk] = []
 
     init(store: ConfigStore) {
@@ -43,7 +44,10 @@ final class SaveFlowModel: Identifiable {
     func overwrite() async {
         guard phase == .conflict else { return }
         // Only overwrite the disk version the user actually reviewed.
-        let current = Self.diskText(store)
+        guard let current = Self.diskText(store) else {
+            phase = .failed(Self.undecodableMessage(store))
+            return
+        }
         if current != conflictDiskText {
             snapshotConflict()
             return
@@ -64,16 +68,25 @@ final class SaveFlowModel: Identifiable {
     }
 
     static func diskVersusMemory(_ store: ConfigStore) -> [DiffHunk] {
-        LineDiff.hunks(old: diskText(store), new: store.document.render())
+        LineDiff.hunks(old: diskText(store) ?? "", new: store.document.render())
     }
 
-    private static func diskText(_ store: ConfigStore) -> String {
-        (try? Data(contentsOf: store.fileURL)).flatMap { String(validating: $0, as: UTF8.self) } ?? ""
+    /// nil when the file cannot be read or is not valid UTF-8; a missing file counts as empty.
+    private static func diskText(_ store: ConfigStore) -> String? {
+        guard FileManager.default.fileExists(atPath: store.fileURL.path) else { return "" }
+        guard let data = try? Data(contentsOf: store.fileURL) else { return nil }
+        return String(validating: data, as: UTF8.self)
+    }
+
+    private static func undecodableMessage(_ store: ConfigStore) -> String {
+        let readable = (try? Data(contentsOf: store.fileURL)) != nil
+        let state: ConfigLoadState = readable ? .notUTF8 : .unreadable("")
+        return Messages.text(for: state) ?? ""
     }
 
     private func snapshotConflict() {
         conflictDiskText = Self.diskText(store)
-        conflictDiff = LineDiff.hunks(old: conflictDiskText, new: store.document.render())
+        conflictDiff = LineDiff.hunks(old: conflictDiskText ?? "", new: store.document.render())
     }
 
     private func save(overwriting: Bool) async {

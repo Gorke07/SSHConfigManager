@@ -16,6 +16,9 @@ struct SaveSheet: View {
                 Text(String(localized: "save.title")).font(.headline)
                 DiffTextView(hunks: preparation.hunks).frame(minWidth: 640, minHeight: 320)
                 validation(preparation.validation)
+                Text(String(localized: "save.sshNote"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                 HStack {
                     Spacer()
                     Button(String(localized: "action.cancel")) { finish(false) }
