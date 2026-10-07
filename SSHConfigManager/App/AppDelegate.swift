@@ -6,8 +6,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let model: AppModel = AppDelegate.makeModel()
     /// Set by every scene (registersMainWindowOpener); reopens it when the Dock icon is clicked or after a failed quit-save.
     var openMainWindow: (() -> Void)?
+    private(set) lazy var quickConnect = QuickConnectModel(app: model)
 
-    /// Closing the window keeps the app running (the menu bar item arrives in plan 2b).
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        guard !TestEnvironment.isRunningTests else { return }
+        // The Dock icon is shown only while the main window is open (spec §6.2).
+        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { note in
+            nonisolated(unsafe) let object = note.object  // delivered on the main queue
+            MainActor.assumeIsolated {
+                guard Self.isMainWindow(object) else { return }
+                NSApp.setActivationPolicy(.accessory)
+            }
+        }
+        NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main) { note in
+            nonisolated(unsafe) let object = note.object  // delivered on the main queue
+            MainActor.assumeIsolated {
+                guard Self.isMainWindow(object) else { return }
+                NSApp.setActivationPolicy(.regular)
+            }
+        }
+    }
+
+    /// Closing the window keeps the app running (the menu bar item stays).
+    private static func isMainWindow(_ object: Any?) -> Bool {
+        (object as? NSWindow)?.identifier?.rawValue.hasPrefix("main") ?? false
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
     }

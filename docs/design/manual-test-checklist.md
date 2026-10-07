@@ -40,3 +40,7 @@ Her sürüm öncesi temiz bir test kullanıcısında veya `~/.ssh/config` yedeğ
 - [ ] Test Et → rozet "Bağlantı reddedildi" ve ssh'in mesajı; Tümünü Test Et → tüm hostlarda rozet; Testi Durdur yarıda keser.
 - [ ] Sağ tık → Bağlan / Test Et, dahil edilen (🔒) hostlarda da çalışır.
 - [ ] Ayarlar → Girişte Aç açılır; oturumu kapatıp açınca uygulama menü çubuğunda başlar; kapatılınca başlamaz.
+- [ ] Menü çubuğundaki ikon → arama kutusu odaklı açılır; yaz → ↑↓ → ↩ ile bağlanır ve pencere kapanır; ⌘↩ seçili host'u test eder (rozet); esc kapatır.
+- [ ] Dahil edilen hostlar 🔒 ile listede; desenler (`*`) yok; aynı alias bir kez.
+- [ ] Ana pencere kapatılınca Dock simgesi kaybolur, menü çubuğu kalır; "SSH Config Yöneticisini Aç" pencereyi ve Dock simgesini geri getirir.
+- [ ] Menüden "Çık" kaydedilmemiş değişiklik varken kaydetme uyarısını gösterir.

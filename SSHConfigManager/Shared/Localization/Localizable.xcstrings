@@ -421,6 +421,48 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Host, kaydettiğinizde dosyadan kaldırılır." } }
       }
     },
+    "quick.search.prompt" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connect to…" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bağlan…" } }
+      }
+    },
+    "quick.empty" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No matching hosts." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Eşleşen host yok." } }
+      }
+    },
+    "quick.hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "↩ connect · ⌘↩ test · esc close" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "↩ bağlan · ⌘↩ test et · esc kapat" } }
+      }
+    },
+    "quick.openMainWindow" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open SSH Config Manager" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "SSH Config Yöneticisini Aç" } }
+      }
+    },
+    "quick.settings" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Settings…" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Ayarlar…" } }
+      }
+    },
+    "quick.quit" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Quit" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Çık" } }
+      }
+    },
     "quit.unsaved.title" : {
       "extractionState" : "manual",
       "localizations" : {

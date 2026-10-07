@@ -1,0 +1,77 @@
+import Foundation
+import Observation
+import SSHConfigKit
+
+struct QuickConnectEntry: Identifiable, Hashable, Sendable {
+    let alias: String
+    let subtitle: String
+    let isIncluded: Bool
+    var id: String { alias }
+}
+
+/// Shared by the menu bar window and the floating panel.
+@MainActor
+@Observable
+final class QuickConnectModel {
+    let app: AppModel
+    var query = "" {
+        didSet { if query != oldValue { selectedIndex = 0 } }
+    }
+    var selectedIndex = 0
+    /// Changes every time the UI is shown, so the view can focus the search field again.
+    private(set) var focusToken = UUID()
+
+    init(app: AppModel) {
+        self.app = app
+    }
+
+    var entries: [QuickConnectEntry] {
+        var seen = Set<String>()
+        var result: [QuickConnectEntry] = []
+        for entry in app.store.document.hosts where !entry.isPattern && seen.insert(entry.alias.lowercased()).inserted {
+            result.append(QuickConnectEntry(alias: entry.alias, subtitle: SidebarBuilder.subtitle(for: entry), isIncluded: false))
+        }
+        for host in app.store.includedHosts where !host.entry.isPattern && seen.insert(host.entry.alias.lowercased()).inserted {
+            result.append(QuickConnectEntry(alias: host.entry.alias, subtitle: SidebarBuilder.subtitle(for: host.entry), isIncluded: true))
+        }
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return result }
+        return result.filter { $0.alias.localizedStandardContains(trimmed) || $0.subtitle.localizedStandardContains(trimmed) }
+    }
+
+    var selectedEntry: QuickConnectEntry? {
+        let list = entries
+        guard !list.isEmpty else { return nil }
+        return list[min(max(selectedIndex, 0), list.count - 1)]
+    }
+
+    func move(by delta: Int) {
+        let count = entries.count
+        guard count > 0 else { selectedIndex = 0; return }
+        let current = min(max(selectedIndex, 0), count - 1)
+        selectedIndex = ((current + delta) % count + count) % count
+    }
+
+    func select(_ entry: QuickConnectEntry) {
+        if let index = entries.firstIndex(of: entry) { selectedIndex = index }
+    }
+
+    @discardableResult
+    func connectSelected() -> Bool {
+        guard let entry = selectedEntry else { return false }
+        app.connect(alias: entry.alias)
+        return true
+    }
+
+    func testSelected() {
+        guard let entry = selectedEntry else { return }
+        let builder = app.commandBuilder
+        Task { await app.connectionTests.test(entry.alias, using: builder) }
+    }
+
+    func prepareForDisplay() {
+        query = ""
+        selectedIndex = 0
+        focusToken = UUID()
+    }
+}

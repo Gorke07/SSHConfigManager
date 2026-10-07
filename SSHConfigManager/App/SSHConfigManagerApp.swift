@@ -18,5 +18,13 @@ struct SSHConfigManagerApp: App {
             BackupsView(model: appDelegate.model)
                 .registersMainWindowOpener(appDelegate)
         }
+        MenuBarExtra {
+            MenuBarContent(appDelegate: appDelegate)
+        } label: {
+            Image(systemName: "terminal")
+                .accessibilityLabel(String(localized: "app.title"))
+                .registersMainWindowOpener(appDelegate)
+        }
+        .menuBarExtraStyle(.window)
     }
 }
