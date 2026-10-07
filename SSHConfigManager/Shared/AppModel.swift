@@ -197,12 +197,14 @@ final class AppModel {
     @discardableResult
     func connect(alias requested: String) -> Connector.Outcome {
         guard let alias = savedAlias(requested) else {
+            AppLog.error(.connect, LaunchError.failed("not in the saved file"))
             errorMessage = String(localized: "connect.notSaved")
             return .failed(.failed("not in the saved file"))
         }
         let builder = commandBuilder
         let request = LaunchRequest(sshArguments: builder.sshArguments(alias: alias), shellCommand: builder.shellCommand(alias: alias))
         guard !request.shellCommand.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7F }) else {
+            AppLog.error(.connect, LaunchError.failed("control character"))
             errorMessage = String(localized: "connect.invalidCommand")
             return .failed(.failed("control character"))
         }
@@ -213,12 +215,14 @@ final class AppModel {
     @discardableResult
     func uploadKey(publicKey: URL, alias requested: String) -> Connector.Outcome {
         guard let alias = savedAlias(requested) else {
+            AppLog.error(.connect, LaunchError.failed("not in the saved file"))
             errorMessage = String(localized: "connect.notSaved")
             return .failed(.failed("not in the saved file"))
         }
         let arguments = ["-i", publicKey.path] + commandBuilder.configArguments + ["--", alias]
         let shellCommand = (["ssh-copy-id"] + arguments.map(SSHCommandBuilder.shellQuote)).joined(separator: " ")
         guard !shellCommand.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7F }) else {
+            AppLog.error(.connect, LaunchError.failed("control character"))
             errorMessage = String(localized: "connect.invalidCommand")
             return .failed(.failed("control character"))
         }

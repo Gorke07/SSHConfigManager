@@ -19,4 +19,19 @@ struct AboutPanelTests {
         #expect(!described.kind.contains("/Users"))
         #expect(described.detail.contains("/Users/x/.ssh/id"))   // logged as .private only
     }
+
+    @Test func cocoaErrorKindCarriesNoPathOrPayload() {
+        let error = CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey: "/Users/x/secret"])
+        let described = AppLog.describe(error)
+        #expect(!described.kind.contains("/Users"))
+        #expect(!described.kind.contains("secret"))
+    }
+
+    @Test func payloadFreeEnumCaseIsNamed() {
+        #expect(AppLog.describe(KeyManagerError.wrongPassphrase).kind == "KeyManagerError.wrongPassphrase")
+    }
+
+    @Test func payloadEnumCaseIsNamedWithoutItsPayload() {
+        #expect(AppLog.describe(KeyManagerError.failed("secret /Users/x")).kind == "KeyManagerError.failed")
+    }
 }

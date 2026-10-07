@@ -131,11 +131,9 @@ final class KeysModel {
             notice = app.fallbackNotice
             noticeIsAutomationDenied = false
         case .failed(.automationDenied):
-            AppLog.error(.keys, LaunchError.automationDenied)
             notice = String(localized: "connect.automationDenied.message")
             noticeIsAutomationDenied = true
-        case .failed(.failed(let detail)):
-            AppLog.error(.keys, LaunchError.failed(detail))
+        case .failed(.failed):
             errorMessage = app.errorMessage
         }
         app.errorMessage = savedError

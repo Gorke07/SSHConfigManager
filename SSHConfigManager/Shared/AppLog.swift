@@ -8,7 +8,7 @@ enum AppLog {
         case save, connect, knownHosts, keys, backups
     }
 
-    private static let subsystem = "tr.com.mess.SSHConfigManager"
+    private static let subsystem = Bundle.main.bundleIdentifier ?? "tr.com.mess.SSHConfigManager"
 
     static func error(_ category: Category, _ error: any Error) {
         let (kind, detail) = describe(error)
@@ -16,10 +16,22 @@ enum AppLog {
             .error("\(kind, privacy: .public): \(detail, privacy: .private)")
     }
 
-    /// `Type.case` (public) and the full description (private).
+    /// Public kind and private detail. The kind never contains an error payload: enums give `Type.case`,
+    /// anything else gives type, domain and code (NSError bridging), never the user info.
     static func describe(_ error: any Error) -> (kind: String, detail: String) {
         let detail = String(describing: error)
-        let caseName = detail.prefix { $0 != "(" }
-        return ("\(type(of: error)).\(caseName)", detail)
+        let type = "\(type(of: error))"
+        let mirror = Mirror(reflecting: error)
+        if mirror.displayStyle == .enum {
+            if let label = mirror.children.first?.label {
+                return ("\(type).\(label)", detail)
+            }
+            if !detail.isEmpty, detail.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_") }) {
+                return ("\(type).\(detail)", detail)
+            }
+            return (type, detail)
+        }
+        let ns = error as NSError
+        return ("\(type)(domain: \(ns.domain), code: \(ns.code))", detail)
     }
 }

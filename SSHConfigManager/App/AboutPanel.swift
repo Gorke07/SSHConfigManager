@@ -17,9 +17,9 @@ enum AboutPanel {
     static var credits: NSAttributedString {
         let result = NSMutableAttributedString()
         let heading = String(localized: "about.thirdParty")
-        result.append(NSAttributedString(string: heading + "\n\n", attributes: [.font: NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize)]))
-        result.append(NSAttributedString(string: "KeyboardShortcuts\n", attributes: [.font: NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize)]))
-        result.append(NSAttributedString(string: keyboardShortcutsLicense, attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)]))
+        result.append(NSAttributedString(string: heading + "\n\n", attributes: [.font: NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize), .foregroundColor: NSColor.labelColor]))
+        result.append(NSAttributedString(string: "KeyboardShortcuts\n", attributes: [.font: NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize), .foregroundColor: NSColor.labelColor]))
+        result.append(NSAttributedString(string: keyboardShortcutsLicense, attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize), .foregroundColor: NSColor.labelColor]))
         return result
     }
 
