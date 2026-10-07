@@ -1289,6 +1289,13 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Üzerine Yaz" } }
       }
     },
+    "keys.notice.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Note" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bilgi" } }
+      }
+    },
     "error.title" : {
       "extractionState" : "manual",
       "localizations" : {

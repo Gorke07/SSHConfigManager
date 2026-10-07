@@ -43,8 +43,6 @@ struct NewKeySheet: View {
                         if await keys.generate(type: type, fileName: fileName, comment: comment,
                                                passphrase: passphrase, assignTo: alias.isEmpty ? nil : alias) {
                             finish()
-                        } else if keys.createdButNotAssigned {
-                            fileName = keys.suggestedFileName(for: type)   // the old name is taken now
                         }
                     }
                 }
@@ -187,10 +185,10 @@ struct UploadKeySheet: View {
                 Spacer()
                 Button(String(localized: "action.cancel"), role: .cancel) { close() }.keyboardShortcut(.cancelAction)
                 Button(String(localized: "keys.upload")) {
-                    // A terminal was opened (launched or fell back): close; the window shows any notice.
+                    // Launched, fell back or Automation denied: close; the window shows the notice.
                     switch app.keys.upload(row, alias: alias) {
-                    case .launched, .fellBack: close()
-                    case .failed: break   // the error shows inline
+                    case .launched, .fellBack, .failed(.automationDenied): close()
+                    case .failed(.failed): break   // the error shows inline
                     }
                 }
                 .keyboardShortcut(.defaultAction)

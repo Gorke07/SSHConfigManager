@@ -105,6 +105,22 @@ struct KeysWindow: View {
         } message: {
             Text(verbatim: keys.errorMessage ?? "")
         }
+        .alert(
+            String(localized: "keys.notice.title"),
+            isPresented: Binding(get: { sheet == nil && keys.notice != nil },
+                                 set: { if !$0 { keys.notice = nil; keys.noticeIsAutomationDenied = false } })
+        ) {
+            if keys.noticeIsAutomationDenied {
+                Button(String(localized: "connect.automationDenied.open")) {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+            }
+            Button(String(localized: "action.close"), role: .cancel) {}
+        } message: {
+            Text(verbatim: keys.notice ?? "")
+        }
         .task { await keys.refresh() }
         .onChange(of: app.store.savedDocument) { Task { await keys.refresh() } }
         .onChange(of: app.store.fileURL) { Task { await keys.refresh() } }

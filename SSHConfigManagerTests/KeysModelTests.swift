@@ -116,7 +116,7 @@ struct KeysModelTests {
         return try #require(model.keys.rows.first)
     }
 
-    @Test func uploadFailuresShowInTheKeysWindowAndClearTheMainWindowCopies() async throws {
+    @Test func uploadFailuresShowInTheKeysWindowAndLeaveTheMainWindowAlone() async throws {
         let tmp = try TempDir()
         let launcher = RecordingLauncher()
         let model = makeTestModel(tmp, config: "Host web\n", launcher: launcher)
@@ -124,7 +124,8 @@ struct KeysModelTests {
 
         launcher.error = .automationDenied
         #expect(model.keys.upload(row, alias: "web") == .failed(.automationDenied))
-        #expect(model.keys.errorMessage == String(localized: "connect.automationDenied.message"))
+        #expect(model.keys.notice == String(localized: "connect.automationDenied.message"))
+        #expect(model.keys.errorMessage == nil)
         #expect(!model.automationDenied && model.errorMessage == nil && model.fallbackNotice == nil)
 
         launcher.error = .failed("x")
@@ -134,14 +135,14 @@ struct KeysModelTests {
         #expect(launcher.requests.isEmpty)
     }
 
-    @Test func uploadFallbackNoticeShowsInTheKeysWindowAndSuccessClearsIt() async throws {
+    @Test func uploadFallbackNoticeShowsInTheKeysWindow() async throws {
         let tmp = try TempDir()
         let launcher = RecordingLauncher()
         let model = makeTestModel(tmp, config: "Host web\n", launcher: launcher, isTerminalInstalled: { $0 == .terminal })
         model.settings.setTerminal(.ghostty)
         let row = try await keyRow(model)
         #expect(model.keys.upload(row, alias: "web") == .fellBack(from: .ghostty))
-        #expect(model.keys.errorMessage == String(localized: "connect.fellBack \(TerminalChoice.ghostty.displayName)"))
+        #expect(model.keys.notice == String(localized: "connect.fellBack \(TerminalChoice.ghostty.displayName)"))
         #expect(model.fallbackNotice == nil && model.errorMessage == nil)
         #expect(launcher.requests.count == 1)
 
@@ -184,16 +185,50 @@ struct KeysModelTests {
         // rsa 4096 takes long enough to dirty the form while ssh-keygen runs (the main actor is free meanwhile).
         let task = Task { await keys.generate(type: .rsa, fileName: "deploy", comment: "c", passphrase: "", assignTo: "web") }
         let privateKey = tmp.url.appending(path: ".ssh/deploy").path
-        while !FileManager.default.fileExists(atPath: privateKey) { await Task.yield() }
+        let deadline = ContinuousClock.now + .seconds(30)
+        while !FileManager.default.fileExists(atPath: privateKey) {
+            if ContinuousClock.now > deadline { Issue.record("key file never appeared"); break }
+            await Task.yield()
+        }
         editor.fields["Port"] = "abc"
         #expect(!editor.commit())
-        #expect(await task.value == false)
+        #expect(await task.value == true)
         #expect(keys.createdButNotAssigned)
         let prefix = String(localized: "keys.error.createdNotAssigned \("~/.ssh/deploy")")
-        #expect(keys.errorMessage == prefix + String(localized: "keys.error.pendingFormEdits"))
+        #expect(keys.notice == prefix + String(localized: "keys.error.pendingFormEdits"))
         #expect(FileManager.default.fileExists(atPath: privateKey))
         #expect(keys.suggestedFileName(for: .rsa) == "id_rsa")   // a fresh name, so Create again cannot hit "file exists"
         #expect(!model.store.hasUnsavedChanges)
+    }
+
+    @Test func fallbackNoticeSurvivesTheSheetAndAppAlertsAreRestored() async throws {
+        let tmp = try TempDir()
+        let launcher = RecordingLauncher()
+        let model = makeTestModel(tmp, config: "Host web\n", launcher: launcher, isTerminalInstalled: { $0 == .terminal })
+        model.settings.setTerminal(.ghostty)                     // not installed -> falls back to Terminal
+        model.errorMessage = "unrelated main-window error"
+        _ = await model.keys.generate(type: .ed25519, fileName: "k", comment: "c", passphrase: "", assignTo: nil)
+        await model.keys.refresh()
+        let row = try #require(model.keys.rows.first)
+        guard case .fellBack = model.keys.upload(row, alias: "web") else { Issue.record("expected fellBack"); return }
+        model.keys.errorMessage = nil                             // what the sheet's onDisappear does
+        let name = TerminalChoice.ghostty.displayName
+        #expect(model.keys.notice == String(localized: "connect.fellBack \(name)"))
+        #expect(model.errorMessage == "unrelated main-window error")
+        #expect(model.fallbackNotice == nil)
+    }
+
+    @Test func automationDeniedBecomesAWindowNoticeWithTheSettingsButton() async throws {
+        let tmp = try TempDir()
+        let launcher = RecordingLauncher()
+        launcher.error = .automationDenied
+        let model = makeTestModel(tmp, config: "Host web\n", launcher: launcher)
+        _ = await model.keys.generate(type: .ed25519, fileName: "k", comment: "c", passphrase: "", assignTo: nil)
+        await model.keys.refresh()
+        _ = model.keys.upload(try #require(model.keys.rows.first), alias: "web")
+        #expect(model.keys.notice == String(localized: "connect.automationDenied.message"))
+        #expect(model.keys.noticeIsAutomationDenied)
+        #expect(model.automationDenied == false)
     }
 
     @Test func fileNamesEndingInPubOrCertAreRejected() {

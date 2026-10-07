@@ -21,6 +21,10 @@ final class KeysModel {
     private(set) var isWorking = false
     @ObservationIgnored private var operationCount = 0
     var errorMessage: String?
+    /// Window-level message (not cleared when a sheet closes): fallback notices, Automation
+    /// denial, "created but not assigned".
+    var notice: String?
+    var noticeIsAutomationDenied = false
     var selection: String?
     /// The last Create made the key but could not assign it (the sheet then suggests a fresh file name).
     private(set) var createdButNotAssigned = false
@@ -98,11 +102,12 @@ final class KeysModel {
             }
         }
         if let assignmentError {
-            // The key exists now; the sheet stays open with a message and a fresh file name.
+            // The key exists now; the sheet closes and the window shows the message.
             createdButNotAssigned = true
             let shownPath = app.settings.displayPath(for: url)
-            errorMessage = String(localized: "keys.error.createdNotAssigned \(shownPath)") + assignmentError
-            return false
+            notice = String(localized: "keys.error.createdNotAssigned \(shownPath)") + assignmentError
+            noticeIsAutomationDenied = false
+            return true
         }
         return ok
     }
@@ -111,22 +116,25 @@ final class KeysModel {
     @discardableResult
     func upload(_ row: KeyRow, alias: String) -> Connector.Outcome {
         guard let app, let pub = row.key.publicURL else { return .failed(.failed("no public key")) }
+        let savedError = app.errorMessage
+        let savedFallback = app.fallbackNotice
+        let savedDenied = app.automationDenied
         let outcome = app.uploadKey(publicKey: pub, alias: alias)
         switch outcome {
         case .launched:
             errorMessage = nil
         case .fellBack:
-            errorMessage = app.fallbackNotice
+            notice = app.fallbackNotice
+            noticeIsAutomationDenied = false
         case .failed(.automationDenied):
-            errorMessage = String(localized: "connect.automationDenied.message")
+            notice = String(localized: "connect.automationDenied.message")
+            noticeIsAutomationDenied = true
         case .failed(.failed):
             errorMessage = app.errorMessage
         }
-        if case .launched = outcome {} else {
-            app.errorMessage = nil
-            app.fallbackNotice = nil
-            app.automationDenied = false
-        }
+        app.errorMessage = savedError
+        app.fallbackNotice = savedFallback
+        app.automationDenied = savedDenied
         return outcome
     }
 
