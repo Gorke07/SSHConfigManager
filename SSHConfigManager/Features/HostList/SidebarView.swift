@@ -9,7 +9,10 @@ struct SidebarView: View {
     var body: some View {
         let sections = SidebarBuilder.sections(
             document: model.store.document, included: model.store.includedHosts, search: model.searchText)
-        List(selection: Binding(get: { model.selection }, set: { model.select($0) })) {
+        List(selection: Binding(get: { model.selection }, set: { new in
+            guard let new, new != model.selection else { return }
+            model.requestSelect(new)
+        })) {
             section(String(localized: "sidebar.section.hosts"), rows: sections.hosts, icon: "server.rack", editable: true)
             section(String(localized: "sidebar.section.patterns"), rows: sections.patterns, icon: "asterisk", editable: true)
             section(String(localized: "sidebar.section.included"), rows: sections.included, icon: "lock", editable: false)
@@ -64,7 +67,7 @@ struct SidebarView: View {
     private func menu(for item: SidebarItem) -> some View {
         Button(String(localized: "action.duplicate")) {
             do {
-                if let copy = try HostCommands.duplicate(item, in: model.store) { model.select(copy) }
+                if let copy = try HostCommands.duplicate(item, in: model.store) { model.requestSelect(copy) }
             } catch {
                 model.errorMessage = Messages.text(for: error)
             }

@@ -56,14 +56,16 @@ private struct HostEditorContainer: View {
         Group {
             if let editor {
                 HostEditorView(editor: editor, homeDirectory: model.settings.homeDirectory) { model.resetEditor() }
-                    .onChange(of: editor.item) { _, newItem in model.followRename(to: newItem) }
             } else {
                 ContentUnavailableView(String(localized: "edit.hostNotFound"), systemImage: "questionmark")
             }
         }
         .onAppear {
             if editor == nil, let item = model.selection {
-                editor = HostEditorModel(item: item, store: model.store, homeDirectory: model.settings.homeDirectory)
+                let created = HostEditorModel(item: item, store: model.store, homeDirectory: model.settings.homeDirectory)
+                created?.onItemChange = { [model] in model.followRename(to: $0) }
+                model.activeEditor = created
+                editor = created
             }
         }
     }

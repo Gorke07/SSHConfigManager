@@ -7,7 +7,7 @@ struct SSHConfigManagerApp: App {
 
     var body: some Scene {
         Window(String(localized: "app.title"), id: "main") {
-            MainWindow(model: model)
+            MainWindow(model: model, appDelegate: appDelegate)
                 .frame(minWidth: 760, minHeight: 480)
                 .onAppear { appDelegate.model = model }
         }

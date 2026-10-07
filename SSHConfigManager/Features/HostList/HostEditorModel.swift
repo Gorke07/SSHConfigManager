@@ -20,6 +20,10 @@ final class HostEditorModel {
     private(set) var failure: (any Error)?
     /// True when the document's block changed underneath the form; nothing is written until the editor is reopened.
     private(set) var isStale = false
+    /// True when the last commit was blocked (by validation or a failed write) and the draft still differs from the document.
+    private(set) var hasPendingChanges = false
+    /// Called synchronously from `commit()` when the edit changed the item's identity (a rename).
+    @ObservationIgnored var onItemChange: ((SidebarItem) -> Void)?
 
     @ObservationIgnored private var baseline: HostDraft
 
@@ -69,6 +73,7 @@ final class HostEditorModel {
         guard let entry = SidebarBuilder.hostEntry(for: item, in: store.document) else {
             failure = ConfigEditError.hostNotFound(-1)
             issues = []
+            hasPendingChanges = false
             return false
         }
         guard HostDraft(entry) == baseline else {
@@ -77,18 +82,25 @@ final class HostEditorModel {
         }
         let draft = self.draft
         issues = validator.issues(for: draft, in: store.document, editing: entry.headerLine)
-        guard !hasBlockingIssues else { return false }
+        guard !hasBlockingIssues else {
+            hasPendingChanges = draft != baseline
+            return false
+        }
         do {
             try store.apply { try $0.updateHost(at: entry.headerLine, to: draft) }
             if let renamed = SidebarBuilder.item(forHeader: entry.headerLine, in: store.document) {
+                let changed = renamed != item
                 item = renamed
                 if let updated = SidebarBuilder.hostEntry(for: renamed, in: store.document) {
                     baseline = HostDraft(updated)
                 }
+                if changed { onItemChange?(renamed) }
             }
+            hasPendingChanges = false
             return true
         } catch {
             failure = error
+            hasPendingChanges = draft != baseline
             return false
         }
     }

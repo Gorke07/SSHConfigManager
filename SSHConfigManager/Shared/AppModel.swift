@@ -18,6 +18,10 @@ final class AppModel {
     private(set) var editorToken = UUID()
     var searchText = ""
     var errorMessage: String?
+    /// The form currently shown (set by the editor view); used to protect edits that validation blocked.
+    @ObservationIgnored weak var activeEditor: HostEditorModel?
+    /// A selection waiting for the user to confirm discarding blocked form edits.
+    var pendingSelection: SidebarItem?
 
     @ObservationIgnored private let makeStore: StoreFactory
 
@@ -40,6 +44,27 @@ final class AppModel {
     func select(_ item: SidebarItem?) {
         selection = item
         editorToken = UUID()
+    }
+
+    var hasPendingFormEdits: Bool { activeEditor?.hasPendingChanges ?? false }
+
+    /// Selects `item`, unless the form holds edits that were never applied; then asks first.
+    func requestSelect(_ item: SidebarItem?) {
+        if hasPendingFormEdits, item != nil {
+            pendingSelection = item
+        } else {
+            select(item)
+        }
+    }
+
+    func confirmPendingSelection() {
+        let item = pendingSelection
+        pendingSelection = nil
+        select(item)
+    }
+
+    func cancelPendingSelection() {
+        pendingSelection = nil
     }
 
     /// Called by the editor after it renamed the selected host.

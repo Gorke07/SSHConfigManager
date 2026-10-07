@@ -4,13 +4,21 @@ import AppKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var model: AppModel?
+    /// Set by the main window; reopens it when the Dock icon is clicked or after a failed quit-save.
+    var openMainWindow: (() -> Void)?
 
+    /// Closing the window keeps the app running (the menu bar item arrives in plan 2b).
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        true
+        false
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { openMainWindow?() }
+        return true
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard let model, model.store.hasUnsavedChanges else { return .terminateNow }
+        guard let model, model.store.hasUnsavedChanges || model.hasPendingFormEdits else { return .terminateNow }
         let alert = NSAlert()
         alert.messageText = String(localized: "quit.unsaved.title")
         alert.informativeText = String(localized: "quit.unsaved.message")
@@ -24,6 +32,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     try await model.store.save()
                     sender.reply(toApplicationShouldTerminate: true)
                 } catch {
+                    openMainWindow?()
+                    NSApp.activate()
                     model.errorMessage = Messages.text(for: error)
                     sender.reply(toApplicationShouldTerminate: false)
                 }

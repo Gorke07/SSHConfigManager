@@ -33,12 +33,12 @@ struct HostEditorView: View {
             }
 
             Section(String(localized: "editor.identityFiles")) {
-                ForEach(editor.identityFiles.indices, id: \.self) { index in
+                ForEach(Array(editor.identityFiles.enumerated()), id: \.offset) { index, _ in
                     HStack {
-                        TextField(String(localized: "editor.identityFiles"), text: $editor.identityFiles[index])
+                        TextField(String(localized: "editor.identityFiles"), text: identityBinding(index))
                             .labelsHidden()
                         Button(String(localized: "editor.remove"), systemImage: "minus.circle") {
-                            editor.identityFiles.remove(at: index)
+                            if editor.identityFiles.indices.contains(index) { editor.identityFiles.remove(at: index) }
                         }
                         .labelStyle(.iconOnly)
                         .buttonStyle(.borderless)
@@ -51,12 +51,12 @@ struct HostEditorView: View {
             }
 
             Section(String(localized: "editor.otherOptions")) {
-                ForEach(editor.otherOptions.indices, id: \.self) { index in
+                ForEach(Array(editor.otherOptions.enumerated()), id: \.offset) { index, _ in
                     HStack {
-                        TextField(String(localized: "editor.otherOptions.key"), text: $editor.otherOptions[index].key)
-                        TextField(String(localized: "editor.otherOptions.value"), text: $editor.otherOptions[index].value)
+                        TextField(String(localized: "editor.otherOptions.key"), text: optionBinding(index, \.key))
+                        TextField(String(localized: "editor.otherOptions.value"), text: optionBinding(index, \.value))
                         Button(String(localized: "editor.remove"), systemImage: "minus.circle") {
-                            editor.otherOptions.remove(at: index)
+                            if editor.otherOptions.indices.contains(index) { editor.otherOptions.remove(at: index) }
                         }
                         .labelStyle(.iconOnly)
                         .buttonStyle(.borderless)
@@ -93,6 +93,19 @@ struct HostEditorView: View {
     private func field(_ key: String, help: String) -> some View {
         TextField(key, text: binding(key))
             .help(help)
+    }
+
+    /// Bounds-safe: a row can outlive its element for one render after a removal.
+    private func identityBinding(_ index: Int) -> Binding<String> {
+        Binding(
+            get: { editor.identityFiles.indices.contains(index) ? editor.identityFiles[index] : "" },
+            set: { if editor.identityFiles.indices.contains(index) { editor.identityFiles[index] = $0 } })
+    }
+
+    private func optionBinding(_ index: Int, _ keyPath: WritableKeyPath<DraftDirective, String>) -> Binding<String> {
+        Binding(
+            get: { editor.otherOptions.indices.contains(index) ? editor.otherOptions[index][keyPath: keyPath] : "" },
+            set: { if editor.otherOptions.indices.contains(index) { editor.otherOptions[index][keyPath: keyPath] = $0 } })
     }
 
     private func binding(_ key: String) -> Binding<String> {

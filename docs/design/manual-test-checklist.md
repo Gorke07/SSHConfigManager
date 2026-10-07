@@ -18,6 +18,8 @@ Her sürüm öncesi temiz bir test kullanıcısında veya `~/.ssh/config` yedeğ
 - [ ] Düzenleme varken başka bir editörde kaydedip ⌘S → çakışma ekranı; "Üzerine Yaz" ve "Diskteki Sürümü Yükle" beklendiği gibi.
 - [ ] BOM'lu bir dosya: bant görünür, "BOM'u Kaldır" → kaydet → dosya BOM'suz.
 - [ ] Sağ tık → Çoğalt (`web-copy`), SSH Komutunu Kopyala (`ssh -- web`), Sil (onaylı).
-- [ ] Kaydedilmemiş değişiklikle ⌘Q: Kaydet / Vazgeç / Kaydetme seçenekleri; Vazgeç uygulamayı açık tutar.
+- [ ] Kaydedilmemiş değişiklikle ⌘Q: Kaydet / Vazgeç / Kaydetme seçenekleri; Vazgeç uygulamayı açık tutar. Kaydet başarısız olursa pencere yeniden açılır ve hata görünür.
+- [ ] Pencereyi kapatmak uygulamayı kapatmaz (değişiklikler korunur); Dock simgesine tıklayınca pencere geri gelir.
+- [ ] Formda hatalı bir alan varken (ör. Port `abc`) başka host seçmek / ⌘S / ⌘Q uyarı verir; alias'ı harf harf yeniden adlandırırken odak kaybolmaz; arama seçili host'u gizlese bile form kalır.
 - [ ] Sistem dili Türkçe iken tüm metinler Türkçe; İngilizce iken İngilizce.
 - [ ] Koyu temada diff renkleri ve bantlar okunaklı.
