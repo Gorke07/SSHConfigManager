@@ -62,10 +62,7 @@ private struct HostEditorContainer: View {
         }
         .onAppear {
             if editor == nil, let item = model.selection {
-                let created = HostEditorModel(item: item, store: model.store, homeDirectory: model.settings.homeDirectory)
-                created?.onItemChange = { [model] in model.followRename(to: $0) }
-                model.activeEditor = created
-                editor = created
+                editor = model.editor(for: item)
             }
         }
     }

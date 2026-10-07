@@ -135,8 +135,7 @@ struct AppModelTests {
         let b = SidebarItem.host(alias: "b", occurrence: 0)
         model.select(a)
         let token = model.editorToken
-        let editor = try #require(HostEditorModel(item: a, store: model.store, homeDirectory: tmp.url))
-        model.activeEditor = editor
+        let editor = try #require(model.editor(for: a))
         editor.fields["Port"] = "abc"
         #expect(!editor.commit())
         #expect(model.hasPendingFormEdits)
@@ -155,5 +154,57 @@ struct AppModelTests {
         #expect(model.selection == b)
         #expect(model.pendingSelection == nil)
         #expect(model.editorToken != token)
+    }
+
+    @Test func editorSurvivesWindowCloseAndKeepsPendingEdits() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\nHost b\n")
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        model.select(a)
+        let first = try #require(model.editor(for: a))
+        #expect(model.editor(for: a) === first)
+        first.fields["Port"] = "abc"
+        #expect(!first.commit())
+
+        // Window closed and reopened: the view asks again with the same token.
+        let again = try #require(model.editor(for: a))
+        #expect(again === first)
+        #expect(again.hasPendingChanges)
+        #expect(model.hasPendingFormEdits)
+        #expect(again.fields["Port"] == "abc")
+    }
+
+    @Test func selectingOrResettingDropsTheEditor() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\nHost b\n")
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        let b = SidebarItem.host(alias: "b", occurrence: 0)
+        model.select(a)
+        let first = try #require(model.editor(for: a))
+        first.fields["Port"] = "abc"
+        _ = first.commit()
+        model.select(b)
+        #expect(model.activeEditor == nil)
+        #expect(!model.hasPendingFormEdits)
+
+        let second = try #require(model.editor(for: b))
+        model.resetEditor()
+        #expect(model.activeEditor == nil)
+        let third = try #require(model.editor(for: b))
+        #expect(third !== second)
+    }
+
+    @Test func editorFollowsRenameThroughTheModel() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n")
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        model.select(a)
+        let editor = try #require(model.editor(for: a))
+        let token = model.editorToken
+        editor.aliasText = "a2"
+        #expect(editor.commit())
+        #expect(model.selection == .host(alias: "a2", occurrence: 0))
+        #expect(model.editorToken == token)
+        #expect(model.editor(for: .host(alias: "a2", occurrence: 0)) === editor)
     }
 }

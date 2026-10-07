@@ -124,6 +124,7 @@ struct HostEditorModelTests {
         editor.fields["HostName"] = "x"
         #expect(!editor.commit())
         #expect(editor.isStale)
+        #expect(editor.hasPendingChanges)
         #expect(app.store.document.render() == "Host web\n  User other\n")
     }
 

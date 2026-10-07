@@ -23,3 +23,4 @@ Her sürüm öncesi temiz bir test kullanıcısında veya `~/.ssh/config` yedeğ
 - [ ] Formda hatalı bir alan varken (ör. Port `abc`) başka host seçmek / ⌘S / ⌘Q uyarı verir; alias'ı harf harf yeniden adlandırırken odak kaybolmaz; arama seçili host'u gizlese bile form kalır.
 - [ ] Sistem dili Türkçe iken tüm metinler Türkçe; İngilizce iken İngilizce.
 - [ ] Koyu temada diff renkleri ve bantlar okunaklı.
+- [ ] Port `abc` iken pencere kapatılıp Dock'tan yeniden açılınca form `abc` ve hata satırıyla durur; ⌘Q → Kaydet çıkmaz, formdaki sorunu belirten uyarı gösterir; ⌘Q → Kaydetme çıkar.

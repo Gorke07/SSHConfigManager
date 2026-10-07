@@ -679,6 +679,13 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "The form has problems; those fields will not be saved." } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Formda sorunlar var; o alanlar kaydedilmeyecek." } }
       }
+    },
+    "quit.pendingForm" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Some fields in the form have problems. Fix them or discard them before quitting." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Formdaki bazı alanlarda sorun var. Çıkmadan önce düzeltin ya da atın." } }
+      }
     }
   },
   "version" : "1.0"

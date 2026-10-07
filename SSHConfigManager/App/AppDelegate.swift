@@ -27,6 +27,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.addButton(withTitle: String(localized: "action.discardAndQuit"))
         switch alert.runModal() {
         case .alertFirstButtonReturn:
+            if model.hasPendingFormEdits {
+                // Saving would silently drop the fields that have problems.
+                openMainWindow?()
+                NSApp.activate()
+                model.errorMessage = String(localized: "quit.pendingForm")
+                return .terminateCancel
+            }
             Task { @MainActor in
                 do {
                     try await model.store.save()

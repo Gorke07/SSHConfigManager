@@ -18,8 +18,10 @@ final class AppModel {
     private(set) var editorToken = UUID()
     var searchText = ""
     var errorMessage: String?
-    /// The form currently shown (set by the editor view); used to protect edits that validation blocked.
-    @ObservationIgnored weak var activeEditor: HostEditorModel?
+    /// The form for the current selection. Owned here (not by the view) so edits that validation
+    /// blocked survive closing the window; dropped when the selection or document is reset.
+    @ObservationIgnored private(set) var activeEditor: HostEditorModel?
+    @ObservationIgnored private var activeEditorToken: UUID?
     /// A selection waiting for the user to confirm discarding blocked form edits.
     var pendingSelection: SidebarItem?
 
@@ -44,6 +46,20 @@ final class AppModel {
     func select(_ item: SidebarItem?) {
         selection = item
         editorToken = UUID()
+        activeEditor = nil
+        activeEditorToken = nil
+    }
+
+    /// The editor for the selected host: the existing one while the token is unchanged, else a new one.
+    func editor(for item: SidebarItem) -> HostEditorModel? {
+        if let activeEditor, activeEditorToken == editorToken, activeEditor.item == item {
+            return activeEditor
+        }
+        let created = HostEditorModel(item: item, store: store, homeDirectory: settings.homeDirectory)
+        created?.onItemChange = { [weak self] in self?.followRename(to: $0) }
+        activeEditor = created
+        activeEditorToken = created == nil ? nil : editorToken
+        return created
     }
 
     var hasPendingFormEdits: Bool { activeEditor?.hasPendingChanges ?? false }
@@ -74,6 +90,8 @@ final class AppModel {
 
     func resetEditor() {
         editorToken = UUID()
+        activeEditor = nil
+        activeEditorToken = nil
     }
 
     func switchConfig(to path: String, discardingUnsavedChanges: Bool = false) -> SwitchResult {

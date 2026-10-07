@@ -78,6 +78,7 @@ final class HostEditorModel {
         }
         guard HostDraft(entry) == baseline else {
             isStale = true
+            hasPendingChanges = draft != baseline
             return false
         }
         let draft = self.draft
