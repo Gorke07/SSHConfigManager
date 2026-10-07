@@ -40,9 +40,18 @@ public struct KeyScanner: Sendable {
     public func scan(directories: [URL], extraPrivateKeys: [URL] = []) async -> [SSHKey] {
         var keys = Self.discover(directories: directories, extraPrivateKeys: extraPrivateKeys)
         for index in keys.indices {
-            guard let pub = keys[index].publicURL,
-                  let result = try? await runner.run(sshKeygen, arguments: ["-lf", pub.path], environment: [:], timeout: .seconds(30)),
-                  result.exitCode == 0, let described = Self.parseKeygenList(result.stdout) else { continue }
+            // Stop on cancellation: no more processes, return what we have.
+            if Task.isCancelled { break }
+            guard let pub = keys[index].publicURL else { continue }
+            let result: ProcessResult
+            do {
+                result = try await runner.run(sshKeygen, arguments: ["-lf", pub.path], environment: [:], timeout: .seconds(5))
+            } catch is CancellationError {
+                break
+            } catch {
+                continue
+            }
+            guard result.exitCode == 0, !result.timedOut, let described = Self.parseKeygenList(result.stdout) else { continue }
             keys[index].bits = described.bits
             keys[index].typeLabel = described.type
         }
@@ -55,9 +64,11 @@ public struct KeyScanner: Sendable {
         var seenFiles = Set<String>()
         var keys: [SSHKey] = []
 
+        /// A regular file after following symlinks: never a FIFO, device, socket or directory,
+        /// which could block or misbehave when read.
         func isFile(_ url: URL) -> Bool {
-            var isDirectory: ObjCBool = false
-            return fm.fileExists(atPath: url.path, isDirectory: &isDirectory) && !isDirectory.boolValue
+            let resolved = url.resolvingSymlinksInPath()
+            return (try? resolved.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true
         }
         func publicInfo(_ url: URL) -> PublicKeyInfo? {
             (try? String(contentsOf: url, encoding: .utf8)).flatMap(PublicKeyInfo.init(text:))
@@ -77,19 +88,25 @@ public struct KeyScanner: Sendable {
             guard seenDirectories.insert(KeyUsage.canonicalPath(directory)).inserted,
                   let names = try? fm.contentsOfDirectory(atPath: directory.path) else { continue }
             let visible = names.filter { !$0.hasPrefix(".") }.sorted()
-            for name in visible where !name.hasSuffix(".pub") && visible.contains(name + ".pub") {
+            let visibleSet = Set(visible)
+            for name in visible where !name.hasSuffix(".pub") && visibleSet.contains(name + ".pub") {
                 addPrivate(directory.appending(path: name))
             }
             for name in visible where name.hasSuffix(".pub") && !name.hasSuffix("-cert.pub") {
                 let pub = directory.appending(path: name)
                 let base = URL(filePath: String(pub.path.dropLast(4)))
-                guard !seenFiles.contains(KeyUsage.canonicalPath(base)), isFile(pub), let info = publicInfo(pub) else { continue }
-                seenFiles.insert(KeyUsage.canonicalPath(pub))
+                let canonicalPub = KeyUsage.canonicalPath(pub)
+                guard !seenFiles.contains(KeyUsage.canonicalPath(base)), !seenFiles.contains(canonicalPub),
+                      isFile(pub), let info = publicInfo(pub) else { continue }
+                seenFiles.insert(canonicalPub)
                 keys.append(SSHKey(privateURL: nil, publicURL: pub, publicKey: info, encryption: .unknown))
             }
         }
         for url in extraPrivateKeys { addPrivate(url) }
-        return keys.sorted { $0.name.utf8.lexicographicallyPrecedes($1.name.utf8) }
+        return keys.sorted {
+            if $0.name != $1.name { return $0.name.utf8.lexicographicallyPrecedes($1.name.utf8) }
+            return $0.id.utf8.lexicographicallyPrecedes($1.id.utf8)
+        }
     }
 
     /// `256 SHA256:… comment (ED25519)` → (256, "ED25519").

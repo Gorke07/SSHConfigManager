@@ -53,6 +53,96 @@ struct KeyScannerTests {
         #expect(plain.bits == 256 && plain.typeLabel == "ED25519")
     }
 
+    struct StubRunner: ProcessRunning {
+        enum Mode: Sendable { case throwing, timedOut, cancelling }
+        let mode: Mode
+        func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
+            switch mode {
+            case .throwing: throw NSError(domain: "stub", code: 1)
+            case .timedOut: return ProcessResult(exitCode: 15, stdout: "", stderr: "", timedOut: true)
+            case .cancelling: throw CancellationError()
+            }
+        }
+    }
+
+    @Test(arguments: [StubRunner.Mode.throwing, .timedOut, .cancelling])
+    func scanStillReturnsKeysWhenSshKeygenFails(_ mode: StubRunner.Mode) async throws {
+        let tmp = try TempDir()
+        let ssh = try await makeDirectory(tmp)
+        let keys = await KeyScanner(runner: StubRunner(mode: mode)).scan(directories: [ssh], extraPrivateKeys: [])
+        #expect(keys.map(\.name) == ["gone.pub", "id_ed25519", "work"])
+        #expect(keys.allSatisfy { $0.bits == nil && $0.typeLabel == nil })
+    }
+
+    @Test func fifoWithPubBesideItIsNeverReadOrListedAsPrivate() async throws {
+        let tmp = try TempDir()
+        let ssh = tmp.url.appending(path: "ssh")
+        try FileManager.default.createDirectory(at: ssh, withIntermediateDirectories: true)
+        _ = try await keygen(["-q", "-t", "ed25519", "-N", "", "-C", "real", "-f", ssh.appending(path: "real").path])
+        #expect(mkfifo(ssh.appending(path: "x").path, 0o600) == 0)
+        try FileManager.default.copyItem(at: ssh.appending(path: "real.pub"), to: ssh.appending(path: "x.pub"))
+        let keys = KeyScanner.discover(directories: [ssh], extraPrivateKeys: [ssh.appending(path: "x")])
+        #expect(keys.first { $0.name == "x" } == nil)
+        #expect(keys.first { $0.name == "real" }?.hasPrivateKey == true)
+    }
+
+    @Test func symlinkedDirectoryAlongsideItsTargetGivesNoDuplicates() async throws {
+        let tmp = try TempDir()
+        let ssh = try await makeDirectory(tmp)
+        let link = tmp.url.appending(path: "ssh-link")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: ssh)
+        let keys = KeyScanner.discover(directories: [ssh, link], extraPrivateKeys: [])
+        #expect(keys.map(\.name) == ["gone.pub", "id_ed25519", "work"])
+    }
+
+    @Test func samePubReachedThroughASymlinkInASecondDirectoryIsListedOnce() async throws {
+        let tmp = try TempDir()
+        let ssh = try await makeDirectory(tmp)
+        let other = tmp.url.appending(path: "other")
+        try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: other.appending(path: "gone.pub"), withDestinationURL: ssh.appending(path: "gone.pub"))
+        let keys = KeyScanner.discover(directories: [ssh, other], extraPrivateKeys: [])
+        #expect(keys.filter { $0.name == "gone.pub" }.count == 1)
+    }
+
+    @Test func directoryNamedLikeAKeyIsListedAsPublicOnly() async throws {
+        let tmp = try TempDir()
+        let ssh = try await makeDirectory(tmp)
+        try FileManager.default.createDirectory(at: ssh.appending(path: "x"), withIntermediateDirectories: true)
+        try FileManager.default.copyItem(at: ssh.appending(path: "gone.pub"), to: ssh.appending(path: "x.pub"))
+        let keys = KeyScanner.discover(directories: [ssh], extraPrivateKeys: [])
+        let x = try #require(keys.first { $0.name == "x.pub" })
+        #expect(!x.hasPrivateKey)
+        #expect(keys.first { $0.name == "x" } == nil)
+    }
+
+    @Test func hiddenKeyPairsAreNotListed() async throws {
+        let tmp = try TempDir()
+        let ssh = tmp.url.appending(path: "ssh")
+        try FileManager.default.createDirectory(at: ssh, withIntermediateDirectories: true)
+        _ = try await keygen(["-q", "-t", "ed25519", "-N", "", "-f", ssh.appending(path: ".secret").path])
+        #expect(KeyScanner.discover(directories: [ssh], extraPrivateKeys: []).isEmpty)
+    }
+
+    @Test func publicKeyWhoseBaseIsNotAPrivateKeyIsPublicOnly() async throws {
+        let tmp = try TempDir()
+        let ssh = try await makeDirectory(tmp)
+        try tmp.file("ssh/notkey", "just some text\n")
+        try FileManager.default.copyItem(at: ssh.appending(path: "gone.pub"), to: ssh.appending(path: "notkey.pub"))
+        let keys = KeyScanner.discover(directories: [ssh], extraPrivateKeys: [])
+        #expect(keys.first { $0.name == "notkey.pub" }?.hasPrivateKey == false)
+        #expect(keys.first { $0.name == "notkey" } == nil)
+    }
+
+    @Test func publicKeyWithoutTrailingNewlineIsParsed() async throws {
+        let tmp = try TempDir()
+        let ssh = try await makeDirectory(tmp)
+        let text = try String(contentsOf: ssh.appending(path: "gone.pub"), encoding: .utf8).trimmingCharacters(in: .newlines)
+        try tmp.file("ssh/nonl.pub", text)
+        let keys = KeyScanner.discover(directories: [ssh], extraPrivateKeys: [])
+        #expect(keys.first { $0.name == "nonl.pub" }?.publicKey?.comment == "pubonly")
+    }
+
     @Test func parsesKeygenListOutput() {
         let ed = KeyScanner.parseKeygenList("256 SHA256:abc my comment (ED25519)\n")
         #expect(ed?.bits == 256 && ed?.type == "ED25519")
