@@ -28,13 +28,31 @@ public struct BackupManager: Sendable {
         let directory = rootDirectory.appending(path: kind, directoryHint: .isDirectory)
         try fm.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
 
-        let stamp = Self.makeFormatter().string(from: now())
+        let currentDate = now()
+        let stamp = Self.makeFormatter().string(from: currentDate)
         let name = url.lastPathComponent
-        var target = directory.appending(path: "\(stamp)-\(name)")
-        var counter = 2
+
+        // Find the maximum sequence for backups with the same date
+        let existingBackups = (try? list(kind: kind)) ?? []
+        let formatter = Self.makeFormatter()
+        let backupsWithSameDate = existingBackups.filter { backup in
+            formatter.string(from: backup.date) == stamp
+        }
+        let maxSequence = backupsWithSameDate.map { $0.sequence }.max() ?? 0
+        var sequence = maxSequence + 1
+
+        // Generate target filename
+        var target: URL
+        if sequence == 1 {
+            target = directory.appending(path: "\(stamp)-\(name)")
+        } else {
+            target = directory.appending(path: "\(stamp)_\(sequence)-\(name)")
+        }
+
+        // Safety net: if file exists (shouldn't happen), increment sequence further
         while fm.fileExists(atPath: target.path) {
-            target = directory.appending(path: "\(stamp)_\(counter)-\(name)")
-            counter += 1
+            sequence += 1
+            target = directory.appending(path: "\(stamp)_\(sequence)-\(name)")
         }
 
         // Copy bytes (not the item): copyItem would copy a symlink as a symlink.
