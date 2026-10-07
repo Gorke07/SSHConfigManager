@@ -4,6 +4,7 @@ import SwiftUI
 struct HostEditorView: View {
     @Bindable var editor: HostEditorModel
     let homeDirectory: URL
+    let keys: KeysModel
     let reload: () -> Void
     @State private var importingIdentity = false
 
@@ -46,7 +47,23 @@ struct HostEditorView: View {
                 }
                 HStack {
                     Button(String(localized: "editor.identityFiles.add")) { editor.identityFiles.append("") }
-                    Button(String(localized: "action.choose")) { importingIdentity = true }
+                    Menu(String(localized: "action.choose")) {
+                        let privateKeys = keys.rows.filter(\.key.hasPrivateKey)
+                        if privateKeys.isEmpty {
+                            Text(String(localized: "editor.identityFiles.noKeys"))
+                        }
+                        ForEach(privateKeys) { row in
+                            Button {
+                                if !editor.identityFiles.contains(row.displayPath) { editor.identityFiles.append(row.displayPath) }
+                            } label: {
+                                Text(verbatim: row.displayPath)
+                            }
+                        }
+                        Divider()
+                        Button(String(localized: "editor.identityFiles.otherFile")) { importingIdentity = true }
+                    }
+                    .fixedSize()
+                    .task { if keys.rows.isEmpty { await keys.refresh() } }
                 }
             }
 

@@ -95,3 +95,4 @@ Elle denemede gerçek anahtarlarınıza dokunmamak için yeni anahtarları `dene
 - [ ] Çöp Kutusuna Taşı: kullanan host varsa onay penceresinde listeleniyor; özel anahtar ve .pub birlikte çöp kutusunda.
 - [ ] Agent çalışmıyorken (`SSH_AUTH_SOCK` geçersiz bir oturumda) Agent sütunu "?" gösteriyor ve uygulama donmuyor.
 - [ ] Koyu tema ve Türkçe arayüz.
+- [ ] Host formunda IdentityFile → "Seç…" önce bilinen özel anahtarları (`~/.ssh/…`), ardından "Başka Dosya…" seçeneğini gösteriyor; seçilen yol listeye bir kez ekleniyor.

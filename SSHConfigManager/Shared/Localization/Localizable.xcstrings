@@ -918,6 +918,20 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Seç…" } }
       }
     },
+    "editor.identityFiles.otherFile" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Other File…" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Başka Dosya…" } }
+      }
+    },
+    "editor.identityFiles.noKeys" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No keys found" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Anahtar bulunamadı" } }
+      }
+    },
     "action.discardAndQuit" : {
       "extractionState" : "manual",
       "localizations" : {

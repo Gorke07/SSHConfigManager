@@ -63,7 +63,7 @@ private struct HostEditorContainer: View {
     var body: some View {
         Group {
             if let editor {
-                HostEditorView(editor: editor, homeDirectory: model.settings.homeDirectory) { model.resetEditor() }
+                HostEditorView(editor: editor, homeDirectory: model.settings.homeDirectory, keys: model.keys) { model.resetEditor() }
             } else {
                 ContentUnavailableView(String(localized: "edit.hostNotFound"), systemImage: "questionmark")
             }
