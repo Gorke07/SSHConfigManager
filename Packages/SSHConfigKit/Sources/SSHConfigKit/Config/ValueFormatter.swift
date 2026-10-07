@@ -15,9 +15,12 @@ public enum ValueFormatter {
 
     public static func encode(key: String, value: String) -> String {
         guard singleValueKeys.contains(key.asciiLowercased),
-              value.unicodeScalars.contains(where: LineTokenizer.isSpace),
-              value.unicodeScalars.first != "\""
-        else { return value }
+              value.unicodeScalars.contains(where: LineTokenizer.isSpace) else { return value }
+
+        let scalars = Array(value.unicodeScalars)
+        let isProperlyQuoted = scalars.count >= 2 && scalars.first == "\"" && scalars.last == "\""
+
+        guard !isProperlyQuoted else { return value }
         return "\"" + value + "\""
     }
 }

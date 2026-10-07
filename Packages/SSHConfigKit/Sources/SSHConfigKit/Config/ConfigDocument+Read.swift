@@ -50,9 +50,26 @@ extension ConfigDocument {
     }
 
     /// Like `blockEnd`, but comment lines glued to the next header belong to that header.
+    /// At EOF, trailing comments are owned only if contiguous with the block's content (no blank line).
     func ownedEnd(of header: Int) -> Int {
         let end = blockEnd(after: header)
-        guard end < lines.count else { return end }
+        guard end < lines.count else {
+            // No next header (EOF). Find last non-blank, non-comment line.
+            var c = header
+            for i in (header + 1)..<lines.count {
+                if lines[i].kind != .blank && lines[i].kind != .comment {
+                    c = i
+                }
+            }
+            // Extend over directly following comments
+            var e = c + 1
+            while e < lines.count && lines[e].kind == .comment {
+                e += 1
+            }
+            return e
+        }
+
+        // There IS a next header. Remove comments that belong to next header.
         var e = end
         while e - 1 > header && lines[e - 1].kind == .comment { e -= 1 }
         return e

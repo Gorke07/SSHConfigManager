@@ -65,11 +65,27 @@ struct ConfigDocumentReadTests {
         #expect(doc.ownedEnd(of: 4) == 7)
     }
 
+    @Test func blockBoundariesAtEndOfFile() {
+        let doc = ConfigDocument(parsing: "Host a\n  X 1\n\n# footer\n")
+        // The "# footer" comment is unowned (separated by blank line).
+        #expect(doc.ownedEnd(of: 0) == 2)
+    }
+
+    @Test func matchFooterAtEndOfFile() {
+        let doc = ConfigDocument(parsing: "Match all\n  Port 1\n\n# footer\n")
+        let match = doc.matches.first
+        #expect(match?.text == "Match all\n  Port 1")
+    }
+
     @Test func valueFormatter() {
         #expect(ValueFormatter.display(key: "IdentityFile", rawValue: "\"~/a b\"") == "~/a b")
         #expect(ValueFormatter.display(key: "LocalForward", rawValue: "8080 \"h:80\"") == "8080 \"h:80\"")
         #expect(ValueFormatter.encode(key: "identityfile", value: "~/a b") == "\"~/a b\"")
         #expect(ValueFormatter.encode(key: "IdentityFile", value: "~/ab") == "~/ab")
         #expect(ValueFormatter.encode(key: "LocalForward", value: "8080 h:80") == "8080 h:80")
+        // Broken quote handling
+        #expect(ValueFormatter.encode(key: "IdentityFile", value: "\"a b") == "\"\"a b\"")
+        #expect(ValueFormatter.encode(key: "IdentityFile", value: "\"~/a b\"") == "\"~/a b\"")
+        #expect(ValueFormatter.encode(key: "IdentityFile", value: "") == "")
     }
 }
