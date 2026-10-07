@@ -9,7 +9,6 @@ struct KnownHostsWindow: View {
     }
 
     var body: some View {
-        let pendingCount = String(model.pendingRemoval?.count ?? 0)
         VStack(spacing: 0) {
             if let message = Messages.knownHostsLoadText(for: model.app.knownHosts.loadState) {
                 Text(verbatim: message)
@@ -59,12 +58,12 @@ struct KnownHostsWindow: View {
             }
         }
         .confirmationDialog(
-            String(localized: "knownHosts.delete.confirm.title \(pendingCount)"),
+            String(localized: "knownHosts.delete.confirm.title"),
             isPresented: Binding(get: { model.pendingRemoval != nil }, set: { if !$0 { model.cancelRemoval() } })
         ) {
             Button(String(localized: "knownHosts.delete"), role: .destructive) { model.confirmRemoval() }
         } message: {
-            Text(String(localized: "knownHosts.delete.confirm.message"))
+            Text(verbatim: model.pendingSummary + "\n\n" + String(localized: "knownHosts.delete.confirm.message"))
         }
         .alert(
             String(localized: "error.title"),

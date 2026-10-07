@@ -57,11 +57,11 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Sil" } }
       }
     },
-    "knownHosts.delete.confirm.title %@" : {
+    "knownHosts.delete.confirm.title" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete %@ known_hosts entries?" } },
-        "tr" : { "stringUnit" : { "state" : "translated", "value" : "%@ known_hosts kaydı silinsin mi?" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete the selected known_hosts entries?" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Seçili known_hosts kayıtları silinsin mi?" } }
       }
     },
     "knownHosts.delete.confirm.message" : {
