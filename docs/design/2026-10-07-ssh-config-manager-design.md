@@ -96,7 +96,7 @@ SSHConfigManager/
 | `FileWatcher` | Dosyanın dışarıdan değiştiğini bildirir | DispatchSource / FSEvents |
 | `ProcessRunner` | Süreç çalıştırma, zaman aşımı, çıktı yakalama. Argüman listesi ve ortam değişkenlerini loglamaz. | Foundation `Process` |
 | `SSHCommandBuilder` | `ssh [-F '<yol>'] -- '<alias>'` komutunu shell için güvenli şekilde üretir | Yok |
-| `TerminalLauncher` | `launch(command:)`; Terminal, iTerm2, Ghostty ve Warp uygulamaları | NSAppleScript, `open` |
+| `TerminalLauncher` | `launch(command:)`; Terminal, iTerm2 ve Ghostty uygulamaları (Warp v1'de yok, bkz. §12) | NSAppleScript, `open` |
 | `ConnectionTester` | `ssh -G` ile adres çözümleme ve BatchMode testi; sonucu sınıflandırır | `ProcessRunner` |
 | `KeyScanner` | Anahtar çiftlerini bulur, meta verilerini çıkarır | FileManager, `ProcessRunner` |
 | `KeyManager` | Anahtar oluşturma, parola değiştirme, agent'a ekleme, çöp kutusuna taşıma | `ProcessRunner`, `AskPass` |
@@ -111,7 +111,7 @@ Ana pencere, menü çubuğu ve hızlı panel aynı `ConfigStore` örneğini payl
 |---|---|
 | `configPath` | `~/.ssh/config` |
 | `knownHostsPath` | `~/.ssh/known_hosts` |
-| `terminal` | `terminal` (`iterm2` / `ghostty` / `warp`) |
+| `terminal` | `terminal` (`iterm2` / `ghostty`) |
 | `backupCount` | 10 |
 | `launchAtLogin` | `false` (`SMAppService`) |
 | Global kısayol | ⌥⌘S (`KeyboardShortcuts` paketi kendi saklar) |
@@ -406,8 +406,7 @@ Host formundaki `IdentityFile` → "Seç…" butonu önce bilinen anahtarların 
 |---|---|
 | Terminal.app | AppleScript: `tell application "Terminal" to do script "<komut>"` + `activate` |
 | iTerm2 | AppleScript: `create window with default profile`, ardından `write text "<komut>"` (ssh kapanınca pencere açık kalır) |
-| Ghostty | `open -na Ghostty --args -e <komut>`. **Doğrulanması gerekiyor** (§12). |
-| Warp | Geçici launch configuration YAML dosyası (`~/.warp/launch_configurations/`) + `warp://launch/<ad>`. **Doğrulanması gerekiyor** (§12). |
+| Ghostty | `open -na Ghostty.app --args -e /usr/bin/ssh <argümanlar>` — argümanlar shell'den geçmeden doğrudan iletilir. 2026-10-07'de Ghostty 1.2.2 ile doğrulandı (§12). `-n` her bağlantıda yeni bir Ghostty örneği açar. |
 
 - Ayarlar'da yalnızca yüklü terminaller seçilebilir. Kontrol `NSWorkspace.urlForApplication(withBundleIdentifier:)` ile yapılır.
 - Seçilen başlatıcı başarısız olursa Terminal.app'e geri dönülür ve kullanıcıya bildirim gösterilir.
@@ -450,8 +449,8 @@ Testler Swift Testing ile, `SSHConfigKit` paketi üzerinde yazılır.
 
 Uygulama planının ilk adımlarında kısa denemelerle doğrulanacaklar:
 
-1. **Ghostty:** `open -na Ghostty --args -e …` komutunun güncel sürümde yeni pencerede komut çalıştırıp çalıştırmadığı.
-2. **Warp:** Launch configuration + `warp://launch/` yönteminin komut çalıştırıp çalıştırmadığı. Çalışmıyorsa Warp v1'den çıkarılır.
+1. **Ghostty:** ✅ 2026-10-07'de doğrulandı — `open -na Ghostty.app --args -e …` komutu yeni pencerede hemen çalıştırıyor (Ghostty 1.2.2).
+2. **Warp:** ❌ 2026-10-07'de denendi — launch configuration + `warp://launch/` (ad ve tam yol ile) komutu çalıştırmadı. Kullanıcı kararıyla Warp v1'den çıkarıldı; Warp komut çalıştırmayı destekleyen bir yöntem sunduğunda yeniden değerlendirilir.
 3. **Askpass + `ssh-add --apple-use-keychain`:** Tty olmayan bir ortamda `SSH_ASKPASS_REQUIRE=force` ile çalıştığı.
 4. **Activation policy geçişi:** `.regular` ↔ `.accessory` geçişinin macOS 26'da pencere odağını bozmadığı.
 
