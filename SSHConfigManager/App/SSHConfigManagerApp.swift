@@ -18,7 +18,7 @@ struct SSHConfigManagerApp: App {
             BackupsView(model: appDelegate.model)
                 .registersMainWindowOpener(appDelegate)
         }
-        MenuBarExtra {
+        MenuBarExtra(isInserted: .constant(!TestEnvironment.isRunningTests)) {
             MenuBarContent(appDelegate: appDelegate)
         } label: {
             Image(systemName: "terminal")

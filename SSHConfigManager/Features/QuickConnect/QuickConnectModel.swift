@@ -21,8 +21,12 @@ final class QuickConnectModel {
     /// Changes every time the UI is shown, so the view can focus the search field again.
     private(set) var focusToken = UUID()
 
-    init(app: AppModel) {
+    /// Opens the main window so a failure alert or fallback notice from a launch is visible.
+    private let openMainWindow: @MainActor () -> Void
+
+    init(app: AppModel, openMainWindow: @escaping @MainActor () -> Void = {}) {
         self.app = app
+        self.openMainWindow = openMainWindow
     }
 
     var entries: [QuickConnectEntry] {
@@ -59,7 +63,7 @@ final class QuickConnectModel {
     @discardableResult
     func connectSelected() -> Bool {
         guard let entry = selectedEntry else { return false }
-        app.connect(alias: entry.alias)
+        if case .launched = app.connect(alias: entry.alias) {} else { openMainWindow() }
         return true
     }
 

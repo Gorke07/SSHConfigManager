@@ -5,7 +5,8 @@ import Testing
 
 @MainActor
 struct QuickConnectModelTests {
-    private func model(_ tmp: TempDir, launcher: RecordingLauncher = RecordingLauncher()) throws -> QuickConnectModel {
+    private func model(_ tmp: TempDir, launcher: RecordingLauncher = RecordingLauncher(),
+                       openMainWindow: @escaping @MainActor () -> Void = {}) throws -> QuickConnectModel {
         try tmp.file(".ssh/work", "Host vpn\n  HostName vpn.example\nHost web\n")
         let app = makeTestModel(tmp, config: """
         Include work
@@ -20,7 +21,7 @@ struct QuickConnectModelTests {
           User ops
 
         """, launcher: launcher)
-        return QuickConnectModel(app: app)
+        return QuickConnectModel(app: app, openMainWindow: openMainWindow)
     }
 
     @Test func entriesAreUniqueConnectableAliases() throws {
@@ -71,5 +72,24 @@ struct QuickConnectModelTests {
         quick.prepareForDisplay()
         #expect(quick.query.isEmpty && quick.selectedIndex == 0)
         #expect(quick.focusToken != token)
+    }
+
+    @Test func failedLaunchOpensTheMainWindow() throws {
+        let tmp = try TempDir()
+        let launcher = RecordingLauncher()
+        launcher.error = .automationDenied
+        var opened = 0
+        let quick = try model(tmp, launcher: launcher, openMainWindow: { opened += 1 })
+        #expect(quick.connectSelected())
+        #expect(opened == 1)
+        #expect(quick.app.automationDenied)
+    }
+
+    @Test func successfulLaunchKeepsTheMainWindowClosed() throws {
+        let tmp = try TempDir()
+        var opened = 0
+        let quick = try model(tmp, openMainWindow: { opened += 1 })
+        #expect(quick.connectSelected())
+        #expect(opened == 0)
     }
 }
