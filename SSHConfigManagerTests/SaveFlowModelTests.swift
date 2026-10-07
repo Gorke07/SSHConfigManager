@@ -87,4 +87,39 @@ struct SaveFlowModelTests {
         #expect(message.hasPrefix(fixedPart))
         #expect(try tmp.read(".ssh/config") == "Host a\n")
     }
+
+    @Test func overwriteRechecksDiskSnapshot() async throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\n  User u\n")
+        try addPort(app)
+        try tmp.file(".ssh/config", "Host a\n  User vim\n")
+        let flow = SaveFlowModel(store: app.store)
+        await flow.prepare()
+        await flow.confirm()
+        #expect(flow.phase == .conflict)
+        let before = flow.conflictHunks()
+
+        try tmp.file(".ssh/config", "Host a\n  User second\n")
+        await flow.overwrite()
+        #expect(flow.phase == .conflict)
+        #expect(try tmp.read(".ssh/config") == "Host a\n  User second\n")
+        #expect(flow.conflictHunks() != before)
+
+        await flow.overwrite()
+        #expect(flow.phase == .done)
+        #expect(try tmp.read(".ssh/config") == "Host a\n  User u\n  Port 2222\n")
+    }
+
+    @Test func overwriteAndLoadDiskIgnoredOutsideConflict() async throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\n  User u\n")
+        try addPort(app)
+        let flow = SaveFlowModel(store: app.store)
+        await flow.prepare()
+        await flow.overwrite()
+        flow.loadDiskVersion()
+        guard case .review = flow.phase else { Issue.record("review bekleniyordu"); return }
+        #expect(app.store.hasUnsavedChanges)
+        #expect(try tmp.read(".ssh/config") == "Host a\n  User u\n")
+    }
 }

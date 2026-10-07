@@ -18,6 +18,8 @@ final class SaveFlowModel: Identifiable {
     let id = UUID()
     let store: ConfigStore
     private(set) var phase: Phase = .preparing
+    private(set) var conflictDiskText = ""
+    private(set) var conflictDiff: [DiffHunk] = []
 
     init(store: ConfigStore) {
         self.store = store
@@ -40,23 +42,38 @@ final class SaveFlowModel: Identifiable {
 
     func overwrite() async {
         guard phase == .conflict else { return }
+        // Only overwrite the disk version the user actually reviewed.
+        let current = Self.diskText(store)
+        if current != conflictDiskText {
+            snapshotConflict()
+            return
+        }
         await save(overwriting: true)
     }
 
     /// Discards the in-memory edits and loads what is on disk now.
     func loadDiskVersion() {
+        guard phase == .conflict else { return }
         store.discardChanges()
         phase = .done
     }
 
     /// Disk version (old) → my version (new), for the conflict view.
     func conflictHunks() -> [DiffHunk] {
-        Self.diskVersusMemory(store)
+        conflictDiff
     }
 
     static func diskVersusMemory(_ store: ConfigStore) -> [DiffHunk] {
-        let disk = (try? Data(contentsOf: store.fileURL)).flatMap { String(validating: $0, as: UTF8.self) } ?? ""
-        return LineDiff.hunks(old: disk, new: store.document.render())
+        LineDiff.hunks(old: diskText(store), new: store.document.render())
+    }
+
+    private static func diskText(_ store: ConfigStore) -> String {
+        (try? Data(contentsOf: store.fileURL)).flatMap { String(validating: $0, as: UTF8.self) } ?? ""
+    }
+
+    private func snapshotConflict() {
+        conflictDiskText = Self.diskText(store)
+        conflictDiff = LineDiff.hunks(old: conflictDiskText, new: store.document.render())
     }
 
     private func save(overwriting: Bool) async {
@@ -65,6 +82,7 @@ final class SaveFlowModel: Identifiable {
             try await store.save(overwritingExternalChanges: overwriting)
             phase = .done
         } catch ConfigStoreError.conflict {
+            snapshotConflict()
             phase = .conflict
         } catch {
             phase = .failed(Messages.text(for: error))
