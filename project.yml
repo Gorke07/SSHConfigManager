@@ -1,0 +1,73 @@
+name: SSHConfigManager
+options:
+  bundleIdPrefix: tr.com.mess
+  deploymentTarget:
+    macOS: "26.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+    SWIFT_EMIT_LOC_STRINGS: YES
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: ""
+packages:
+  SSHConfigKit:
+    path: Packages/SSHConfigKit
+targets:
+  SSHConfigManager:
+    type: application
+    platform: macOS
+    sources:
+      - path: SSHConfigManager
+    dependencies:
+      - package: SSHConfigKit
+    info:
+      path: SSHConfigManager/Info.plist
+      properties:
+        CFBundleDisplayName: SSH Config Manager
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations: [en, tr]
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        LSApplicationCategoryType: public.app-category.developer-tools
+        LSMinimumSystemVersion: "26.0"
+    entitlements:
+      path: SSHConfigManager/SSHConfigManager.entitlements
+      properties:
+        com.apple.security.app-sandbox: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: tr.com.mess.SSHConfigManager
+        PRODUCT_NAME: SSH Config Manager
+      configs:
+        Debug:
+          ENABLE_HARDENED_RUNTIME: NO
+        Release:
+          ENABLE_HARDENED_RUNTIME: YES
+  SSHConfigManagerTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: SSHConfigManagerTests
+    dependencies:
+      - target: SSHConfigManager
+      - package: SSHConfigKit
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: tr.com.mess.SSHConfigManagerTests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SSH Config Manager.app/Contents/MacOS/SSH Config Manager"
+schemes:
+  SSHConfigManager:
+    build:
+      targets:
+        SSHConfigManager: all
+        SSHConfigManagerTests: [test]
+    test:
+      targets:
+        - SSHConfigManagerTests

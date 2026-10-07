@@ -1,0 +1,27 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "app.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "SSH Config Manager" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "SSH Config Yöneticisi" } }
+      }
+    },
+    "detail.empty.message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Select a host from the list or add a new one." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Listeden bir host seçin ya da yeni bir host ekleyin." } }
+      }
+    },
+    "detail.empty.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No Host Selected" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Host Seçilmedi" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}
