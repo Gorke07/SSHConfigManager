@@ -37,10 +37,13 @@ public final class FileWatcher: @unchecked Sendable {
         }
         let flags = FSEventStreamCreateFlags(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer)
         let path = directory.resolvingSymlinksInPath().path
-        guard let created = FSEventStreamCreate(
-            nil, callback, &context, [path] as CFArray,
-            FSEventStreamEventId(kFSEventStreamEventIdSinceNow), latency, flags)
-        else { return nil }
+        // FSEvents retains the box via the context; keep it alive until then.
+        let maybeCreated = withExtendedLifetime(box) {
+            FSEventStreamCreate(
+                nil, callback, &context, [path] as CFArray,
+                FSEventStreamEventId(kFSEventStreamEventIdSinceNow), latency, flags)
+        }
+        guard let created = maybeCreated else { return nil }
 
         FSEventStreamSetDispatchQueue(created, queue)
         guard FSEventStreamStart(created) else {
