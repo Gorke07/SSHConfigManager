@@ -73,7 +73,7 @@ final class HostEditorModel {
         guard let entry = SidebarBuilder.hostEntry(for: item, in: store.document) else {
             failure = ConfigEditError.hostNotFound(-1)
             issues = []
-            hasPendingChanges = false
+            hasPendingChanges = draft != baseline
             return false
         }
         guard HostDraft(entry) == baseline else {

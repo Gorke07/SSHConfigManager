@@ -192,4 +192,17 @@ struct HostEditorModelTests {
         #expect(editor.commit())
         #expect(!editor.hasPendingChanges)
     }
+
+    @Test func vanishedHostKeepsTypedEditsPending() throws {
+        let tmp = try TempDir()
+        let app = model(tmp, "Host web\n  User u\n")
+        let item = SidebarItem.host(alias: "web", occurrence: 0)
+        let editor = try #require(app.editor(for: item))
+        editor.fields["Port"] = "2200"
+        try app.store.apply { try $0.removeHost(at: $0.hosts[0].headerLine) }
+        #expect(!editor.commit())
+        #expect(editor.failure as? ConfigEditError == .hostNotFound(-1))
+        #expect(editor.hasPendingChanges)
+        #expect(app.hasPendingFormEdits)
+    }
 }
