@@ -89,4 +89,26 @@ struct UpdateHostTests {
             try doc.updateHost(at: 0, to: HostDraft(patterns: ["a"]))
         }
     }
+
+    @Test func removingFirstOfRepeatedKeysDeletesCorrectLine() throws {
+        let out = try update("Host a\n  IdentityFile k1 # first\n  IdentityFile k2 # second\n") {
+            $0.directives.removeAll { $0.value == "k1" }
+        }
+        #expect(out == "Host a\n  IdentityFile k2 # second\n")
+    }
+
+    @Test func changingMiddleOfThreeRepeatedKeysOnlyChangesMiddle() throws {
+        let out = try update("Host a\n  IdentityFile k1\n  IdentityFile k2\n  IdentityFile k3\n") {
+            let index = $0.directives.firstIndex { $0.value == "k2" }!
+            $0.directives[index].value = "kx"
+        }
+        #expect(out == "Host a\n  IdentityFile k1\n  IdentityFile kx\n  IdentityFile k3\n")
+    }
+
+    @Test func insertionAtEndOfFileWithoutTrailingNewline() throws {
+        let out = try update("Host a\n  User u") {
+            $0.directives.append(DraftDirective(key: "Port", value: "22"))
+        }
+        #expect(out == "Host a\n  User u\n  Port 22")
+    }
 }
