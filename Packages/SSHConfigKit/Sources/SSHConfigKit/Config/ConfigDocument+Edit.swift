@@ -90,4 +90,64 @@ extension ConfigDocument {
             at: insertAt)
         lines.replaceSubrange(header..<end, with: block)
     }
+
+    /// `Host *` or `Match all`: ssh uses the first value it finds, so new hosts must come before these.
+    private func isCatchAll(_ index: Int) -> Bool {
+        switch lines[index].kind {
+        case .hostStart(let patterns): patterns == ["*"]
+        case .matchStart(let criteria): criteria.asciiLowercased == "all"
+        default: false
+        }
+    }
+
+    @discardableResult
+    public mutating func addHost(_ draft: HostDraft) -> Int {
+        let indent = directiveIndent
+        let blank = ConfigLine(raw: lineEndingSuffix)
+        var hostLines = [ConfigLine(raw: "Host " + draft.patterns.joined(separator: " ") + lineEndingSuffix)]
+        hostLines += draft.directives.map { makeDirectiveLine(indent: indent, key: $0.key, value: $0.value) }
+
+        if let catchAll = headerIndices.first(where: isCatchAll) {
+            var position = catchAll
+            while position > 0 && lines[position - 1].kind == .comment { position -= 1 }
+            let lead = (position > 0 && lines[position - 1].kind != .blank) ? [blank] : []
+            lines.insert(contentsOf: lead + hostLines + [blank], at: position)
+            return position + lead.count
+        }
+
+        if let last = lines.last, last.kind != .blank { lines.append(blank) }
+        let header = lines.count
+        lines += hostLines
+        hasTrailingNewline = true
+        return header
+    }
+
+    public mutating func removeHost(at header: Int) throws {
+        guard hostEntry(at: header) != nil else { throw ConfigEditError.hostNotFound(header) }
+        var start = header
+        while start > 0 && lines[start - 1].kind == .comment { start -= 1 }
+        lines.removeSubrange(start..<ownedEnd(of: header))
+
+        while start < lines.count, lines[start].kind == .blank, start == 0 || lines[start - 1].kind == .blank {
+            lines.remove(at: start)
+        }
+        if start == lines.count {
+            while lines.last?.kind == .blank { lines.removeLast() }
+        }
+        if lines.isEmpty { hasTrailingNewline = false }
+    }
+
+    @discardableResult
+    public mutating func duplicateHost(at header: Int, newAlias: String) throws -> Int {
+        guard hostEntry(at: header) != nil, let parts = lines[header].parts else {
+            throw ConfigEditError.hostNotFound(header)
+        }
+        var end = ownedEnd(of: header)
+        while end - 1 > header && lines[end - 1].kind == .blank { end -= 1 }
+
+        var copy = Array(lines[header..<end])
+        copy[0] = ConfigLine(raw: LineTokenizer.replacingValue(in: parts, with: newAlias))
+        lines.insert(contentsOf: [ConfigLine(raw: lineEndingSuffix)] + copy, at: end)
+        return end + 1
+    }
 }
