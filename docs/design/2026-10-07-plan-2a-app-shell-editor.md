@@ -25,7 +25,7 @@
 
 - macOS 26.0 deployment target; Swift 6 dil modu (`SWIFT_VERSION = 6.0`), `SWIFT_STRICT_CONCURRENCY = complete`.
 - App Sandbox **kapalı** (`com.apple.security.app-sandbox = false`). Hardened Runtime yalnızca Release'te açık (Debug'da kapalı; ad-hoc imzalı test paketi yüklenebilsin diye).
-- Bundle ID: `tr.com.kokilmetal.SSHConfigManager`. Geliştirme dili `en`, yerelleştirmeler `en`, `tr`.
+- Bundle ID: `tr.com.mess.SSHConfigManager`. Geliştirme dili `en`, yerelleştirmeler `en`, `tr`.
 - Uygulama target'ında tek dış bağımlılık yerel `SSHConfigKit` paketidir (Plan 2b'ye kadar başka paket yok). `SSHConfigKit` bağımlılıksız kalır.
 - **Kullanıcıya görünen her metin** `String(localized: "anahtar")` ile alınır ve `SSHConfigManager/Shared/Localization/Localizable.xcstrings` içinde hem `en` hem `tr` değeri `translated` durumundadır. `Text`, `Button`, `Label`, `Section`, `Toggle`, `TextField`, `Picker`, `Menu`, `LabeledContent` başlatıcılarına string **literal** verilmez (ssh anahtar kelimeleri gibi çevrilmeyecek metinler için `Text(verbatim:)` kullanılır). Yerelleştirilmiş metinlerdeki interpolasyonlar yalnızca düz tanımlayıcıdır (`\(name)`), sayı önce `String(...)`'e çevrilir. Bu kurallar Task 2'deki testlerle denetlenir.
 - ssh direktif adları (`HostName`, `IdentityFile` …), ssh'in kendi hata metinleri ve komut metinleri çevrilmez (spec §6.5).
@@ -380,7 +380,7 @@ Expected: `Version: 2.46.0` (veya daha yeni).
 ```yaml
 name: SSHConfigManager
 options:
-  bundleIdPrefix: tr.com.kokilmetal
+  bundleIdPrefix: tr.com.mess
   deploymentTarget:
     macOS: "26.0"
   developmentLanguage: en
@@ -422,7 +422,7 @@ targets:
         com.apple.security.app-sandbox: false
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: tr.com.kokilmetal.SSHConfigManager
+        PRODUCT_BUNDLE_IDENTIFIER: tr.com.mess.SSHConfigManager
         PRODUCT_NAME: SSH Config Manager
       configs:
         Debug:
@@ -440,7 +440,7 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-        PRODUCT_BUNDLE_IDENTIFIER: tr.com.kokilmetal.SSHConfigManagerTests
+        PRODUCT_BUNDLE_IDENTIFIER: tr.com.mess.SSHConfigManagerTests
 schemes:
   SSHConfigManager:
     build:
@@ -3279,7 +3279,7 @@ Her sürüm öncesi temiz bir test kullanıcısında veya `~/.ssh/config` yedeğ
 Run: `scripts/test-app.sh`
 Expected: PASS — tüm testler (özellikle `LocalizationTests`: kaynaktaki her anahtar katalogda, katalogda kullanılmayan anahtar yok, görünüm başlatıcılarında literal yok), derleme uyarısı yok.
 
-Uygulamayı geçici bir test config'iyle çalıştır (gerçek config'e dokunmadan): Ayarlar henüz yok, bu yüzden geçici olarak `defaults write tr.com.kokilmetal.SSHConfigManager configPath /tmp/sshcm-manual/config` ile yolu ayarla, `mkdir -p /tmp/sshcm-manual && printf 'Host demo\n  HostName 127.0.0.1\n' > /tmp/sshcm-manual/config && chmod 600 /tmp/sshcm-manual/config`, uygulamayı aç ve manuel listenin ilk altı maddesini uygula; sonra `defaults delete tr.com.kokilmetal.SSHConfigManager configPath`. Gözlemleri raporuna yaz.
+Uygulamayı geçici bir test config'iyle çalıştır (gerçek config'e dokunmadan): Ayarlar henüz yok, bu yüzden geçici olarak `defaults write tr.com.mess.SSHConfigManager configPath /tmp/sshcm-manual/config` ile yolu ayarla, `mkdir -p /tmp/sshcm-manual && printf 'Host demo\n  HostName 127.0.0.1\n' > /tmp/sshcm-manual/config && chmod 600 /tmp/sshcm-manual/config`, uygulamayı aç ve manuel listenin ilk altı maddesini uygula; sonra `defaults delete tr.com.mess.SSHConfigManager configPath`. Gözlemleri raporuna yaz.
 
 - [ ] **Step 7: Commit**
 
