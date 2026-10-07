@@ -21,7 +21,8 @@ final class AppSettings {
     init(defaults: UserDefaults = .standard, homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser) {
         self.defaults = defaults
         self.homeDirectory = homeDirectory
-        configPath = defaults.string(forKey: Keys.configPath) ?? Self.defaultConfigPath
+        let stored = defaults.string(forKey: Keys.configPath)
+        configPath = stored.flatMap { Self.isValidConfigPath($0) ? $0 : nil } ?? Self.defaultConfigPath
         backupCount = Self.clamp(defaults.object(forKey: Keys.backupCount) as? Int ?? Self.defaultBackupCount)
     }
 
@@ -44,6 +45,12 @@ final class AppSettings {
         if path == home { return "~" }
         if path.hasPrefix(home + "/") { return "~" + path.dropFirst(home.count) }
         return path
+    }
+
+    /// Only absolute paths, "~" and "~/..." are accepted; anything else would resolve against the CWD.
+    static func isValidConfigPath(_ path: String) -> Bool {
+        guard !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        return path.hasPrefix("/") || path == "~" || path.hasPrefix("~/")
     }
 
     static func expand(_ path: String, home: URL) -> URL {

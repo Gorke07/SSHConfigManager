@@ -7,7 +7,7 @@ import SSHConfigKit
 final class AppModel {
     typealias StoreFactory = @MainActor (URL, BackupManager) -> ConfigStore
 
-    enum SwitchResult: Equatable { case switched, needsConfirmation, unchanged }
+    enum SwitchResult: Equatable { case switched, needsConfirmation, unchanged, invalid }
 
     let settings: AppSettings
     private(set) var store: ConfigStore
@@ -52,6 +52,7 @@ final class AppModel {
     }
 
     func switchConfig(to path: String, discardingUnsavedChanges: Bool = false) -> SwitchResult {
+        guard AppSettings.isValidConfigPath(path) else { return .invalid }
         let url = AppSettings.expand(path, home: settings.homeDirectory)
         if url.standardizedFileURL == store.fileURL.standardizedFileURL {
             settings.setConfigPath(path)

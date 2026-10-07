@@ -5,31 +5,27 @@ import Testing
 
 @MainActor
 struct AppModelTests {
-    private func freshDefaults() -> UserDefaults {
-        UserDefaults(suiteName: "AppModelTests-\(UUID().uuidString)")!
-    }
-
     @Test func settingsDefaultsAndPersistence() throws {
         let tmp = try TempDir()
-        let defaults = freshDefaults()
-        let settings = AppSettings(defaults: defaults, homeDirectory: tmp.url)
+        let settings = AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url)
         #expect(settings.configPath == "~/.ssh/config")
         #expect(settings.backupCount == 10)
         #expect(settings.configURL == tmp.url.appending(path: ".ssh/config"))
 
         settings.setConfigPath("~/dotfiles/ssh/config")
         settings.setBackupCount(99)
-        let reloaded = AppSettings(defaults: defaults, homeDirectory: tmp.url)
+        let reloaded = AppSettings(defaults: UserDefaults(suiteName: tmp.defaultsSuiteName)!, homeDirectory: tmp.url)
         #expect(reloaded.configPath == "~/dotfiles/ssh/config")
         #expect(reloaded.backupCount == 50)
     }
 
     @Test func expandAndDisplayPaths() throws {
+        let tmp = try TempDir()
         let home = URL(filePath: "/Users/test")
         #expect(AppSettings.expand("~", home: home) == home)
         #expect(AppSettings.expand("~/a/b", home: home) == home.appending(path: "a/b"))
         #expect(AppSettings.expand("/etc/ssh/x", home: home) == URL(filePath: "/etc/ssh/x"))
-        let settings = AppSettings(defaults: freshDefaults(), homeDirectory: home)
+        let settings = AppSettings(defaults: tmp.defaults, homeDirectory: home)
         #expect(settings.displayPath(for: home.appending(path: ".ssh/config")) == "~/.ssh/config")
         #expect(settings.displayPath(for: URL(filePath: "/opt/x")) == "/opt/x")
     }
@@ -88,5 +84,38 @@ struct AppModelTests {
         #expect(model.editorToken == afterSelect)   // rename keeps the editor alive
         model.resetEditor()
         #expect(model.editorToken != afterSelect)
+    }
+
+    @Test func invalidPathsAreRejected() throws {
+        #expect(AppSettings.isValidConfigPath("/etc/x"))
+        #expect(AppSettings.isValidConfigPath("~"))
+        #expect(AppSettings.isValidConfigPath("~/a"))
+        for bad in ["", "   ", "relative/config", "~bob/x"] {
+            #expect(!AppSettings.isValidConfigPath(bad))
+        }
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n")
+        let original = model.store
+        for bad in ["", "relative/config", "~bob/x"] {
+            #expect(model.switchConfig(to: bad) == .invalid)
+            #expect(model.store === original)
+            #expect(model.settings.configPath == "~/.ssh/config")
+        }
+    }
+
+    @Test func invalidStoredPathFallsBackToDefault() throws {
+        let tmp = try TempDir()
+        tmp.defaults.set("relative/config", forKey: "configPath")
+        let settings = AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url)
+        #expect(settings.configPath == "~/.ssh/config")
+    }
+
+    @Test func oldStoreIsReleasedOnSwitch() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n")
+        try tmp.file("other/config", "Host b\n")
+        weak let old = model.store
+        #expect(model.switchConfig(to: tmp.url.appending(path: "other/config").path, discardingUnsavedChanges: true) == .switched)
+        #expect(old == nil)
     }
 }

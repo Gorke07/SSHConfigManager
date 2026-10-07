@@ -5,6 +5,11 @@ import SSHConfigKit
 /// A unique temporary directory that is removed when the object is released.
 final class TempDir {
     let url: URL
+    /// An absolute-path suite name stores the plist inside the temp directory, not in ~/Library/Preferences.
+    var defaultsSuiteName: String { url.appending(path: "defaults").path }
+
+    /// A UserDefaults over a suite living in this temp directory (removed with it).
+    lazy var defaults: UserDefaults = UserDefaults(suiteName: defaultsSuiteName)!
 
     init() throws {
         url = FileManager.default.temporaryDirectory
@@ -46,8 +51,7 @@ struct FixedRunner: ProcessRunning {
 @MainActor
 func makeTestModel(_ tmp: TempDir, config: String? = nil, runner: FixedRunner = .valid) -> AppModel {
     if let config { _ = try? tmp.file(".ssh/config", config) }
-    let defaults = UserDefaults(suiteName: "SSHConfigManagerTests-\(UUID().uuidString)")!
-    let settings = AppSettings(defaults: defaults, homeDirectory: tmp.url)
+    let settings = AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url)
     return AppModel(settings: settings, backupRoot: tmp.url.appending(path: "Backups")) { url, backups in
         ConfigStore(
             fileURL: url,
