@@ -4,10 +4,11 @@ import Testing
 
 @MainActor
 struct ConfigStoreTests {
-    private func makeStore(_ tmp: TempDir, name: String = "config", watch: Bool = false) -> ConfigStore {
+    private func makeStore(_ tmp: TempDir, name: String = "config", watch: Bool = false, validator: ConfigValidator = ConfigValidator()) -> ConfigStore {
         ConfigStore(
             fileURL: tmp.url.appending(path: name),
             writer: SafeFileWriter(backups: BackupManager(rootDirectory: tmp.url.appending(path: "Backups"))),
+            validator: validator,
             includeResolver: IncludeResolver(homeDirectory: tmp.url),
             watchForChanges: watch)
     }
@@ -150,6 +151,60 @@ struct ConfigStoreTests {
         store.fileDidChange()
         #expect(!store.externalChangePending)
         #expect(!store.hasUnsavedChanges)
+
+        try store.apply { doc in
+            var draft = HostDraft(doc.hosts[0])
+            draft.directives.append(DraftDirective(key: "User", value: "x"))
+            try doc.updateHost(at: doc.hosts[0].headerLine, to: draft)
+        }
+        store.fileDidChange()
+        #expect(store.hasUnsavedChanges)
+        #expect(store.document.render().contains("User x"))
+        #expect(!store.externalChangePending)
+    }
+
+    @Test func externalEditDuringValidationIsAConflict() async throws {
+        let tmp = try TempDir()
+        try tmp.file("config", "Host a\n")
+        let runner = FakeRunner(delay: .milliseconds(300)) { _ in
+            ProcessResult(exitCode: 0, stdout: "", stderr: "", timedOut: false)
+        }
+        let store = makeStore(tmp, validator: ConfigValidator(runner: runner))
+        let task = Task { try await store.save() }
+        try await Task.sleep(for: .milliseconds(100))
+        try tmp.file("config", "Host external\n")
+        store.fileDidChange()
+        #expect(store.document.hosts.map(\.alias) == ["external"])
+
+        let result = await task.result
+        guard case .failure(let error) = result, error as? ConfigStoreError == .conflict else {
+            Issue.record("conflict bekleniyordu: \(result)")
+            return
+        }
+        #expect(try tmp.read("config") == "Host external\n")
+    }
+
+    @Test func applyRefreshesIncludedHosts() throws {
+        let tmp = try TempDir()
+        try tmp.file(".ssh/extra", "Host inc\n")
+        try tmp.file("config", "Host a\n")
+        let store = makeStore(tmp)
+        #expect(store.includedHosts.isEmpty)
+        try store.apply { $0 = ConfigDocument(parsing: "Include extra\nHost a\n") }
+        #expect(store.includedHosts.map(\.entry.alias) == ["inc"])
+    }
+
+    @Test func discardClearsPendingExternalChange() throws {
+        let tmp = try TempDir()
+        try tmp.file("config", "Host a\n  User u\n")
+        let store = makeStore(tmp)
+        try addPort(store)
+        try tmp.file("config", "Host new\n")
+        store.fileDidChange()
+        #expect(store.externalChangePending)
+        store.discardChanges()
+        #expect(!store.externalChangePending)
+        #expect(store.document.render() == "Host new\n")
     }
 
     @Test func discardChangesRestoresDiskVersion() throws {

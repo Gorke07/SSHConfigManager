@@ -102,10 +102,12 @@ public final class ConfigStore {
         var copy = document
         try edit(&copy)
         document = copy
+        includedHosts = includeResolver.includedHosts(of: document, rootFile: fileURL)
     }
 
+    /// Reloads from disk (also clears `externalChangePending`).
     public func discardChanges() {
-        document = ConfigDocument(parsing: diskText)
+        load()
     }
 
     public func prepareSave(probeAlias: String? = nil) async -> SavePreparation {
@@ -118,6 +120,7 @@ public final class ConfigStore {
     public func save(overwritingExternalChanges: Bool = false) async throws {
         guard loadState == .loaded else { throw ConfigStoreError.notEditable }
         let text = document.render()
+        let expected = diskFingerprint   // captured before the await: an external edit during validation must conflict
 
         switch await validate(text, probeAlias: nil) {
         case .valid: break
@@ -126,7 +129,7 @@ public final class ConfigStore {
         }
 
         do {
-            try writer.write(text, to: fileURL, expected: diskFingerprint,
+            try writer.write(text, to: fileURL, expected: expected,
                              ignoreConflict: overwritingExternalChanges, backupKind: "config")
         } catch SafeFileWriterError.conflict {
             externalChangePending = true
@@ -138,7 +141,7 @@ public final class ConfigStore {
         diskText = text
         diskFingerprint = FileFingerprint(data: Data(text.utf8))
         externalChangePending = false
-        includedHosts = includeResolver.includedHosts(of: document, rootFile: fileURL)
+        includedHosts = includeResolver.includedHosts(of: ConfigDocument(parsing: text), rootFile: fileURL)
     }
 
     func fileDidChange() {
