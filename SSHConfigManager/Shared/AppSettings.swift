@@ -5,11 +5,13 @@ import Observation
 @Observable
 final class AppSettings {
     static let defaultConfigPath = "~/.ssh/config"
+    static let defaultKnownHostsPath = "~/.ssh/known_hosts"
     static let defaultBackupCount = 10
     static let backupCountRange = 1...50
 
     private enum Keys {
         static let configPath = "configPath"
+        static let knownHostsPath = "knownHostsPath"
         static let backupCount = "backupCount"
         static let terminal = "terminal"
     }
@@ -17,6 +19,7 @@ final class AppSettings {
     @ObservationIgnored private let defaults: UserDefaults
     let homeDirectory: URL
     private(set) var configPath: String
+    private(set) var knownHostsPath: String
     private(set) var backupCount: Int
     private(set) var terminal: TerminalChoice
 
@@ -25,6 +28,8 @@ final class AppSettings {
         self.homeDirectory = homeDirectory
         let stored = defaults.string(forKey: Keys.configPath)
         configPath = stored.flatMap { Self.isValidConfigPath($0) ? $0 : nil } ?? Self.defaultConfigPath
+        let storedKnownHosts = defaults.string(forKey: Keys.knownHostsPath)
+        knownHostsPath = storedKnownHosts.flatMap { Self.isValidConfigPath($0) ? $0 : nil } ?? Self.defaultKnownHostsPath
         backupCount = Self.clamp(defaults.object(forKey: Keys.backupCount) as? Int ?? Self.defaultBackupCount)
         terminal = TerminalChoice(rawValue: defaults.string(forKey: Keys.terminal) ?? "") ?? .terminal
     }
@@ -34,6 +39,13 @@ final class AppSettings {
     func setConfigPath(_ path: String) {
         configPath = path
         defaults.set(path, forKey: Keys.configPath)
+    }
+
+    var knownHostsURL: URL { Self.expand(knownHostsPath, home: homeDirectory) }
+
+    func setKnownHostsPath(_ path: String) {
+        knownHostsPath = path
+        defaults.set(path, forKey: Keys.knownHostsPath)
     }
 
     func setBackupCount(_ count: Int) {

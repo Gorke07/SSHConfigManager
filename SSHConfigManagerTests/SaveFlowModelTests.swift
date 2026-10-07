@@ -33,7 +33,7 @@ struct SaveFlowModelTests {
 
     @Test func invalidConfigCannotBeConfirmed() async throws {
         let tmp = try TempDir()
-        let app = makeTestModel(tmp, config: "Host a\n", runner: .invalid("line 2: Bad configuration option: bogus"))
+        let app = makeTestModel(tmp, config: "Host a\n", runner: FixedRunner.invalid("line 2: Bad configuration option: bogus"))
         try addPort(app)
         let flow = SaveFlowModel(store: app.store)
         await flow.prepare()

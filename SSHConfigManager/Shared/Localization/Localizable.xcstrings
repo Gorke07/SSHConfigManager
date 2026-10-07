@@ -1,6 +1,55 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "knownHosts.hashed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "(hashed entry)" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "(hash'li kayıt)" } }
+      }
+    },
+    "knownHosts.missing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "There is no known_hosts file yet. ssh creates it the first time you connect to a host." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Henüz known_hosts dosyası yok. ssh ilk bağlantıda oluşturur." } }
+      }
+    },
+    "knownHosts.notUTF8" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The known_hosts file is not valid UTF-8, so it is shown read-only and never rewritten." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "known_hosts dosyası geçerli UTF-8 değil; salt okunur gösterilir ve hiçbir zaman yeniden yazılmaz." } }
+      }
+    },
+    "knownHosts.unreadable %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The known_hosts file could not be read: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "known_hosts dosyası okunamadı: %@" } }
+      }
+    },
+    "knownHosts.staleSelection" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The known_hosts file changed. The list was refreshed; select the entries again." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "known_hosts dosyası değişti. Liste yenilendi; kayıtları yeniden seçin." } }
+      }
+    },
+    "knownHosts.conflict" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The known_hosts file was changed by another program. It was reloaded and nothing was deleted." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "known_hosts dosyası başka bir program tarafından değiştirildi. Yeniden yüklendi ve hiçbir şey silinmedi." } }
+      }
+    },
+    "knownHosts.notEditable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This known_hosts file cannot be changed." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu known_hosts dosyası değiştirilemez." } }
+      }
+    },
     "app.title" : {
       "extractionState" : "manual",
       "localizations" : {

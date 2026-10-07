@@ -41,6 +41,26 @@ enum Messages {
         }
     }
 
+    static func text(for error: KnownHostsStoreError) -> String {
+        switch error {
+        case .notEditable: String(localized: "knownHosts.notEditable")
+        case .staleSelection: String(localized: "knownHosts.staleSelection")
+        case .conflict, .writeFailed(.conflict): String(localized: "knownHosts.conflict")
+        case .writeFailed(.backupFailed(let detail)): String(localized: "store.backupFailed \(detail)")
+        case .writeFailed(.writeFailed(let detail)): String(localized: "store.writeFailed \(detail)")
+        }
+    }
+
+    /// known_hosts load states: a missing file is normal (ssh creates it), not an error.
+    static func knownHostsLoadText(for state: ConfigLoadState) -> String? {
+        switch state {
+        case .loaded: nil
+        case .missing: String(localized: "knownHosts.missing")
+        case .notUTF8: String(localized: "knownHosts.notUTF8")
+        case .unreadable(let detail): String(localized: "knownHosts.unreadable \(detail)")
+        }
+    }
+
     static func text(for state: ConfigLoadState) -> String? {
         switch state {
         case .loaded: nil
@@ -62,6 +82,7 @@ enum Messages {
     static func text(for error: any Error) -> String {
         if let error = error as? ConfigStoreError { return text(for: error) }
         if let error = error as? ConfigEditError { return text(for: error) }
+        if let error = error as? KnownHostsStoreError { return text(for: error) }
         let detail = error.localizedDescription
         return String(localized: "error.generic \(detail)")
     }

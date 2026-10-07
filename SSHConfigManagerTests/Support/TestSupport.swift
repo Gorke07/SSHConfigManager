@@ -60,23 +60,28 @@ struct DelayedRunner: ProcessRunning {
 
 /// An AppModel wired to a temporary home, temporary backups and fake ssh validation.
 @MainActor
-func makeTestModel(_ tmp: TempDir, config: String? = nil, runner: FixedRunner = .valid,
+func makeTestModel(_ tmp: TempDir, config: String? = nil, runner: any ProcessRunning = FixedRunner.valid,
                    launcher: RecordingLauncher = RecordingLauncher(),
                    isTerminalInstalled: @escaping @MainActor (TerminalChoice) -> Bool = { _ in true }) -> AppModel {
     if let config { _ = try? tmp.file(".ssh/config", config) }
     let settings = AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url)
-    return AppModel(settings: settings, backupRoot: tmp.url.appending(path: "Backups"),
-                    processRunner: runner,
-                    launcherFactory: { _ in launcher },
-                    isTerminalInstalled: isTerminalInstalled) { url, backups, kind in
-        ConfigStore(
-            fileURL: url,
-            writer: SafeFileWriter(backups: backups),
-            validator: ConfigValidator(runner: runner),
-            includeResolver: IncludeResolver(homeDirectory: tmp.url),
-            watchForChanges: false,
-            backupKind: kind)
-    }
+    return AppModel(
+        settings: settings, backupRoot: tmp.url.appending(path: "Backups"),
+        processRunner: runner,
+        launcherFactory: { _ in launcher },
+        isTerminalInstalled: isTerminalInstalled,
+        makeStore: { url, backups, kind in
+            ConfigStore(
+                fileURL: url,
+                writer: SafeFileWriter(backups: backups),
+                validator: ConfigValidator(runner: runner),
+                includeResolver: IncludeResolver(homeDirectory: tmp.url),
+                watchForChanges: false,
+                backupKind: kind)
+        },
+        makeKnownHostsStore: { url, backups, kind in
+            KnownHostsStore(fileURL: url, writer: SafeFileWriter(backups: backups), watchForChanges: false, backupKind: kind)
+        })
 }
 
 /// Records launch requests instead of opening a terminal. Tests must never open real terminals.

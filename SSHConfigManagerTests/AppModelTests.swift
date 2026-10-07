@@ -283,4 +283,30 @@ struct AppModelTests {
         #expect(!AppSettings.isValidConfigPath("/tmp/a\tb"))
         #expect(AppSettings.isValidConfigPath("/tmp/with space/config"))
     }
+
+    @Test func knownHostsDefaultsToTheHomeFileAndItsBackupKind() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp)
+        #expect(model.knownHosts.fileURL.standardizedFileURL == tmp.url.appending(path: ".ssh/known_hosts").standardizedFileURL)
+        #expect(model.knownHosts.backupKind == "known_hosts")
+        let other = AppModel.knownHostsBackupKind(for: URL(filePath: "/tmp/other_known_hosts"), home: tmp.url)
+        #expect(other.hasPrefix("known_hosts-") && other.count == "known_hosts-".count + 12)
+    }
+
+    @Test func switchingKnownHostsPersistsAndReplacesTheStore() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp)
+        try tmp.file("other/known_hosts", "a.example.com ssh-ed25519 \(KnownHostsModelTests.ed)\n")
+        #expect(model.switchKnownHosts(to: tmp.url.appending(path: "other/known_hosts").path))
+        #expect(model.knownHosts.document.entries.count == 1)
+        #expect(model.settings.knownHostsPath == tmp.url.appending(path: "other/known_hosts").path)
+        #expect(!model.switchKnownHosts(to: "relative/path"))
+    }
+
+    @Test func backupCountAlsoAppliesToKnownHosts() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp)
+        model.setBackupCount(3)
+        #expect(model.knownHosts.backupKeep == 3)
+    }
 }

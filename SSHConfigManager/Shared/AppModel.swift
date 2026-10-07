@@ -8,10 +8,13 @@ import SSHConfigKit
 final class AppModel {
     typealias StoreFactory = @MainActor (URL, BackupManager, String) -> ConfigStore
 
+    typealias KnownHostsStoreFactory = @MainActor (URL, BackupManager, String) -> KnownHostsStore
+
     enum SwitchResult: Equatable { case switched, needsConfirmation, unchanged, invalid }
 
     let settings: AppSettings
     private(set) var store: ConfigStore
+    private(set) var knownHosts: KnownHostsStore
     private(set) var backupManager: BackupManager
     var selection: SidebarItem?
     /// Changes when the user picks another row (or the document is reloaded); the editor view
@@ -29,6 +32,7 @@ final class AppModel {
     var pendingSelection: SidebarItem?
 
     @ObservationIgnored private let makeStore: StoreFactory
+    @ObservationIgnored private let makeKnownHostsStore: KnownHostsStoreFactory
     @ObservationIgnored let processRunner: any ProcessRunning
     @ObservationIgnored private let launcherFactory: @MainActor (TerminalChoice) -> any TerminalLaunching
     @ObservationIgnored private let terminalInstalled: @MainActor (TerminalChoice) -> Bool
@@ -42,7 +46,8 @@ final class AppModel {
          processRunner: any ProcessRunning = ProcessRunner(),
          launcherFactory: @escaping @MainActor (TerminalChoice) -> any TerminalLaunching = LiveTerminals.launcher(for:),
          isTerminalInstalled: @escaping @MainActor (TerminalChoice) -> Bool = LiveTerminals.isInstalled,
-         makeStore: @escaping StoreFactory = AppModel.liveStore) {
+         makeStore: @escaping StoreFactory = AppModel.liveStore,
+         makeKnownHostsStore: @escaping KnownHostsStoreFactory = AppModel.liveKnownHostsStore) {
         self.settings = settings
         self.processRunner = processRunner
         self.connectionTests = ConnectionTestsModel(runner: processRunner)
@@ -52,6 +57,9 @@ final class AppModel {
         self.backupManager = backups
         self.makeStore = makeStore
         self.store = makeStore(settings.configURL, backups, Self.backupKind(for: settings.configURL, home: settings.homeDirectory))
+        self.makeKnownHostsStore = makeKnownHostsStore
+        self.knownHosts = makeKnownHostsStore(
+            settings.knownHostsURL, backups, Self.knownHostsBackupKind(for: settings.knownHostsURL, home: settings.homeDirectory))
         observeSavedState()
     }
 
@@ -70,12 +78,35 @@ final class AppModel {
         ConfigStore(fileURL: url, writer: SafeFileWriter(backups: backups), backupKind: backupKind)
     }
 
+    static func liveKnownHostsStore(url: URL, backups: BackupManager, backupKind: String) -> KnownHostsStore {
+        KnownHostsStore(fileURL: url, writer: SafeFileWriter(backups: backups), backupKind: backupKind)
+    }
+
     /// "config" for ~/.ssh/config; otherwise a stable per-path kind so backups of different files never mix.
     static func backupKind(for url: URL, home: URL) -> String {
+        backupKind(for: url, defaultPath: home.appending(path: ".ssh/config"), prefix: "config")
+    }
+
+    /// "known_hosts" for ~/.ssh/known_hosts; otherwise a stable per-path kind.
+    static func knownHostsBackupKind(for url: URL, home: URL) -> String {
+        backupKind(for: url, defaultPath: home.appending(path: ".ssh/known_hosts"), prefix: "known_hosts")
+    }
+
+    private static func backupKind(for url: URL, defaultPath: URL, prefix: String) -> String {
         let path = url.standardizedFileURL.path
-        if path == home.appending(path: ".ssh/config").standardizedFileURL.path { return "config" }
+        if path == defaultPath.standardizedFileURL.path { return prefix }
         let digest = SHA256.hash(data: Data(path.utf8))
-        return "config-" + digest.map { String(format: "%02x", $0) }.joined().prefix(12)
+        return prefix + "-" + digest.map { String(format: "%02x", $0) }.joined().prefix(12)
+    }
+
+    /// Opens another known_hosts file. There are no drafts, so nothing needs confirming.
+    @discardableResult
+    func switchKnownHosts(to path: String) -> Bool {
+        guard AppSettings.isValidConfigPath(path) else { return false }
+        settings.setKnownHostsPath(path)
+        let url = settings.knownHostsURL
+        knownHosts = makeKnownHostsStore(url, backupManager, Self.knownHostsBackupKind(for: url, home: settings.homeDirectory))
+        return true
     }
 
     var commandBuilder: SSHCommandBuilder {
@@ -253,5 +284,6 @@ final class AppModel {
         settings.setBackupCount(count)
         backupManager.keep = settings.backupCount
         store.setBackupKeep(settings.backupCount)
+        knownHosts.setBackupKeep(settings.backupCount)
     }
 }
