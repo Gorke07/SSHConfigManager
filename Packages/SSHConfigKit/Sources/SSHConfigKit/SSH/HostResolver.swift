@@ -45,6 +45,8 @@ public struct HostResolver: Sendable {
         let result: ProcessResult
         do {
             result = try await runner.run(sshPath, arguments: arguments, environment: [:], timeout: .seconds(5))
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             throw HostResolverError.failed(error.localizedDescription)
         }
@@ -61,7 +63,7 @@ public struct HostResolver: Sendable {
             let parts = line.split(separator: " ", maxSplits: 1)
             guard parts.count == 2 else { continue }
             let key = String(parts[0])
-            if values[key] == nil { values[key] = String(parts[1]) }
+            if values[key] == nil { values[key] = parts[1].trimmingCharacters(in: .whitespaces) }
         }
         guard let hostname = values["hostname"], !hostname.isEmpty,
               let port = Int(values["port"] ?? "22"), (1...65535).contains(port) else { return nil }

@@ -36,7 +36,7 @@ struct HostResolverTests {
         #expect(host?.lookupNames == ["10.0.0.1"])
     }
 
-    @Test func missingHostnameOrBadPortIsUnparsable() {
+    @Test func parseReturnsNilWithoutHostnameOrWithBadPort() {
         #expect(HostResolver.parse("port 22\n") == nil)
         #expect(HostResolver.parse("hostname a\nport x\n") == nil)
     }
@@ -58,6 +58,72 @@ struct HostResolverTests {
         let slow = RecordingRunner(ProcessResult(exitCode: 15, stdout: "", stderr: "", timedOut: true))
         await #expect(throws: HostResolverError.timedOut) {
             try await HostResolver(commandBuilder: builder, runner: slow).resolve(alias: "a")
+        }
+    }
+
+    @Test func firstValueWins() {
+        let host = HostResolver.parse("hostname first\nhostname second\nport 22\nport 99\n")
+        #expect(host == ResolvedHost(hostname: "first", port: 22, hostKeyAlias: nil))
+    }
+
+    @Test func parsesCRLFOutput() {
+        #expect(HostResolver.parse("hostname a\r\nport 2222\r\n") == ResolvedHost(hostname: "a", port: 2222, hostKeyAlias: nil))
+    }
+
+    @Test func aliasNoneIsNil() {
+        #expect(HostResolver.parse("hostname a\nport 22\nhostkeyalias none\n")?.hostKeyAlias == nil)
+    }
+
+    @Test func missingPortDefaultsTo22() {
+        #expect(HostResolver.parse("hostname a\n")?.port == 22)
+    }
+
+    @Test func outOfRangePortsAreRejected() {
+        #expect(HostResolver.parse("hostname a\nport 0\n") == nil)
+        #expect(HostResolver.parse("hostname a\nport 70000\n") == nil)
+    }
+
+    @Test func valuesWithSpacesDoNotBreakParsing() {
+        let host = HostResolver.parse("userknownhostsfile /a b/known_hosts /c/known_hosts2\nhostname a\nport 22\n")
+        #expect(host?.hostname == "a")
+    }
+
+    @Test func valueIsTrimmed() {
+        #expect(HostResolver.parse("hostname   a  \nport 22\n")?.hostname == "a")
+    }
+
+    @Test func uppercaseHostnameIsLowercasedInLookupNames() {
+        #expect(HostResolver.parse("hostname Example.COM\nport 22\n")?.lookupNames == ["example.com"])
+    }
+
+    @Test func throwingRunnerMapsToFailed() async {
+        struct Boom: Error {}
+        struct Throwing: ProcessRunning {
+            func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult { throw Boom() }
+        }
+        let builder = SSHCommandBuilder(configFile: URL(filePath: "/h/.ssh/config"), homeDirectory: URL(filePath: "/h"))
+        await #expect {
+            try await HostResolver(commandBuilder: builder, runner: Throwing()).resolve(alias: "a")
+        } throws: { error in
+            if case .failed = error as? HostResolverError { return true } else { return false }
+        }
+    }
+
+    @Test func cancellationIsRethrown() async {
+        struct Cancelling: ProcessRunning {
+            func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult { throw CancellationError() }
+        }
+        let builder = SSHCommandBuilder(configFile: URL(filePath: "/h/.ssh/config"), homeDirectory: URL(filePath: "/h"))
+        await #expect(throws: CancellationError.self) {
+            try await HostResolver(commandBuilder: builder, runner: Cancelling()).resolve(alias: "a")
+        }
+    }
+
+    @Test func successWithUnparsableOutputThrowsUnparsable() async {
+        let builder = SSHCommandBuilder(configFile: URL(filePath: "/h/.ssh/config"), homeDirectory: URL(filePath: "/h"))
+        let runner = RecordingRunner(ProcessResult(exitCode: 0, stdout: "garbage\n", stderr: "", timedOut: false))
+        await #expect(throws: HostResolverError.unparsable) {
+            try await HostResolver(commandBuilder: builder, runner: runner).resolve(alias: "a")
         }
     }
 }
