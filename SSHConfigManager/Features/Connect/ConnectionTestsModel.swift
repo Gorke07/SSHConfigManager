@@ -13,14 +13,24 @@ final class ConnectionTestsModel {
     @ObservationIgnored private let runner: any ProcessRunning
     @ObservationIgnored private var allTask: Task<Void, Never>?
     @ObservationIgnored private var currentRun: UUID?
+    @ObservationIgnored private var runAliases: Set<String> = []
+    /// Owner token of each in-flight single test; a test whose token was dropped (cancelAll, clear,
+    /// or a "test all" that took over its alias) never writes results or touches `running`.
+    @ObservationIgnored private var singles: [String: UUID] = [:]
 
     init(runner: any ProcessRunning) {
         self.runner = runner
     }
 
+    /// No-op while `alias` is already being tested (single or as part of "test all").
     func test(_ alias: String, using builder: SSHCommandBuilder) async {
+        guard !running.contains(alias) else { return }
+        let token = UUID()
+        singles[alias] = token
         running.insert(alias)
         let result = await ConnectionTester(commandBuilder: builder, runner: runner).test(alias: alias)
+        guard singles[alias] == token else { return }
+        singles[alias] = nil
         results[alias] = result
         running.remove(alias)
     }
@@ -28,10 +38,12 @@ final class ConnectionTestsModel {
     /// Tests up to 4 hosts at a time. Starting again cancels the previous run; a stale run never
     /// writes results or clears the new run's state.
     func testAll(_ aliases: [String], using builder: SSHCommandBuilder) {
-        cancelAll()
+        stopRun()
+        for alias in aliases { singles[alias] = nil }
         let run = UUID()
         currentRun = run
         isTestingAll = true
+        runAliases = Set(aliases)
         running.formUnion(aliases)
         let tester = ConnectionTester(commandBuilder: builder, runner: runner)
         allTask = Task { @MainActor [self] in
@@ -42,7 +54,14 @@ final class ConnectionTestsModel {
         }
     }
 
+    /// Cancels the "test all" run and abandons in-flight single tests (they write nothing).
     func cancelAll() {
+        stopRun()
+        singles.removeAll()
+        running.removeAll()
+    }
+
+    private func stopRun() {
         allTask?.cancel()
         allTask = nil
         currentRun = nil
@@ -67,6 +86,7 @@ final class ConnectionTestsModel {
 
     private func finish() {
         isTestingAll = false
-        running.removeAll()
+        running.subtract(runAliases)
+        runAliases = []
     }
 }

@@ -33,6 +33,7 @@ struct ConnectionTestsModelTests {
         try? await Task.sleep(for: .milliseconds(50))
         model.cancelAll()
         await model.waitUntilIdle()
+        try? await Task.sleep(for: .milliseconds(600))
         #expect(model.results.isEmpty)
         #expect(!model.isTestingAll)
         #expect(model.running.isEmpty)
@@ -42,10 +43,49 @@ struct ConnectionTestsModelTests {
         let model = ConnectionTestsModel(runner: DelayedRunner(delay: .milliseconds(200), result: refused))
         model.testAll(["old"], using: builder)
         model.testAll(["new"], using: builder)
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(model.isTestingAll)
+        #expect(model.running == ["new"])
         await model.waitUntilIdle()
         #expect(model.results["old"] == nil)
         #expect(model.results["new"]?.status == .connectionRefused)
         #expect(!model.isTestingAll)
+    }
+
+    @Test func clearDuringSingleTestDropsItsResult() async {
+        let model = ConnectionTestsModel(runner: DelayedRunner(delay: .milliseconds(300), result: refused))
+        let single = Task { await model.test("web", using: builder) }
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(model.running == ["web"])
+        model.clear()
+        #expect(model.running.isEmpty)
+        await single.value
+        #expect(model.results.isEmpty)
+        #expect(model.running.isEmpty)
+    }
+
+    @Test func singleTestWhileRunningIsANoOp() async {
+        let runner = CountingRunner(delay: .milliseconds(300), result: refused)
+        let model = ConnectionTestsModel(runner: runner)
+        let first = Task { await model.test("web", using: builder) }
+        try? await Task.sleep(for: .milliseconds(50))
+        await model.test("web", using: builder)
+        await first.value
+        #expect(runner.count == 1)
+        #expect(model.results["web"]?.status == .connectionRefused)
+        #expect(model.running.isEmpty)
+    }
+
+    @Test func singleTestCannotRemoveATestAllEntry() async {
+        let model = ConnectionTestsModel(runner: DelayedRunner(delay: .milliseconds(300), result: refused))
+        let single = Task { await model.test("web", using: builder) }
+        try? await Task.sleep(for: .milliseconds(50))
+        model.testAll(["web", "db"], using: builder)
+        await single.value
+        #expect(model.running == ["web", "db"])
+        await model.waitUntilIdle()
+        #expect(Set(model.results.keys) == ["web", "db"])
+        #expect(model.running.isEmpty)
     }
 
     @Test func switchingConfigClearsResults() async throws {
@@ -66,5 +106,21 @@ struct ConnectionTestsModelTests {
         let style = ConnectionStatusStyle.style(for: status)
         #expect(!style.symbol.isEmpty)
         #expect(!style.title.isEmpty && !style.title.hasPrefix("status."))
+    }
+}
+
+/// Counts how many times ssh would have been started.
+final class CountingRunner: ProcessRunning, @unchecked Sendable {
+    private let lock = NSLock()
+    private var runs = 0
+    let delay: Duration
+    let result: ProcessResult
+    init(delay: Duration, result: ProcessResult) { self.delay = delay; self.result = result }
+    var count: Int { lock.withLock { runs } }
+
+    func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
+        lock.withLock { runs += 1 }
+        try await Task.sleep(for: delay)
+        return result
     }
 }
