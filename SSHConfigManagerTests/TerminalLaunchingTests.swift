@@ -227,4 +227,20 @@ struct TerminalLaunchingTests {
         tmp.defaults.set("warp", forKey: "terminal")
         #expect(AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url).terminal == .terminal)
     }
+
+    @Test func launchScriptAndGhosttyUseTheRequestedProgram() throws {
+        let request = LaunchRequest(sshArguments: ["-i", "/k.pub", "--", "a"], shellCommand: "ssh-copy-id -i /k.pub -- a", program: "/usr/bin/ssh-copy-id")
+        #expect(LaunchScript.content(sshArguments: request.sshArguments, program: request.program)
+                == "#!/bin/sh\nrm -f -- \"$0\"\nexec /usr/bin/ssh-copy-id '-i' '/k.pub' '--' 'a'\n")
+        #expect(GhosttyArguments.openArguments(for: request) == ["-na", "Ghostty.app", "--args", "-e", "/usr/bin/ssh-copy-id", "-i", "/k.pub", "--", "a"])
+        #expect(LaunchRequest(sshArguments: [], shellCommand: "ssh").program == "/usr/bin/ssh")
+    }
+
+    @Test func anUnsafeProgramPathIsRefused() throws {
+        let tmp = try TempDir()
+        let launcher = AppleScriptLauncher(makeSource: AppleScriptBuilder.terminal(scriptPath:), scriptDirectory: tmp.url)
+        #expect(throws: LaunchError.self) {
+            try launcher.prepare(LaunchRequest(sshArguments: [], shellCommand: "x", program: "/usr/bin/ssh; rm"))
+        }
+    }
 }

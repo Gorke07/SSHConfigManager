@@ -194,6 +194,26 @@ final class AppModel {
             errorMessage = String(localized: "connect.invalidCommand")
             return .failed(.failed("control character"))
         }
+        return launch(request)
+    }
+
+    /// "Upload to Server…": `ssh-copy-id -i <pub> [-F <config>] -- <alias>` in the chosen terminal (interactive).
+    @discardableResult
+    func uploadKey(publicKey: URL, alias requested: String) -> Connector.Outcome {
+        guard let alias = savedAlias(requested) else {
+            errorMessage = String(localized: "connect.notSaved")
+            return .failed(.failed("not in the saved file"))
+        }
+        let arguments = ["-i", publicKey.path] + commandBuilder.configArguments + ["--", alias]
+        let shellCommand = (["ssh-copy-id"] + arguments.map(SSHCommandBuilder.shellQuote)).joined(separator: " ")
+        guard !shellCommand.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7F }) else {
+            errorMessage = String(localized: "connect.invalidCommand")
+            return .failed(.failed("control character"))
+        }
+        return launch(LaunchRequest(sshArguments: arguments, shellCommand: shellCommand, program: "/usr/bin/ssh-copy-id"))
+    }
+
+    private func launch(_ request: LaunchRequest) -> Connector.Outcome {
         let outcome = Connector(choice: settings.terminal, isInstalled: terminalInstalled, makeLauncher: launcherFactory).connect(request)
         switch outcome {
         case .launched:

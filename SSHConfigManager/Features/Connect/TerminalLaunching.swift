@@ -5,6 +5,8 @@ struct LaunchRequest: Equatable, Sendable {
     let sshArguments: [String]
     /// Shell-quoted command line, for display and validation only: no launcher types it into a shell.
     let shellCommand: String
+    /// Absolute path of the program to run: ssh, or ssh-copy-id for "Upload to Server".
+    var program = "/usr/bin/ssh"
 }
 
 enum LaunchError: Error, Equatable {
@@ -49,7 +51,7 @@ enum AppleScriptBuilder {
 enum GhosttyArguments {
     /// `open -na Ghostty.app --args -e /usr/bin/ssh …` (verified with Ghostty 1.2.2; `-n` opens a new instance).
     static func openArguments(for request: LaunchRequest) -> [String] {
-        ["-na", "Ghostty.app", "--args", "-e", "/usr/bin/ssh"] + request.sshArguments
+        ["-na", "Ghostty.app", "--args", "-e", request.program] + request.sshArguments
     }
 }
 
@@ -62,10 +64,10 @@ enum LaunchScript {
         case writeFailed(Int32)
     }
 
-    /// `#!/bin/sh`, delete itself, then `exec /usr/bin/ssh` with every argument single-quoted for sh.
-    static func content(sshArguments: [String]) -> String {
+    /// `#!/bin/sh`, delete itself, then `exec <program>` with every argument single-quoted for sh.
+    static func content(sshArguments: [String], program: String = "/usr/bin/ssh") -> String {
         let arguments = sshArguments.map(singleQuoted).joined(separator: " ")
-        return "#!/bin/sh\nrm -f -- \"$0\"\nexec /usr/bin/ssh \(arguments)\n"
+        return "#!/bin/sh\nrm -f -- \"$0\"\nexec \(program) \(arguments)\n"
     }
 
     /// sh single quotes: nothing inside is special; a `'` becomes `'\''`.
@@ -82,7 +84,8 @@ enum LaunchScript {
 
     /// Writes `sshcm-<UUID>.sh` (mode 0700, never following or replacing an existing file) into
     /// `directory`, which must be private to the user (the default is the per-user temporary directory).
-    static func write(sshArguments: [String], in directory: URL) throws -> URL {
+    static func write(sshArguments: [String], program: String = "/usr/bin/ssh", in directory: URL) throws -> URL {
+        guard isSafePath(program) else { throw Failure.unsafePath(program) }
         let url = directory.appending(path: "sshcm-\(UUID().uuidString).sh")
         guard isSafePath(url.path) else { throw Failure.unsafePath(url.path) }
         let descriptor = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o700)
@@ -90,7 +93,7 @@ enum LaunchScript {
         defer { close(descriptor) }
         do {
             guard fchmod(descriptor, 0o700) == 0 else { throw Failure.writeFailed(errno) }   // the umask may have narrowed it
-            let bytes = Array(content(sshArguments: sshArguments).utf8)
+            let bytes = Array(content(sshArguments: sshArguments, program: program).utf8)
             var written = 0
             while written < bytes.count {
                 let count = bytes[written...].withUnsafeBytes { Foundation.write(descriptor, $0.baseAddress, $0.count) }

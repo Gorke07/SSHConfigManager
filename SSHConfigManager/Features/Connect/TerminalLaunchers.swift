@@ -11,7 +11,7 @@ struct AppleScriptLauncher: TerminalLaunching {
     func prepare(_ request: LaunchRequest) throws -> (script: URL, source: String) {
         let script: URL
         do {
-            script = try LaunchScript.write(sshArguments: request.sshArguments, in: scriptDirectory)
+            script = try LaunchScript.write(sshArguments: request.sshArguments, program: request.program, in: scriptDirectory)
         } catch {
             throw LaunchError.failed(String(describing: error))
         }
@@ -49,6 +49,7 @@ struct AppleScriptLauncher: TerminalLaunching {
 
 struct GhosttyLauncher: TerminalLaunching {
     func launch(_ request: LaunchRequest) throws {
+        guard LaunchScript.isSafePath(request.program) else { throw LaunchError.failed("unsafe program path") }
         let process = Process()
         process.executableURL = URL(filePath: "/usr/bin/open")
         process.arguments = GhosttyArguments.openArguments(for: request)
