@@ -854,6 +854,69 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "This host can't be opened because its connection command contains invalid characters." } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu host açılamıyor çünkü bağlantı komutu geçersiz karakterler içeriyor." } }
       }
+    },
+    "status.reachable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reachable" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Erişilebilir" } }
+      }
+    },
+    "status.authenticationRequired" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Authentication required" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kimlik doğrulama gerekli" } }
+      }
+    },
+    "status.hostKeyChanged" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Host key changed" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Host anahtarı değişmiş" } }
+      }
+    },
+    "status.unknownHostKey" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unknown host key" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bilinmeyen host anahtarı" } }
+      }
+    },
+    "status.timeout" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Timed out" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Zaman aşımı" } }
+      }
+    },
+    "status.dnsFailure" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Host name not found" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Sunucu adı bulunamadı" } }
+      }
+    },
+    "status.connectionRefused" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connection refused" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bağlantı reddedildi" } }
+      }
+    },
+    "status.other" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connection failed" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bağlantı başarısız" } }
+      }
+    },
+    "status.testing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Testing…" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Test ediliyor…" } }
+      }
     }
   },
   "version" : "1.0"

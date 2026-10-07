@@ -32,6 +32,8 @@ final class AppModel {
     @ObservationIgnored private let terminalInstalled: @MainActor (TerminalChoice) -> Bool
     /// Set when macOS denied Automation access; the main window explains how to allow it.
     var automationDenied = false
+    /// Session-only connection test results; cleared when another config file is opened.
+    let connectionTests: ConnectionTestsModel
 
     init(settings: AppSettings,
          backupRoot: URL = BackupManager.defaultRoot,
@@ -41,6 +43,7 @@ final class AppModel {
          makeStore: @escaping StoreFactory = AppModel.liveStore) {
         self.settings = settings
         self.processRunner = processRunner
+        self.connectionTests = ConnectionTestsModel(runner: processRunner)
         self.launcherFactory = launcherFactory
         self.terminalInstalled = isTerminalInstalled
         let backups = BackupManager(rootDirectory: backupRoot, keep: settings.backupCount)
@@ -174,6 +177,7 @@ final class AppModel {
         settings.setConfigPath(path)
         store = makeStore(url, backupManager, Self.backupKind(for: url, home: settings.homeDirectory))
         select(nil)
+        connectionTests.clear()
         searchText = ""
         errorMessage = nil
         return .switched

@@ -47,6 +47,17 @@ struct FixedRunner: ProcessRunning {
     }
 }
 
+/// A ProcessRunning that waits before answering (cancellable), for concurrency tests.
+struct DelayedRunner: ProcessRunning {
+    let delay: Duration
+    let result: ProcessResult
+
+    func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
+        try await Task.sleep(for: delay)
+        return result
+    }
+}
+
 /// An AppModel wired to a temporary home, temporary backups and fake ssh validation.
 @MainActor
 func makeTestModel(_ tmp: TempDir, config: String? = nil, runner: FixedRunner = .valid,
