@@ -94,3 +94,41 @@ struct AddRemoveHostTests {
         #expect(Array(doc.render().utf8) == Array(text.utf8))
     }
 }
+
+struct EditGuardTests {
+    static let source = "Host a\n  User u\n"
+
+    static let badDrafts: [(HostDraft, ConfigEditError)] = [
+        (HostDraft(patterns: ["x"], directives: [DraftDirective(key: "", value: "v")]), .invalidDirectiveKey("")),
+        (HostDraft(patterns: ["x"], directives: [DraftDirective(key: "Bad Key", value: "v")]), .invalidDirectiveKey("Bad Key")),
+        (HostDraft(patterns: ["x"], directives: [DraftDirective(key: "Us-er", value: "v")]), .invalidDirectiveKey("Us-er")),
+        (HostDraft(patterns: ["x"], directives: [DraftDirective(key: "HOST", value: "v")]), .forbiddenDirectiveKey("HOST")),
+        (HostDraft(patterns: ["x"], directives: [DraftDirective(key: "match", value: "v")]), .forbiddenDirectiveKey("match")),
+        (HostDraft(patterns: ["x"], directives: [DraftDirective(key: "Include", value: "v")]), .forbiddenDirectiveKey("Include")),
+        (HostDraft(patterns: []), .invalidAlias("")),
+        (HostDraft(patterns: ["x", ""]), .invalidAlias("")),
+        (HostDraft(patterns: ["a b"]), .invalidAlias("a b")),
+        (HostDraft(patterns: ["a\tb"]), .invalidAlias("a\tb")),
+    ]
+
+    @Test(arguments: badDrafts)
+    func updateHostRejects(draft: HostDraft, error: ConfigEditError) {
+        var doc = ConfigDocument(parsing: Self.source)
+        #expect(throws: error) { try doc.updateHost(at: 0, to: draft) }
+        #expect(doc.render() == Self.source)
+    }
+
+    @Test(arguments: badDrafts)
+    func addHostRejects(draft: HostDraft, error: ConfigEditError) {
+        var doc = ConfigDocument(parsing: Self.source)
+        #expect(throws: error) { try doc.addHost(draft) }
+        #expect(doc.render() == Self.source)
+    }
+
+    @Test(arguments: ["", " ", "a b", "a\tb"])
+    func duplicateRejectsBadAlias(alias: String) {
+        var doc = ConfigDocument(parsing: Self.source)
+        #expect(throws: ConfigEditError.invalidAlias(alias)) { try doc.duplicateHost(at: 0, newAlias: alias) }
+        #expect(doc.render() == Self.source)
+    }
+}

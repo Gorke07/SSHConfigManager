@@ -1,6 +1,9 @@
 public enum ConfigEditError: Error, Equatable, Sendable {
     case hostNotFound(Int)
     case controlCharacter
+    case invalidDirectiveKey(String)
+    case forbiddenDirectiveKey(String)
+    case invalidAlias(String)
 }
 
 extension ConfigDocument {
@@ -18,21 +21,42 @@ extension ConfigDocument {
         ConfigLine(raw: indent + key + " " + ValueFormatter.encode(key: key, value: value) + lineEndingSuffix)
     }
 
+    /// Rejects drafts that would write a structurally broken or injected line
+    /// (the same structural rules `HostDraftValidator` reports as issues).
+    func checkDraft(_ draft: HostDraft) throws {
+        for pattern in draft.patterns where pattern.containsControlCharacter {
+            throw ConfigEditError.controlCharacter
+        }
+        for directive in draft.directives
+        where directive.key.containsControlCharacter || directive.value.containsControlCharacter {
+            throw ConfigEditError.controlCharacter
+        }
+        if draft.patterns.isEmpty { throw ConfigEditError.invalidAlias("") }
+        for pattern in draft.patterns { try checkAlias(pattern) }
+        for directive in draft.directives {
+            guard DirectiveKeyRules.isValid(directive.key) else {
+                throw ConfigEditError.invalidDirectiveKey(directive.key)
+            }
+            if DirectiveKeyRules.isForbidden(directive.key) {
+                throw ConfigEditError.forbiddenDirectiveKey(directive.key)
+            }
+        }
+    }
+
+    func checkAlias(_ alias: String) throws {
+        if alias.containsControlCharacter { throw ConfigEditError.controlCharacter }
+        if alias.isEmpty || alias.unicodeScalars.contains(where: LineTokenizer.isSpace) {
+            throw ConfigEditError.invalidAlias(alias)
+        }
+    }
+
     /// Applies `draft` to the Host block at `header`, touching only lines whose content changes.
     /// Existing directives are paired with draft directives by key: first matching by value,
     /// then by order for remaining directives.
     public mutating func updateHost(at header: Int, to draft: HostDraft) throws {
         guard let entry = hostEntry(at: header) else { throw ConfigEditError.hostNotFound(header) }
 
-        // Check for control characters in patterns and directives
-        for pattern in draft.patterns {
-            if pattern.containsControlCharacter { throw ConfigEditError.controlCharacter }
-        }
-        for directive in draft.directives {
-            if directive.key.containsControlCharacter || directive.value.containsControlCharacter {
-                throw ConfigEditError.controlCharacter
-            }
-        }
+        try checkDraft(draft)
 
         let end = blockEnd(after: header)
 
@@ -114,15 +138,7 @@ extension ConfigDocument {
 
     @discardableResult
     public mutating func addHost(_ draft: HostDraft) throws -> Int {
-        // Check for control characters in patterns and directives
-        for pattern in draft.patterns {
-            if pattern.containsControlCharacter { throw ConfigEditError.controlCharacter }
-        }
-        for directive in draft.directives {
-            if directive.key.containsControlCharacter || directive.value.containsControlCharacter {
-                throw ConfigEditError.controlCharacter
-            }
-        }
+        try checkDraft(draft)
 
         let indent = directiveIndent
         let blank = ConfigLine(raw: lineEndingSuffix)
@@ -165,7 +181,7 @@ extension ConfigDocument {
             throw ConfigEditError.hostNotFound(header)
         }
 
-        if newAlias.containsControlCharacter { throw ConfigEditError.controlCharacter }
+        try checkAlias(newAlias)
 
         var end = ownedEnd(of: header)
         while end - 1 > header && lines[end - 1].kind == .blank { end -= 1 }

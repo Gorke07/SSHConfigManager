@@ -16,6 +16,19 @@ public enum DraftIssue: Equatable, Sendable {
     }
 }
 
+/// Directive-key rules shared by `HostDraftValidator` and the `ConfigDocument` edit guards.
+enum DirectiveKeyRules {
+    static func isValid(_ key: String) -> Bool {
+        !key.isEmpty && key.unicodeScalars.allSatisfy {
+            (65...90).contains($0.value) || (97...122).contains($0.value) || (48...57).contains($0.value)
+        }
+    }
+
+    static func isForbidden(_ key: String) -> Bool {
+        ["host", "match", "include"].contains(key.asciiLowercased)
+    }
+}
+
 public struct HostDraftValidator: Sendable {
     private let fileExists: @Sendable (String) -> Bool
 
@@ -69,14 +82,11 @@ public struct HostDraftValidator: Sendable {
             }
 
             let key = directive.key.asciiLowercased
-            let isValidKey = !directive.key.isEmpty && directive.key.unicodeScalars.allSatisfy {
-                (65...90).contains($0.value) || (97...122).contains($0.value) || (48...57).contains($0.value)
-            }
-            if !isValidKey {
+            if !DirectiveKeyRules.isValid(directive.key) {
                 issues.append(.invalidDirectiveKey(directive.key))
                 continue
             }
-            if ["host", "match", "include"].contains(key) {
+            if DirectiveKeyRules.isForbidden(directive.key) {
                 issues.append(.forbiddenDirectiveKey(directive.key))
                 continue
             }
