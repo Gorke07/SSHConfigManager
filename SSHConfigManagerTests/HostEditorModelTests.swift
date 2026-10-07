@@ -116,6 +116,33 @@ struct HostEditorModelTests {
         #expect(app.store.document.render() == "Host web\n")
     }
 
+    @Test func staleFormIsNotWrittenOverChangedBlock() throws {
+        let tmp = try TempDir()
+        let app = model(tmp, "Host web\n  User u\n")
+        let editor = try #require(HostEditorModel(item: .host(alias: "web", occurrence: 0), store: app.store, homeDirectory: tmp.url))
+        try app.store.apply { $0 = ConfigDocument(parsing: "Host web\n  User other\n") }
+        editor.fields["HostName"] = "x"
+        #expect(!editor.commit())
+        #expect(editor.isStale)
+        #expect(app.store.document.render() == "Host web\n  User other\n")
+    }
+
+    @Test func consecutiveCommitsSucceedAndFailureClears() throws {
+        let tmp = try TempDir()
+        let app = model(tmp, "Host web\n  User u\n")
+        let editor = try #require(HostEditorModel(item: .host(alias: "web", occurrence: 0), store: app.store, homeDirectory: tmp.url))
+        editor.fields["Port"] = "99999"
+        #expect(!editor.commit())
+        editor.fields["Port"] = ""
+        editor.fields["User"] = "v"
+        #expect(editor.commit())
+        #expect(editor.failure == nil)
+        editor.fields["Port"] = "22"
+        #expect(editor.commit())
+        #expect(!editor.isStale)
+        #expect(app.store.document.render().contains("User v") && app.store.document.render().contains("Port 22"))
+    }
+
     @Test func nonHostItemsHaveNoEditor() throws {
         let tmp = try TempDir()
         let app = model(tmp, "Match all\n")

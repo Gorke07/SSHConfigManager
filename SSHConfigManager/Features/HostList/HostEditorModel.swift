@@ -17,7 +17,11 @@ final class HostEditorModel {
     var identityFiles: [String]
     var otherOptions: [DraftDirective]
     private(set) var issues: [DraftIssue] = []
-    private(set) var editError: ConfigEditError?
+    private(set) var failure: (any Error)?
+    /// True when the document's block changed underneath the form; nothing is written until the editor is reopened.
+    private(set) var isStale = false
+
+    @ObservationIgnored private var baseline: HostDraft
 
     @ObservationIgnored private let validator: HostDraftValidator
 
@@ -25,6 +29,7 @@ final class HostEditorModel {
         guard let entry = SidebarBuilder.hostEntry(for: item, in: store.document) else { return nil }
         self.store = store
         self.item = item
+        baseline = HostDraft(entry)
         aliasText = entry.patterns.joined(separator: " ")
         var fields: [String: String] = [:]
         for key in Self.fieldKeys { fields[key] = entry.value(for: key) ?? "" }
@@ -60,8 +65,14 @@ final class HostEditorModel {
     /// Returns true when the document reflects the draft afterwards.
     @discardableResult
     func commit() -> Bool {
+        failure = nil
         guard let entry = SidebarBuilder.hostEntry(for: item, in: store.document) else {
-            editError = .hostNotFound(-1)
+            failure = ConfigEditError.hostNotFound(-1)
+            issues = []
+            return false
+        }
+        guard HostDraft(entry) == baseline else {
+            isStale = true
             return false
         }
         let draft = self.draft
@@ -69,15 +80,15 @@ final class HostEditorModel {
         guard !hasBlockingIssues else { return false }
         do {
             try store.apply { try $0.updateHost(at: entry.headerLine, to: draft) }
-            editError = nil
             if let renamed = SidebarBuilder.item(forHeader: entry.headerLine, in: store.document) {
                 item = renamed
+                if let updated = SidebarBuilder.hostEntry(for: renamed, in: store.document) {
+                    baseline = HostDraft(updated)
+                }
             }
             return true
-        } catch let error as ConfigEditError {
-            editError = error
-            return false
         } catch {
+            failure = error
             return false
         }
     }
