@@ -246,6 +246,13 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "“%@” host'u dosyada bulunamadı." } }
       }
     },
+    "keys.error.pendingFormEdits" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Apply or discard the changes in the host form first." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Önce host formundaki değişiklikleri uygulayın ya da vazgeçin." } }
+      }
+    },
     "issue.duplicateAlias %@" : {
       "extractionState" : "manual",
       "localizations" : {

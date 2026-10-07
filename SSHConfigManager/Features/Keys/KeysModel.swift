@@ -19,6 +19,7 @@ final class KeysModel {
     private(set) var rows: [KeyRow] = []
     private(set) var isRefreshing = false
     private(set) var isWorking = false
+    @ObservationIgnored private var operationCount = 0
     var errorMessage: String?
     var selection: Set<String> = []
 
@@ -69,6 +70,12 @@ final class KeysModel {
             return false
         }
         let url = app.sshDirectory.appending(path: fileName)
+        if let alias {
+            do { try app.validateAssignment(toAlias: alias) } catch {
+                errorMessage = Messages.text(for: error)
+                return false
+            }
+        }
         return await perform {
             try await tools.manager.generate(type: type, at: url, comment: comment, passphrase: passphrase)
             if let alias { try app.assignIdentityFile(url, toAlias: alias) }
@@ -88,8 +95,13 @@ final class KeysModel {
     }
 
     func copyPublicKey(_ row: KeyRow) {
-        guard let url = row.key.publicURL, let text = try? String(contentsOf: url, encoding: .utf8) else { return }
-        tools.copyToPasteboard(text.trimmingCharacters(in: .whitespacesAndNewlines))
+        guard let url = row.key.publicURL else { return }
+        do {
+            let text = try String(contentsOf: url, encoding: .utf8)
+            tools.copyToPasteboard(text.trimmingCharacters(in: .whitespacesAndNewlines))
+        } catch {
+            errorMessage = Messages.text(for: error)
+        }
     }
 
     /// Moves the private key and its `.pub` to the Trash together (spec §8.3).
@@ -100,8 +112,12 @@ final class KeysModel {
 
     /// Runs an operation, reports errors, then refreshes the list.
     private func perform(_ operation: () async throws -> Void) async -> Bool {
+        operationCount += 1
         isWorking = true
-        defer { isWorking = false }
+        defer {
+            operationCount -= 1
+            isWorking = operationCount > 0
+        }
         do {
             try await operation()
             errorMessage = nil
@@ -109,12 +125,13 @@ final class KeysModel {
             return true
         } catch {
             errorMessage = Messages.text(for: error)
+            await refresh()   // the operation may have changed files before failing
             return false
         }
     }
 
     static func isValidFileName(_ name: String) -> Bool {
-        !name.isEmpty && !name.hasPrefix(".") && !name.contains("/")
+        !name.isEmpty && name == name.trimmingCharacters(in: .whitespacesAndNewlines) && !name.hasPrefix(".") && !name.contains("/")
             && !name.unicodeScalars.contains { $0.value < 0x20 || $0.value == 0x7F }
     }
 }

@@ -295,11 +295,21 @@ final class AppModel {
 
     /// Editable, non-pattern hosts of the document (included files are read-only).
     var assignableAliases: [String] {
-        store.document.hosts.filter { !$0.isPattern }.map(\.alias)
+        var seen: Set<String> = []
+        return store.document.hosts.filter { !$0.isPattern }.map(\.alias).filter { seen.insert($0).inserted }
+    }
+
+    /// Throws unless `alias` can be edited right now without dropping the open form's edits.
+    func validateAssignment(toAlias alias: String) throws {
+        guard store.loadState == .loaded, assignableAliases.contains(alias) else {
+            throw KeyAssignmentError.hostNotFound(alias)
+        }
+        if hasPendingFormEdits { throw KeyAssignmentError.pendingFormEdits }
     }
 
     /// Adds `IdentityFile <~/path>` to the host as an unsaved edit (the normal Save flow writes it).
     func assignIdentityFile(_ url: URL, toAlias alias: String) throws {
+        try validateAssignment(toAlias: alias)
         guard let entry = store.document.hosts.first(where: { !$0.isPattern && $0.alias == alias }) else {
             throw KeyAssignmentError.hostNotFound(alias)
         }
@@ -347,4 +357,5 @@ final class AppModel {
 
 enum KeyAssignmentError: Error, Equatable {
     case hostNotFound(String)
+    case pendingFormEdits
 }

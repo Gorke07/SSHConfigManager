@@ -105,7 +105,12 @@ enum Messages {
         if let error = error as? KnownHostsStoreError { return text(for: error) }
         if let error = error as? HostResolverError { return text(for: error) }
         if let error = error as? KeyManagerError { return text(for: error) }
-        if case KeyAssignmentError.hostNotFound(let alias) = error { return String(localized: "keys.error.hostNotFound \(alias)") }
+        if let error = error as? KeyAssignmentError {
+            switch error {
+            case .hostNotFound(let alias): return String(localized: "keys.error.hostNotFound \(alias)")
+            case .pendingFormEdits: return String(localized: "keys.error.pendingFormEdits")
+            }
+        }
         let detail = error.localizedDescription
         return String(localized: "error.generic \(detail)")
     }

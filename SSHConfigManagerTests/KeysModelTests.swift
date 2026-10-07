@@ -33,8 +33,9 @@ struct KeysModelTests {
         try tmp.file(".ssh/taken.pub", "keep\n")
         #expect(await model.keys.generate(type: .ed25519, fileName: "taken", comment: "c", passphrase: "", assignTo: nil) == false)
         #expect(try tmp.read(".ssh/taken.pub") == "keep\n")
-        #expect(model.keys.errorMessage?.isEmpty == false)
-        for bad in ["", "../x", "a/b", ".hidden"] {
+        #expect(model.keys.errorMessage == String(localized: "keys.error.fileExists \(tmp.url.appending(path: ".ssh/taken.pub").path)"))
+        for bad in ["", "  ", " k", "k ", "../x", "a/b", ".hidden"] {
+            model.keys.errorMessage = nil
             #expect(await model.keys.generate(type: .ed25519, fileName: bad, comment: "c", passphrase: "", assignTo: nil) == false)
             #expect(model.keys.errorMessage == String(localized: "keys.error.invalidFileName"))
         }
@@ -48,6 +49,38 @@ struct KeysModelTests {
         #expect(model.store.hasUnsavedChanges)
         #expect(model.store.document.hosts.first?.values(for: "IdentityFile") == ["~/.ssh/deploy"])
         #expect(try tmp.read(".ssh/config") == "Host web\n  HostName 10.0.0.1\n")   // saved only through the Save flow
+        await model.keys.refresh()
+        #expect(model.keys.rows.first { $0.key.name == "deploy" }?.usedBy == [])   // "Used by" reads the saved file
+    }
+
+    @Test func assigningWhileTheFormHasPendingEditsIsRefusedBeforeAnythingHappens() async throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\n  HostName 10.0.0.1\n")
+        let item = SidebarItem.host(alias: "web", occurrence: 0)
+        model.select(item)
+        let editor = try #require(model.editor(for: item))
+        editor.fields["Port"] = "abc"
+        #expect(!editor.commit())
+        #expect(model.hasPendingFormEdits)
+        #expect(await model.keys.generate(type: .ed25519, fileName: "deploy", comment: "c", passphrase: "", assignTo: "web") == false)
+        #expect(model.keys.errorMessage == String(localized: "keys.error.pendingFormEdits"))
+        #expect(!FileManager.default.fileExists(atPath: tmp.url.appending(path: ".ssh/deploy").path))
+        #expect(model.hasPendingFormEdits)
+        #expect(model.editor(for: item) === editor)
+    }
+
+    @Test func assigningToAnUnknownAliasCreatesNoKey() async throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\n")
+        #expect(await model.keys.generate(type: .ed25519, fileName: "deploy", comment: "c", passphrase: "", assignTo: "ghost") == false)
+        #expect(model.keys.errorMessage == String(localized: "keys.error.hostNotFound \("ghost")"))
+        #expect(!FileManager.default.fileExists(atPath: tmp.url.appending(path: ".ssh/deploy").path))
+    }
+
+    @Test func duplicateAliasesAreListedOnce() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\nHost web\nHost db\n")
+        #expect(model.assignableAliases == ["web", "db"])
     }
 
     @Test func copyAndTrashUseTheInjectedActions() async throws {
