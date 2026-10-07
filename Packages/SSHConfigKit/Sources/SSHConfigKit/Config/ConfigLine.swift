@@ -17,7 +17,7 @@ public enum LineKind: Equatable, Sendable {
     }
 }
 
-public struct ConfigLine: Equatable, Sendable {
+public struct ConfigLine: Sendable {
     /// Exact original text without the "\n" separator (may end with "\r").
     public let raw: String
     public let kind: LineKind
@@ -39,4 +39,10 @@ public struct ConfigLine: Equatable, Sendable {
     }
 
     var parts: LineParts? { LineTokenizer.classify(raw).parts }
+}
+
+extension ConfigLine: Equatable {
+    public static func == (lhs: ConfigLine, rhs: ConfigLine) -> Bool {
+        Array(lhs.raw.utf8).elementsEqual(Array(rhs.raw.utf8)) && lhs.kind == rhs.kind
+    }
 }

@@ -86,4 +86,10 @@ struct ConfigDocumentRoundTripTests {
         #expect(ConfigDocument(parsing: "").lines.isEmpty)
         #expect(ConfigDocument(parsing: "Host a\r\n").lineEndingSuffix == "\r")
     }
+
+    @Test func equalityIsByteLevel() {
+        // U+00E9 (composed) vs e + U+0301 (combining) must not be equal
+        #expect(ConfigLine(raw: "Host \u{E9}") != ConfigLine(raw: "Host e\u{301}"))
+        #expect(ConfigDocument(parsing: "Host \u{E9}\n") != ConfigDocument(parsing: "Host e\u{301}\n"))
+    }
 }
