@@ -50,6 +50,8 @@ public final class ConfigStore {
     public private(set) var isWatching = false
 
     @ObservationIgnored private var diskFingerprint: FileFingerprint?
+    /// The text `savedDocument` was built from (nil: no file); lets refreshes skip no-op notifications.
+    @ObservationIgnored private var savedViewText: String?
     @ObservationIgnored private var writer: SafeFileWriter
     @ObservationIgnored private let watchForChanges: Bool
     @ObservationIgnored private let validator: ConfigValidator
@@ -109,6 +111,7 @@ public final class ConfigStore {
         }
         document = ConfigDocument(parsing: text)
         diskText = text
+        savedViewText = text
         savedDocument = document
         diskFingerprint = FileFingerprint(data: data)
         loadState = .loaded
@@ -188,6 +191,7 @@ public final class ConfigStore {
         }
 
         diskText = text
+        savedViewText = text
         savedDocument = ConfigDocument(parsing: text)
         diskFingerprint = FileFingerprint(data: Data(text.utf8))
         externalChangePending = false
@@ -198,7 +202,14 @@ public final class ConfigStore {
 
     func fileDidChange() {
         let current = try? FileFingerprint.of(fileAt: fileURL)
-        guard current != diskFingerprint else { return }
+        guard current != diskFingerprint else {
+            // Reverted to what we loaded: the saved view returns to `diskText` and the conflict is gone.
+            if externalChangePending {
+                externalChangePending = false
+                setSavedView(text: diskText)
+            }
+            return
+        }
         if hasUnsavedChanges {
             externalChangePending = true
             refreshSavedView()
@@ -209,11 +220,30 @@ public final class ConfigStore {
 
     /// The file changed under unsaved edits: keep `diskText` and the fingerprint (so Save still
     /// detects the conflict) but show what ssh now reads, so Connect/Test never offer removed hosts.
+    /// A missing file empties the view; any other read failure or invalid UTF-8 keeps the old one.
     private func refreshSavedView() {
-        guard let data = try? Data(contentsOf: fileURL),
-              let text = String(validating: data, as: UTF8.self) else { return }
-        savedDocument = ConfigDocument(parsing: text)
-        savedIncludedHosts = includeResolver.includedHosts(of: savedDocument, rootFile: fileURL)
+        do {
+            let data = try Data(contentsOf: fileURL)
+            guard let text = String(validating: data, as: UTF8.self) else { return }
+            setSavedView(text: text)
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+            setSavedView(text: nil)
+        } catch {
+            return
+        }
+    }
+
+    /// Rebuilds what ssh reads from `text` (nil: no file). Notifies only when that text changed.
+    private func setSavedView(text: String?) {
+        guard text != savedViewText else { return }
+        savedViewText = text
+        if let text {
+            savedDocument = ConfigDocument(parsing: text)
+            savedIncludedHosts = includeResolver.includedHosts(of: savedDocument, rootFile: fileURL)
+        } else {
+            savedDocument = .empty
+            savedIncludedHosts = []
+        }
         onDiskStateChange?()
     }
 
@@ -229,6 +259,7 @@ public final class ConfigStore {
     private func reset(state: ConfigLoadState) {
         document = .empty
         diskText = ""
+        savedViewText = nil
         savedDocument = .empty
         diskFingerprint = nil
         includedHosts = []

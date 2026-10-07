@@ -405,6 +405,7 @@ struct ConfigStoreTests {
         var notified = 0
         store.onDiskStateChange = { notified += 1 }
         try addPort(store)
+        let includedBefore = store.includedHosts.map(\.entry.alias)
         try tmp.file("config", "Host a\n  User u\nHost added\n  User y\n")
 
         store.fileDidChange()
@@ -412,6 +413,7 @@ struct ConfigStoreTests {
         #expect(store.externalChangePending)
         #expect(store.savedDocument.hosts.map(\.alias) == ["a", "added"])
         #expect(notified == 1)
+        #expect(store.includedHosts.map(\.entry.alias) == includedBefore)
         // The edit and the conflict guard are untouched.
         #expect(store.document.hosts.map(\.alias) == ["a", "gone"])
         #expect(store.diskText == "Host a\n  User u\nHost gone\n  User x\n")
@@ -423,10 +425,63 @@ struct ConfigStoreTests {
         let tmp = try TempDir()
         try tmp.file("config", "Host a\n")
         let store = makeStore(tmp)
+        var notified = 0
+        store.onDiskStateChange = { notified += 1 }
         try addPort(store)
         try Data([0xFF, 0xFE]).write(to: tmp.url.appending(path: "config"))
         store.fileDidChange()
+        #expect(notified == 0)
         #expect(store.externalChangePending)
         #expect(store.savedDocument.hosts.map(\.alias) == ["a"])
+    }
+
+    @Test func deletionWithLocalEditsEmptiesWhatSshReads() throws {
+        let tmp = try TempDir()
+        try tmp.file("config", "Host a\n")
+        let store = makeStore(tmp)
+        var notified = 0
+        store.onDiskStateChange = { notified += 1 }
+        try addPort(store)
+        try FileManager.default.removeItem(at: tmp.url.appending(path: "config"))
+        store.fileDidChange()
+        store.fileDidChange()
+        #expect(store.externalChangePending)
+        #expect(store.savedDocument.hosts.isEmpty)
+        #expect(store.savedIncludedHosts.isEmpty)
+        #expect(notified == 1)
+        #expect(store.diskText == "Host a\n")
+    }
+
+    @Test func revertToLoadedContentRestoresTheViewAndAllowsSave() async throws {
+        let tmp = try TempDir()
+        try tmp.file("config", "Host a\n")
+        let store = makeStore(tmp)
+        try addPort(store)
+        try tmp.file("config", "Host b\n")
+        store.fileDidChange()
+        #expect(store.savedDocument.hosts.map(\.alias) == ["b"])
+        var notified = 0
+        store.onDiskStateChange = { notified += 1 }
+        try tmp.file("config", "Host a\n")
+        store.fileDidChange()
+        #expect(!store.externalChangePending)
+        #expect(store.savedDocument.hosts.map(\.alias) == ["a"])
+        #expect(notified == 1)
+        try await store.save()
+        #expect(try tmp.read("config").contains("Port"))
+    }
+
+    @Test func identicalExternalWritesNotifyOnce() throws {
+        let tmp = try TempDir()
+        try tmp.file("config", "Host a\n")
+        let store = makeStore(tmp)
+        var notified = 0
+        store.onDiskStateChange = { notified += 1 }
+        try addPort(store)
+        try tmp.file("config", "Host b\n")
+        store.fileDidChange()
+        try tmp.file("config", "Host b\n")
+        store.fileDidChange()
+        #expect(notified == 1)
     }
 }
