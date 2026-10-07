@@ -62,7 +62,8 @@ struct DelayedRunner: ProcessRunning {
 @MainActor
 func makeTestModel(_ tmp: TempDir, config: String? = nil, runner: any ProcessRunning = FixedRunner.valid,
                    launcher: RecordingLauncher = RecordingLauncher(),
-                   isTerminalInstalled: @escaping @MainActor (TerminalChoice) -> Bool = { _ in true }) -> AppModel {
+                   isTerminalInstalled: @escaping @MainActor (TerminalChoice) -> Bool = { _ in true },
+                   keyActions: RecordingKeyActions = RecordingKeyActions()) -> AppModel {
     if let config { _ = try? tmp.file(".ssh/config", config) }
     let settings = AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url)
     return AppModel(
@@ -70,6 +71,7 @@ func makeTestModel(_ tmp: TempDir, config: String? = nil, runner: any ProcessRun
         processRunner: runner,
         launcherFactory: { _ in launcher },
         isTerminalInstalled: isTerminalInstalled,
+        keyTools: keyActions.tools(tmp),
         makeStore: { url, backups, kind in
             ConfigStore(
                 fileURL: url,
@@ -93,5 +95,21 @@ final class RecordingLauncher: TerminalLaunching {
     func launch(_ request: LaunchRequest) throws {
         if let error { throw error }
         requests.append(request)
+    }
+}
+
+/// Records pasteboard copies and trash requests instead of touching the real ones.
+@MainActor
+final class RecordingKeyActions {
+    private(set) var copied: [String] = []
+    private(set) var recycled: [[URL]] = []
+
+    func tools(_ tmp: TempDir) -> KeyTools {
+        KeyTools(
+            scanner: KeyScanner(),
+            manager: KeyManager(agentSocket: "/tmp/sshcm-none-\(UUID().uuidString.prefix(8))", askPassDirectory: tmp.url),
+            useKeychain: false,
+            recycle: { [weak self] urls in self?.recycled.append(urls) },
+            copyToPasteboard: { [weak self] text in self?.copied.append(text) })
     }
 }

@@ -1,5 +1,6 @@
 import AppKit
 import KeyboardShortcuts
+import SSHConfigKit
 
 /// Quitting (or closing the last window) with unsaved edits asks Save / Cancel / Don't Save.
 @MainActor
@@ -104,7 +105,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return AppModel(settings: AppSettings(defaults: defaults, homeDirectory: home),
                         backupRoot: home.appending(path: "Backups"),
                         launcherFactory: { _ in NoOpLauncher() },
-                        isTerminalInstalled: { _ in false })
+                        isTerminalInstalled: { _ in false },
+                        keyTools: KeyTools(
+                            scanner: KeyScanner(),
+                            manager: KeyManager(agentSocket: "/tmp/sshcm-none", askPassDirectory: home),
+                            useKeychain: false, recycle: { _ in }, copyToPasteboard: { _ in }))
     }
 }
 

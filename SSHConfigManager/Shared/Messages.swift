@@ -87,11 +87,25 @@ enum Messages {
         }
     }
 
+
+    static func text(for error: KeyManagerError) -> String {
+        switch error {
+        case .fileExists(let path): String(localized: "keys.error.fileExists \(path)")
+        case .passphraseTooShort: String(localized: "keys.error.passphraseTooShort")
+        case .wrongPassphrase: String(localized: "keys.error.wrongPassphrase")
+        case .noAgent: String(localized: "keys.error.noAgent")
+        case .timedOut: String(localized: "keys.error.timedOut")
+        case .failed(let detail): String(localized: "keys.error.failed \(detail)")
+        }
+    }
+
     static func text(for error: any Error) -> String {
         if let error = error as? ConfigStoreError { return text(for: error) }
         if let error = error as? ConfigEditError { return text(for: error) }
         if let error = error as? KnownHostsStoreError { return text(for: error) }
         if let error = error as? HostResolverError { return text(for: error) }
+        if let error = error as? KeyManagerError { return text(for: error) }
+        if case KeyAssignmentError.hostNotFound(let alias) = error { return String(localized: "keys.error.hostNotFound \(alias)") }
         let detail = error.localizedDescription
         return String(localized: "error.generic \(detail)")
     }

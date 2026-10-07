@@ -42,12 +42,14 @@ final class AppModel {
     var automationDenied = false
     /// Session-only connection test results; cleared when the saved file changes or another one is opened.
     let connectionTests: ConnectionTestsModel
+    let keys: KeysModel
 
     init(settings: AppSettings,
          backupRoot: URL = BackupManager.defaultRoot,
          processRunner: any ProcessRunning = ProcessRunner(),
          launcherFactory: @escaping @MainActor (TerminalChoice) -> any TerminalLaunching = LiveTerminals.launcher(for:),
          isTerminalInstalled: @escaping @MainActor (TerminalChoice) -> Bool = LiveTerminals.isInstalled,
+         keyTools: KeyTools = .live,
          makeStore: @escaping StoreFactory = AppModel.liveStore,
          makeKnownHostsStore: @escaping KnownHostsStoreFactory = AppModel.liveKnownHostsStore) {
         self.settings = settings
@@ -55,6 +57,7 @@ final class AppModel {
         self.connectionTests = ConnectionTestsModel(runner: processRunner)
         self.launcherFactory = launcherFactory
         self.terminalInstalled = isTerminalInstalled
+        self.keys = KeysModel(tools: keyTools)
         let backups = BackupManager(rootDirectory: backupRoot, keep: settings.backupCount)
         self.backupManager = backups
         self.makeStore = makeStore
@@ -62,6 +65,7 @@ final class AppModel {
         self.makeKnownHostsStore = makeKnownHostsStore
         self.knownHosts = makeKnownHostsStore(
             settings.knownHostsURL, backups, Self.knownHostsBackupKind(for: settings.knownHostsURL, home: settings.homeDirectory))
+        keys.app = self
         observeSavedState()
     }
 
@@ -276,6 +280,37 @@ final class AppModel {
         selection = item
     }
 
+    var sshDirectory: URL { settings.homeDirectory.appending(path: ".ssh") }
+
+    /// ~/.ssh and the active config file's directory (spec §8.1), each once.
+    var keyDirectories: [URL] {
+        let configDirectory = store.fileURL.deletingLastPathComponent()
+        return configDirectory.standardizedFileURL == sshDirectory.standardizedFileURL ? [sshDirectory] : [sshDirectory, configDirectory]
+    }
+
+    /// Host blocks of the saved file and its saved Include files: what ssh reads.
+    var savedHostEntries: [HostEntry] {
+        store.savedDocument.hosts + store.savedIncludedHosts.map(\.entry)
+    }
+
+    /// Editable, non-pattern hosts of the document (included files are read-only).
+    var assignableAliases: [String] {
+        store.document.hosts.filter { !$0.isPattern }.map(\.alias)
+    }
+
+    /// Adds `IdentityFile <~/path>` to the host as an unsaved edit (the normal Save flow writes it).
+    func assignIdentityFile(_ url: URL, toAlias alias: String) throws {
+        guard let entry = store.document.hosts.first(where: { !$0.isPattern && $0.alias == alias }) else {
+            throw KeyAssignmentError.hostNotFound(alias)
+        }
+        let path = settings.displayPath(for: url)
+        guard !entry.values(for: "IdentityFile").contains(path) else { return }
+        var draft = HostDraft(entry)
+        draft.directives.append(DraftDirective(key: "IdentityFile", value: path))
+        try store.apply { try $0.updateHost(at: entry.headerLine, to: draft) }
+        resetEditor()
+    }
+
     func resetEditor() {
         editorToken = UUID()
         activeEditor = nil
@@ -308,4 +343,8 @@ final class AppModel {
         store.setBackupKeep(settings.backupCount)
         knownHosts.setBackupKeep(settings.backupCount)
     }
+}
+
+enum KeyAssignmentError: Error, Equatable {
+    case hostNotFound(String)
 }

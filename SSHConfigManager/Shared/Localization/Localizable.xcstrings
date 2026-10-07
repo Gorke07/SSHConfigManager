@@ -190,6 +190,62 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Alias boşluk içeremez." } }
       }
     },
+    "keys.error.fileExists %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "A file already exists at %@. Nothing was overwritten." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "%@ konumunda zaten bir dosya var. Hiçbir şeyin üzerine yazılmadı." } }
+      }
+    },
+    "keys.error.passphraseTooShort" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Use no passphrase or at least 5 characters." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Parola kullanmayın ya da en az 5 karakter kullanın." } }
+      }
+    },
+    "keys.error.wrongPassphrase" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The passphrase is not correct." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Parola doğru değil." } }
+      }
+    },
+    "keys.error.noAgent" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ssh-agent is not running or cannot be reached." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "ssh-agent çalışmıyor ya da erişilemiyor." } }
+      }
+    },
+    "keys.error.timedOut" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The operation did not finish within 30 seconds." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "İşlem 30 saniye içinde bitmedi." } }
+      }
+    },
+    "keys.error.failed %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ssh reported: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "ssh şunu bildirdi: %@" } }
+      }
+    },
+    "keys.error.invalidFileName" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Use a plain file name without “/” that does not start with a dot." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "“/” içermeyen ve nokta ile başlamayan düz bir dosya adı kullanın." } }
+      }
+    },
+    "keys.error.hostNotFound %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The host “%@” was not found in the file." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "“%@” host'u dosyada bulunamadı." } }
+      }
+    },
     "issue.duplicateAlias %@" : {
       "extractionState" : "manual",
       "localizations" : {
