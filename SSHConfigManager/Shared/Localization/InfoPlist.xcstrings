@@ -1,0 +1,14 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "NSAppleEventsUsageDescription" : {
+      "comment" : "Automation (Apple Events) permission prompt shown by macOS before the app controls Terminal or iTerm2.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "SSH Config Manager opens your terminal and runs ssh for the host you choose." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "SSH Config Manager, SSH bağlantılarını açmak için Terminal veya iTerm2'yi kontrol eder." } }
+      }
+    }
+  },
+  "version" : "1.0"
+}

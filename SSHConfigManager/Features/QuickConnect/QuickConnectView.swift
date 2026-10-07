@@ -58,7 +58,11 @@ struct QuickConnectView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     footerButton(String(localized: "quick.openMainWindow")) { openMainWindow(); dismiss() }
                     footerButton(String(localized: "quick.settings")) { openSettings(); dismiss() }
-                    footerButton(String(localized: "quick.quit")) { NSApp.terminate(nil) }
+                    footerButton(String(localized: "quick.quit")) {
+                        // Close the menu first so the unsaved-changes alert is not left behind it.
+                        dismiss()
+                        Task { @MainActor in NSApp.terminate(nil) }
+                    }
                 }
                 .padding(6)
             }

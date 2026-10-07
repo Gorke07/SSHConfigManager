@@ -40,6 +40,7 @@ targets:
         CFBundleVersion: "1"
         LSApplicationCategoryType: public.app-category.developer-tools
         LSMinimumSystemVersion: "26.0"
+        # Localized (en, tr) by SSHConfigManager/Shared/Localization/InfoPlist.xcstrings, built from the sources above.
         NSAppleEventsUsageDescription: SSH Config Manager opens your terminal and runs ssh for the host you choose.
     entitlements:
       path: SSHConfigManager/SSHConfigManager.entitlements

@@ -1064,6 +1064,13 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "This host isn't in the saved file yet. Save your changes to connect to it." } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu host henüz kaydedilmiş dosyada yok. Bağlanmak için değişikliklerinizi kaydedin." } }
       }
+    },
+    "connect.fellBack.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Opened in Terminal" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Terminal'de Açıldı" } }
+      }
     }
   },
   "version" : "1.0"

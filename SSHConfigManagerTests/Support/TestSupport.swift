@@ -61,13 +61,14 @@ struct DelayedRunner: ProcessRunning {
 /// An AppModel wired to a temporary home, temporary backups and fake ssh validation.
 @MainActor
 func makeTestModel(_ tmp: TempDir, config: String? = nil, runner: FixedRunner = .valid,
-                   launcher: RecordingLauncher = RecordingLauncher()) -> AppModel {
+                   launcher: RecordingLauncher = RecordingLauncher(),
+                   isTerminalInstalled: @escaping @MainActor (TerminalChoice) -> Bool = { _ in true }) -> AppModel {
     if let config { _ = try? tmp.file(".ssh/config", config) }
     let settings = AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url)
     return AppModel(settings: settings, backupRoot: tmp.url.appending(path: "Backups"),
                     processRunner: runner,
                     launcherFactory: { _ in launcher },
-                    isTerminalInstalled: { _ in true }) { url, backups, kind in
+                    isTerminalInstalled: isTerminalInstalled) { url, backups, kind in
         ConfigStore(
             fileURL: url,
             writer: SafeFileWriter(backups: backups),

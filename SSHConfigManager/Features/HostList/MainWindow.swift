@@ -106,6 +106,14 @@ struct MainWindow: View {
             Text(String(localized: "connect.automationDenied.message"))
         }
         .alert(
+            String(localized: "connect.fellBack.title"),
+            isPresented: Binding(get: { model.fallbackNotice != nil }, set: { if !$0 { model.fallbackNotice = nil } })
+        ) {
+            Button(String(localized: "action.close")) { model.fallbackNotice = nil }
+        } message: {
+            Text(model.fallbackNotice ?? "")
+        }
+        .alert(
             String(localized: "error.title"),
             isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })
         ) {

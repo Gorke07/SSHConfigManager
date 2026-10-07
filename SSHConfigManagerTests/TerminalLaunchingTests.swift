@@ -194,6 +194,19 @@ struct TerminalLaunchingTests {
         #expect(app.connectableAlias(for: .host(alias: "b", occurrence: 0)) == "b")
     }
 
+    @Test func fallbackIsAnInformationalNoticeNotAnError() throws {
+        let tmp = try TempDir()
+        let launcher = RecordingLauncher()
+        let app = makeTestModel(tmp, config: "Host a\n", launcher: launcher, isTerminalInstalled: { $0 == .terminal })
+        app.settings.setTerminal(.ghostty)
+        app.errorMessage = "stale"
+        #expect(app.connect(alias: "a") == .fellBack(from: .ghostty))
+        #expect(app.errorMessage == nil)
+        let name = TerminalChoice.ghostty.displayName
+        #expect(app.fallbackNotice == String(localized: "connect.fellBack \(name)"))
+        #expect(launcher.requests.count == 1)
+    }
+
     @Test func customConfigUsesDashF() throws {
         let tmp = try TempDir()
         try tmp.file("dot/config", "Host a\n")

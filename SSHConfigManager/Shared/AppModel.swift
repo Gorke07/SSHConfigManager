@@ -19,6 +19,8 @@ final class AppModel {
     private(set) var editorToken = UUID()
     var searchText = ""
     var errorMessage: String?
+    /// Informational: the chosen terminal was unavailable and the connection opened in Terminal.
+    var fallbackNotice: String?
     /// The form for the current selection. Owned here (not by the view) so edits that validation
     /// blocked survive closing the window; dropped when the selection or document is reset.
     @ObservationIgnored private(set) var activeEditor: HostEditorModel?
@@ -32,7 +34,7 @@ final class AppModel {
     @ObservationIgnored private let terminalInstalled: @MainActor (TerminalChoice) -> Bool
     /// Set when macOS denied Automation access; the main window explains how to allow it.
     var automationDenied = false
-    /// Session-only connection test results; cleared when another config file is opened.
+    /// Session-only connection test results; cleared when the saved file changes or another one is opened.
     let connectionTests: ConnectionTestsModel
 
     init(settings: AppSettings,
@@ -53,13 +55,15 @@ final class AppModel {
         observeSavedState()
     }
 
-    /// The saved file changed (save, reload, external change): the connectable hosts must be rebuilt.
+    /// The saved file changed (save, reload, external change): results measured against the old
+    /// file are stale and the connectable hosts must be rebuilt.
     private func observeSavedState() {
         store.onDiskStateChange = { [weak self] in self?.savedStateDidChange() }
     }
 
     private func savedStateDidChange() {
         savedHostsCache = nil
+        connectionTests.clear()
     }
 
     static func liveStore(url: URL, backups: BackupManager, backupKind: String) -> ConfigStore {
@@ -161,9 +165,11 @@ final class AppModel {
         switch outcome {
         case .launched:
             errorMessage = nil
+            fallbackNotice = nil
         case .fellBack(let from):
             let name = from.displayName
-            errorMessage = String(localized: "connect.fellBack \(name)")
+            errorMessage = nil
+            fallbackNotice = String(localized: "connect.fellBack \(name)")
         case .failed(.automationDenied):
             automationDenied = true
         case .failed(.failed(let detail)):

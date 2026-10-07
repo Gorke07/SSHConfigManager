@@ -237,6 +237,46 @@ struct AppModelTests {
         #expect(model.errorMessage == nil)
     }
 
+    @Test func connectionResultsAreClearedAfterSaveAndReload() async throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n  HostName 10.0.0.1\n")
+        await model.connectionTests.test("a", using: model.commandBuilder)
+        #expect(model.connectionTests.results["a"] != nil)
+
+        // Editing alone keeps the result (it still describes the saved file)...
+        try model.store.apply { doc in
+            let entry = doc.hosts[0]
+            var draft = HostDraft(entry)
+            draft.directives = [DraftDirective(key: "HostName", value: "10.0.0.2")]
+            try doc.updateHost(at: entry.headerLine, to: draft)
+        }
+        #expect(model.connectionTests.results["a"] != nil)
+        // ...saving changes what ssh connects to, so it goes.
+        try await model.store.save()
+        #expect(model.connectionTests.results.isEmpty)
+
+        await model.connectionTests.test("a", using: model.commandBuilder)
+        #expect(model.connectionTests.results["a"] != nil)
+        try tmp.file(".ssh/config", "Host a\n  HostName 10.0.0.3\n")
+        model.store.discardChanges()
+        #expect(model.connectionTests.results.isEmpty)
+    }
+
+    @Test func connectionResultsAreClearedAfterSwitchingFiles() async throws {
+        let tmp = try TempDir()
+        try tmp.file("other/config", "Host b\n")
+        let model = makeTestModel(tmp, config: "Host a\n")
+        let original = model.store
+        await model.connectionTests.test("a", using: model.commandBuilder)
+        #expect(model.switchConfig(to: tmp.url.appending(path: "other/config").path) == .switched)
+        #expect(model.connectionTests.results.isEmpty)
+        // The old store no longer reaches the model.
+        await model.connectionTests.test("b", using: model.commandBuilder)
+        original.discardChanges()
+        #expect(model.connectionTests.results["b"] != nil)
+        #expect(model.connectableAliases == ["b"])
+    }
+
     @Test func configPathsWithControlCharactersAreInvalid() {
         #expect(!AppSettings.isValidConfigPath("/tmp/a\nb"))
         #expect(!AppSettings.isValidConfigPath("~/x\u{7F}"))

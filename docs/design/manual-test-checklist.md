@@ -52,3 +52,11 @@ Her sürüm öncesi temiz bir test kullanıcısında veya `~/.ssh/config` yedeğ
 - [ ] Ayarlar açıkken ana pencere kapatılır → Dock simgesi kalır; Ayarlar da kapatılınca kaybolur.
 - [ ] Ana pencere kapalıyken menü çubuğundan Ayarlar açılır → Dock simgesi görünür.
 - [ ] Menü çubuğu listesi iki kez açılır → ikincisinde arama sıfırlanmış ve arama kutusu odaklı.
+- [ ] Yeni bir host eklenip kaydedilmez → kenar çubuğunda rozet/Bağlan yok, Bağlan ve Test Et pasif; menü çubuğu ve ⌥⌘S listesinde görünmez; Tümünü Test Et onu test etmez. Kaydedince bağlanılabilir.
+- [ ] Kaydedilmiş bir host'un HostName'i değiştirilip kaydedilmez → bağlantı çubuğunda "Kaydedilmemiş değişiklikler var — Bağlan ve Test kaydedilmiş dosyayı kullanır." notu; Bağlan diskteki değerlerle bağlanır.
+- [ ] Kaydet ve diskten yeniden yükleme sonrası test rozetleri temizlenir.
+- [ ] Varsayılan kabuğu fish olan bir kullanıcıda Terminal ve iTerm2 ile bağlanılır → yalnızca `/…/sshcm-….sh` yolu yazılır, ssh açılır, betik dosyası silinmiş olur.
+- [ ] Ayarlar'da yüklü olmayan terminal seçilemez (satır pasif).
+- [ ] Seçili terminal kullanılamayıp Terminal'e düşülünce uyarının başlığı "Terminal'de Açıldı".
+- [ ] Sistem dili Türkçe iken ilk bağlanmadaki Otomasyon izni penceresinin açıklaması Türkçe.
+- [ ] Kaydedilmemiş değişiklik varken menü çubuğundan "Çık" → menü penceresi kapanır, kaydetme uyarısı önde açılır.

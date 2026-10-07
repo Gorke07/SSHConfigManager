@@ -40,6 +40,7 @@ struct SettingsView: View {
                         let name = choice.displayName
                         Text(verbatim: model.isTerminalInstalled(choice) ? name : String(localized: "settings.terminal.notInstalled \(name)"))
                             .tag(choice)
+                            .selectionDisabled(!model.isTerminalInstalled(choice))
                     }
                 }
                 Toggle(String(localized: "settings.launchAtLogin"), isOn: Binding(get: { loginItem.isOn }, set: { loginItem.set($0) }))

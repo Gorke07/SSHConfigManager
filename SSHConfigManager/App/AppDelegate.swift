@@ -64,6 +64,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.addButton(withTitle: String(localized: "action.save"))
         alert.addButton(withTitle: String(localized: "action.cancel"))
         alert.addButton(withTitle: String(localized: "action.discardAndQuit"))
+        // With the .accessory policy (quit from the menu bar) the alert would open behind other apps.
+        NSApp.activate()
         switch alert.runModal() {
         case .alertFirstButtonReturn:
             if model.hasPendingFormEdits {
