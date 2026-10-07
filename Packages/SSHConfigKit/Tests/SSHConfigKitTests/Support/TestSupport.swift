@@ -93,3 +93,41 @@ final class FakeRunner: ProcessRunning {
         return respond(arguments)
     }
 }
+
+/// Always throws, like an ssh that cannot be launched.
+struct ThrowingRunner: ProcessRunning {
+    struct Failure: Error {}
+    func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
+        throw Failure()
+    }
+}
+
+/// Signals when a run starts and keeps it pending until the test calls `release()`.
+final class GatedRunner: ProcessRunning {
+    let entered: AsyncStream<Void>
+    private let enteredContinuation: AsyncStream<Void>.Continuation
+    private let released: AsyncStream<Void>
+    private let releaseContinuation: AsyncStream<Void>.Continuation
+    private let calls = Mutex<[[String]]>([])
+
+    init() {
+        (entered, enteredContinuation) = AsyncStream.makeStream(of: Void.self)
+        (released, releaseContinuation) = AsyncStream.makeStream(of: Void.self)
+    }
+
+    var arguments: [[String]] { calls.withLock { $0 } }
+
+    /// Suspends until a run has started.
+    func waitUntilEntered() async {
+        for await _ in entered { return }
+    }
+
+    func release() { releaseContinuation.yield() }
+
+    func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
+        calls.withLock { $0.append(arguments) }
+        enteredContinuation.yield()
+        for await _ in released { break }
+        return ProcessResult(exitCode: 0, stdout: "", stderr: "", timedOut: false)
+    }
+}

@@ -14,7 +14,13 @@ public enum ConfigStoreError: Error, Equatable, Sendable {
     case conflict
     case validationFailed(String)
     case validationTimedOut
-    case writeFailed(String)
+    /// The writer's own error (conflicts map to `.conflict`), so backup failures stay distinguishable.
+    case writeFailed(SafeFileWriterError)
+    /// The user discarded or reloaded while the save was validating; nothing was written.
+    case saveCancelled
+    case saveInProgress
+    /// ssh could not be launched to validate; the string is for diagnostics only.
+    case validatorUnavailable(String)
 }
 
 public struct SavePreparation: Equatable, Sendable {
@@ -33,12 +39,16 @@ public final class ConfigStore {
     public private(set) var loadState: ConfigLoadState = .missing
     public private(set) var includedHosts: [IncludedHost] = []
     public private(set) var externalChangePending = false
+    public private(set) var isSaving = false
+    /// True iff the FileWatcher was created.
+    public private(set) var isWatching = false
 
     @ObservationIgnored private var diskFingerprint: FileFingerprint?
     @ObservationIgnored private let writer: SafeFileWriter
     @ObservationIgnored private let validator: ConfigValidator
     @ObservationIgnored private let includeResolver: IncludeResolver
     @ObservationIgnored private var watcher: FileWatcher?
+    @ObservationIgnored private var loadGeneration = 0
 
     public init(
         fileURL: URL,
@@ -60,6 +70,7 @@ public final class ConfigStore {
     }
 
     public func load() {
+        loadGeneration += 1
         externalChangePending = false
         let data: Data
         do {
@@ -117,15 +128,25 @@ public final class ConfigStore {
     }
 
     /// Validates with `ssh -G`, then writes via `SafeFileWriter` (conflict check, backup, atomic rename).
-    public func save(overwritingExternalChanges: Bool = false) async throws {
+    /// Does nothing when there is nothing to write.
+    public func save(overwritingExternalChanges: Bool = false, probeAlias: String? = nil) async throws {
         guard loadState == .loaded else { throw ConfigStoreError.notEditable }
+        guard !isSaving else { throw ConfigStoreError.saveInProgress }
+        guard hasUnsavedChanges || overwritingExternalChanges else { return }
+        isSaving = true
+        defer { isSaving = false }
+
         let text = document.render()
         let expected = diskFingerprint   // captured before the await: an external edit during validation must conflict
+        let generation = loadGeneration
 
-        switch await validate(text, probeAlias: nil) {
+        let outcome = await validate(text, probeAlias: probeAlias)
+        guard generation == loadGeneration else { throw ConfigStoreError.saveCancelled }
+        switch outcome {
         case .valid: break
         case .invalid(let message): throw ConfigStoreError.validationFailed(message)
         case .timedOut: throw ConfigStoreError.validationTimedOut
+        case .validatorUnavailable(let message): throw ConfigStoreError.validatorUnavailable(message)
         }
 
         do {
@@ -135,7 +156,7 @@ public final class ConfigStore {
             externalChangePending = true
             throw ConfigStoreError.conflict
         } catch let error as SafeFileWriterError {
-            throw ConfigStoreError.writeFailed(String(describing: error))
+            throw ConfigStoreError.writeFailed(error)
         }
 
         diskText = text
@@ -159,7 +180,7 @@ public final class ConfigStore {
         do {
             return try await validator.validate(text, probeAlias: alias)
         } catch {
-            return .invalid(message: error.localizedDescription)
+            return .validatorUnavailable(String(describing: error))
         }
     }
 
@@ -177,6 +198,7 @@ public final class ConfigStore {
         watcher = FileWatcher(directory: directory) {
             Task { @MainActor in weakStore.value?.fileDidChange() }
         }
+        isWatching = watcher != nil
     }
 }
 

@@ -64,6 +64,7 @@ struct ConfigStoreTests {
         #expect(store.document.hasByteOrderMark)
         #expect(store.document.hosts.isEmpty)   // ssh does not see this Host line either
 
+        try store.apply { try $0.addHost(HostDraft(patterns: ["added"])) }
         let error = await #expect(throws: ConfigStoreError.self) { try await store.save() }
         guard case .validationFailed? = error else {
             Issue.record("validationFailed bekleniyordu: \(String(describing: error))")
@@ -73,8 +74,11 @@ struct ConfigStoreTests {
 
         try store.apply { $0.removeByteOrderMark() }
         try await store.save()
-        #expect(try Data(contentsOf: store.fileURL) == Data("Host bom\r\n  HostName x\r\n".utf8))
-        #expect(store.document.hosts.map(\.alias) == ["bom"])
+        let written = try tmp.read("config")
+        #expect(written.hasPrefix("Host bom\r\n  HostName x\r\n"))
+        #expect(!written.hasPrefix("\u{FEFF}"))
+        #expect(written == store.document.render())
+        #expect(store.document.hosts.map(\.alias) == ["bom", "added"])
     }
 
     @Test func editPrepareAndSave() async throws {
@@ -166,15 +170,15 @@ struct ConfigStoreTests {
     @Test func externalEditDuringValidationIsAConflict() async throws {
         let tmp = try TempDir()
         try tmp.file("config", "Host a\n")
-        let runner = FakeRunner(delay: .milliseconds(300)) { _ in
-            ProcessResult(exitCode: 0, stdout: "", stderr: "", timedOut: false)
-        }
+        let runner = GatedRunner()
         let store = makeStore(tmp, validator: ConfigValidator(runner: runner))
+        try addPort(store)
         let task = Task { try await store.save() }
-        try await Task.sleep(for: .milliseconds(100))
+        await runner.waitUntilEntered()
         try tmp.file("config", "Host external\n")
         store.fileDidChange()
-        #expect(store.document.hosts.map(\.alias) == ["external"])
+        #expect(store.externalChangePending)
+        runner.release()
 
         let result = await task.result
         guard case .failure(let error) = result, error as? ConfigStoreError == .conflict else {
@@ -182,6 +186,117 @@ struct ConfigStoreTests {
             return
         }
         #expect(try tmp.read("config") == "Host external\n")
+    }
+
+    @Test func discardDuringValidationCancelsSave() async throws {
+        let tmp = try TempDir()
+        try tmp.file("config", "Host a\n  User u\n")
+        let runner = GatedRunner()
+        let store = makeStore(tmp, validator: ConfigValidator(runner: runner))
+        try addPort(store)
+        let task = Task { try await store.save() }
+        await runner.waitUntilEntered()
+        store.discardChanges()
+        runner.release()
+
+        let result = await task.result
+        guard case .failure(let error) = result, error as? ConfigStoreError == .saveCancelled else {
+            Issue.record("saveCancelled bekleniyordu: \(result)")
+            return
+        }
+        #expect(try tmp.read("config") == "Host a\n  User u\n")
+        #expect(store.document.render() == store.diskText)
+        #expect(!store.hasUnsavedChanges)
+        #expect(!store.isSaving)
+    }
+
+    @Test func secondConcurrentSaveIsRejected() async throws {
+        let tmp = try TempDir()
+        try tmp.file("config", "Host a\n  User u\n")
+        let runner = GatedRunner()
+        let store = makeStore(tmp, validator: ConfigValidator(runner: runner))
+        try addPort(store)
+        let first = Task { try await store.save() }
+        await runner.waitUntilEntered()
+        #expect(store.isSaving)
+
+        await #expect(throws: ConfigStoreError.saveInProgress) { try await store.save() }
+        #expect(store.isSaving)   // the rejected call must not touch the flag
+        #expect(try tmp.read("config") == "Host a\n  User u\n")
+
+        runner.release()
+        try await first.value
+        #expect(!store.isSaving)
+        #expect(try tmp.read("config") == "Host a\n  User u\n  Port 2222\n")
+        #expect(runner.arguments.count == 1)
+    }
+
+    @Test func saveWithoutChangesDoesNothing() async throws {
+        let tmp = try TempDir()
+        let url = try tmp.file("config", "Host a\n  User u\n")
+        let before = try FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date
+        let runner = FakeRunner { _ in ProcessResult(exitCode: 0, stdout: "", stderr: "", timedOut: false) }
+        let store = makeStore(tmp, validator: ConfigValidator(runner: runner))
+        for _ in 0..<3 { try await store.save() }
+        #expect(try BackupManager(rootDirectory: tmp.url.appending(path: "Backups")).list(kind: "config").isEmpty)
+        #expect(try tmp.read("config") == "Host a\n  User u\n")
+        #expect(try FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date == before)
+        #expect(runner.calls.isEmpty)
+    }
+
+    @Test func unavailableValidatorIsDistinctAndNothingIsWritten() async throws {
+        let tmp = try TempDir()
+        try tmp.file("config", "Host a\n  User u\n")
+        let store = makeStore(tmp, validator: ConfigValidator(runner: ThrowingRunner()))
+        try addPort(store)
+
+        let preparation = await store.prepareSave()
+        guard case .validatorUnavailable = preparation.validation else {
+            Issue.record("validatorUnavailable bekleniyordu: \(preparation.validation)")
+            return
+        }
+        let error = await #expect(throws: ConfigStoreError.self) { try await store.save() }
+        guard case .validatorUnavailable? = error else {
+            Issue.record("validatorUnavailable bekleniyordu: \(String(describing: error))")
+            return
+        }
+        #expect(try tmp.read("config") == "Host a\n  User u\n")
+    }
+
+    @Test func backupFailureIsATypedWriteFailure() async throws {
+        let tmp = try TempDir()
+        try tmp.file("config", "Host a\n  User u\n")
+        let backupRoot = try tmp.file("NotADirectory", "x")
+        let store = ConfigStore(
+            fileURL: tmp.url.appending(path: "config"),
+            writer: SafeFileWriter(backups: BackupManager(rootDirectory: backupRoot)),
+            validator: ConfigValidator(runner: FakeRunner { _ in ProcessResult(exitCode: 0, stdout: "", stderr: "", timedOut: false) }),
+            includeResolver: IncludeResolver(homeDirectory: tmp.url),
+            watchForChanges: false)
+        try addPort(store)
+        let error = await #expect(throws: ConfigStoreError.self) { try await store.save() }
+        guard case .writeFailed(.backupFailed)? = error else {
+            Issue.record("writeFailed(.backupFailed) bekleniyordu: \(String(describing: error))")
+            return
+        }
+        #expect(try tmp.read("config") == "Host a\n  User u\n")
+    }
+
+    @Test func saveForwardsProbeAlias() async throws {
+        let tmp = try TempDir()
+        try tmp.file("config", "Host a\n")
+        let runner = FakeRunner { _ in ProcessResult(exitCode: 0, stdout: "", stderr: "", timedOut: false) }
+        let store = makeStore(tmp, validator: ConfigValidator(runner: runner))
+        try addPort(store)
+        try await store.save(probeAlias: "probe-me")
+        #expect(runner.calls.first?.last == "probe-me")
+    }
+
+    @Test func isWatchingReflectsWatcherCreation() throws {
+        let tmp = try TempDir()
+        try tmp.file("config", "Host a\n")
+        #expect(!makeStore(tmp, watch: false).isWatching)
+        #expect(makeStore(tmp, watch: true).isWatching)
     }
 
     @Test func applyRefreshesIncludedHosts() throws {

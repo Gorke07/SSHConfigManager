@@ -5,6 +5,8 @@ public enum ValidationOutcome: Equatable, Sendable {
     /// `message` is ssh's own stderr (English, untranslated by design).
     case invalid(message: String)
     case timedOut
+    /// ssh could not be launched. The string is the underlying error, for diagnostics only.
+    case validatorUnavailable(String)
 }
 
 /// Validates config text by writing it to a private temp file and running `ssh -G -F <file> -- <alias>`.
