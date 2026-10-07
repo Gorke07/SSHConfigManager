@@ -22,6 +22,24 @@ struct ConfigStoreTests {
         }
     }
 
+    @Test func backupKindSelectsBackupDirectory() async throws {
+        let tmp = try TempDir()
+        try tmp.file("config", "Host a\n")
+        let store = ConfigStore(
+            fileURL: tmp.url.appending(path: "config"),
+            writer: SafeFileWriter(backups: BackupManager(rootDirectory: tmp.url.appending(path: "Backups"))),
+            validator: ConfigValidator(runner: FakeRunner { _ in ProcessResult(exitCode: 0, stdout: "", stderr: "", timedOut: false) }),
+            includeResolver: IncludeResolver(homeDirectory: tmp.url),
+            watchForChanges: false,
+            backupKind: "x")
+        #expect(store.backupKind == "x")
+        try addPort(store)
+        try await store.save()
+        let dir = tmp.url.appending(path: "Backups/x")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: dir.path).count == 1)
+        #expect(!FileManager.default.fileExists(atPath: tmp.url.appending(path: "Backups/config").path))
+    }
+
     @Test func loadsExistingFile() throws {
         let tmp = try TempDir()
         try tmp.file("config", "Host a\n  User u\n")

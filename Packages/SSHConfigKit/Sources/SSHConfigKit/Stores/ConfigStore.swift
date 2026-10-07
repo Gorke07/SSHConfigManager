@@ -34,6 +34,8 @@ public struct SavePreparation: Equatable, Sendable {
 @Observable
 public final class ConfigStore {
     public let fileURL: URL
+    /// Backup directory name under the backup root; per config file so backups never mix.
+    public let backupKind: String
     public private(set) var document: ConfigDocument = .empty
     public private(set) var diskText = ""
     public private(set) var loadState: ConfigLoadState = .missing
@@ -56,9 +58,11 @@ public final class ConfigStore {
         writer: SafeFileWriter = SafeFileWriter(backups: BackupManager(rootDirectory: BackupManager.defaultRoot)),
         validator: ConfigValidator = ConfigValidator(),
         includeResolver: IncludeResolver = IncludeResolver(),
-        watchForChanges: Bool = true
+        watchForChanges: Bool = true,
+        backupKind: String = "config"
     ) {
         self.fileURL = fileURL
+        self.backupKind = backupKind
         self.writer = writer
         self.watchForChanges = watchForChanges
         self.validator = validator
@@ -166,7 +170,7 @@ public final class ConfigStore {
 
         do {
             try writer.write(text, to: fileURL, expected: expected,
-                             ignoreConflict: overwritingExternalChanges, backupKind: "config")
+                             ignoreConflict: overwritingExternalChanges, backupKind: backupKind)
         } catch SafeFileWriterError.conflict {
             externalChangePending = true
             throw ConfigStoreError.conflict
