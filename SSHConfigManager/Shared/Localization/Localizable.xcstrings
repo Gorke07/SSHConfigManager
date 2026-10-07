@@ -203,6 +203,48 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Unexpected error: %@" } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Beklenmeyen hata: %@" } }
       }
+    },
+    "diff.noNewline" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No newline at end of file" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dosya sonunda yeni satır yok" } }
+      }
+    },
+    "diff.a11y.added %@ %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Line %@, added: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Satır %@, eklendi: %@" } }
+      }
+    },
+    "diff.a11y.removed %@ %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Line %@, removed: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Satır %@, silindi: %@" } }
+      }
+    },
+    "diff.a11y.context %@ %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Line %@: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Satır %@: %@" } }
+      }
+    },
+    "text.copyAll" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Copy All" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Tümünü Kopyala" } }
+      }
+    },
+    "diff.empty" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No changes." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Değişiklik yok." } }
+      }
     }
   },
   "version" : "1.0"
