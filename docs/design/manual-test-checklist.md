@@ -30,3 +30,4 @@ Her sürüm öncesi temiz bir test kullanıcısında veya `~/.ssh/config` yedeğ
 - [ ] Yedekler penceresinde bir yedek seçilir → mevcut dosyadan yedeğe diff; "Düzenleyiciye Yükle" → kaydedilmemiş değişiklik olur, ⌘S ile normal kaydetme akışı.
 - [ ] Kaydedilmemiş değişiklik veya formda hatalı alan varken "Düzenleyiciye Yükle" önce "değiştirilsin mi?" onayı ister; başka config dosyasına geçince Yedekler penceresi o dosyanın yedeklerini gösterir.
 - [ ] "Dil Ayarlarını Aç…" Sistem Ayarları'nın Dil ve Bölge sayfasını açar.
+- [ ] Dış değişiklik bandında "Yeniden Yükle", kaydedilmemiş değişiklik veya formda bekleyen düzenleme varken önce "atılsın mı?" onayı ister; değişiklik yoksa doğrudan yeniden yükler.

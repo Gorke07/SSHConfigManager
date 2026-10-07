@@ -5,17 +5,28 @@ struct BannerStack: View {
     @Bindable var model: AppModel
     @Binding var showExternalDiff: Bool
     @Environment(\.openSettings) private var openSettings
+    @State private var confirmReload = false
 
     var body: some View {
         let banners = BannerBuilder.banners(for: model.store)
-        if !banners.isEmpty {
-            VStack(spacing: 0) {
-                ForEach(banners) { banner in
-                    row(for: banner)
-                    Divider()
+        Group {
+            if !banners.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(banners) { banner in
+                        row(for: banner)
+                        Divider()
+                    }
                 }
             }
         }
+        .confirmationDialog(String(localized: "banner.external.reload.confirm.title"), isPresented: $confirmReload) {
+            Button(String(localized: "banner.external.reload.confirm.action"), role: .destructive) { reload() }
+        }
+    }
+
+    private func reload() {
+        model.store.discardChanges()
+        model.resetEditor()
     }
 
     @ViewBuilder
@@ -45,8 +56,11 @@ struct BannerStack: View {
         case .externalChange:
             BannerRow(icon: "arrow.triangle.2.circlepath", tint: .orange, message: Messages.text(for: ConfigStoreError.conflict)) {
                 Button(String(localized: "banner.external.reload")) {
-                    model.store.discardChanges()
-                    model.resetEditor()
+                    if model.store.hasUnsavedChanges || model.hasPendingFormEdits {
+                        confirmReload = true
+                    } else {
+                        reload()
+                    }
                 }
                 Button(String(localized: "banner.external.showDiff")) { showExternalDiff = true }
             }
