@@ -16,15 +16,6 @@ public enum DraftIssue: Equatable, Sendable {
     }
 }
 
-// MARK: - Helpers
-
-private func containsControlCharacter(_ s: String) -> Bool {
-    s.unicodeScalars.contains { scalar in
-        let value = scalar.value
-        return (value >= 0x00 && value <= 0x1F && value != 0x09) || value == 0x7F
-    }
-}
-
 public struct HostDraftValidator: Sendable {
     private let fileExists: @Sendable (String) -> Bool
 
@@ -38,7 +29,7 @@ public struct HostDraftValidator: Sendable {
 
         // Check patterns for control characters FIRST
         for pattern in draft.patterns {
-            if containsControlCharacter(pattern) {
+            if pattern.containsControlCharacter {
                 issues.append(.controlCharacter(pattern))
             }
         }
@@ -72,7 +63,7 @@ public struct HostDraftValidator: Sendable {
 
         for directive in draft.directives {
             // Check directive key for control characters FIRST
-            if containsControlCharacter(directive.key) {
+            if directive.key.containsControlCharacter {
                 issues.append(.controlCharacter(directive.key))
                 continue
             }
@@ -89,16 +80,17 @@ public struct HostDraftValidator: Sendable {
                 issues.append(.forbiddenDirectiveKey(directive.key))
                 continue
             }
+            // Check value for control characters before port check
+            if directive.value.containsControlCharacter {
+                issues.append(.controlCharacter(directive.key))
+                continue
+            }
             if key == "port" {
                 // Port must be ASCII digits only and in range 1-65535
                 let isValidPort = !directive.value.isEmpty &&
                     directive.value.unicodeScalars.allSatisfy { (48...57).contains($0.value) } &&
                     (Int(directive.value).map { (1...65535).contains($0) } ?? false)
                 if !isValidPort { issues.append(.invalidPort(directive.value)) }
-                continue
-            }
-            if containsControlCharacter(directive.value) {
-                issues.append(.controlCharacter(directive.key))
                 continue
             }
             if directive.value.unicodeScalars.allSatisfy(LineTokenizer.isSpace) {

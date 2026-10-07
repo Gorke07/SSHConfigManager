@@ -3,15 +3,6 @@ public enum ConfigEditError: Error, Equatable, Sendable {
     case controlCharacter
 }
 
-// MARK: - Helpers
-
-private func containsControlCharacter(_ s: String) -> Bool {
-    s.unicodeScalars.contains { scalar in
-        let value = scalar.value
-        return (value >= 0x00 && value <= 0x1F && value != 0x09) || value == 0x7F
-    }
-}
-
 extension ConfigDocument {
     /// Indent of the first directive inside any Host block, else four spaces.
     var directiveIndent: String {
@@ -35,10 +26,10 @@ extension ConfigDocument {
 
         // Check for control characters in patterns and directives
         for pattern in draft.patterns {
-            if containsControlCharacter(pattern) { throw ConfigEditError.controlCharacter }
+            if pattern.containsControlCharacter { throw ConfigEditError.controlCharacter }
         }
         for directive in draft.directives {
-            if containsControlCharacter(directive.key) || containsControlCharacter(directive.value) {
+            if directive.key.containsControlCharacter || directive.value.containsControlCharacter {
                 throw ConfigEditError.controlCharacter
             }
         }
@@ -125,10 +116,10 @@ extension ConfigDocument {
     public mutating func addHost(_ draft: HostDraft) throws -> Int {
         // Check for control characters in patterns and directives
         for pattern in draft.patterns {
-            if containsControlCharacter(pattern) { throw ConfigEditError.controlCharacter }
+            if pattern.containsControlCharacter { throw ConfigEditError.controlCharacter }
         }
         for directive in draft.directives {
-            if containsControlCharacter(directive.key) || containsControlCharacter(directive.value) {
+            if directive.key.containsControlCharacter || directive.value.containsControlCharacter {
                 throw ConfigEditError.controlCharacter
             }
         }
@@ -174,7 +165,7 @@ extension ConfigDocument {
             throw ConfigEditError.hostNotFound(header)
         }
 
-        if containsControlCharacter(newAlias) { throw ConfigEditError.controlCharacter }
+        if newAlias.containsControlCharacter { throw ConfigEditError.controlCharacter }
 
         var end = ownedEnd(of: header)
         while end - 1 > header && lines[end - 1].kind == .blank { end -= 1 }

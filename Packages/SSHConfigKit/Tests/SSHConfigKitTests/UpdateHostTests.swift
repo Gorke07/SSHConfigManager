@@ -139,8 +139,10 @@ struct UpdateHostTests {
     }
 
     @Test func updateHostThrowsOnControlCharacterInAlias() {
-        var doc = ConfigDocument(parsing: "Host a\n  User u\n")
+        let text = "Host a\n  User u\n"
+        var doc = ConfigDocument(parsing: text)
         let draft = HostDraft(patterns: ["a\r"], directives: [])
         #expect(throws: ConfigEditError.controlCharacter) { try doc.updateHost(at: 0, to: draft) }
+        #expect(Array(doc.render().utf8) == Array(text.utf8))
     }
 }

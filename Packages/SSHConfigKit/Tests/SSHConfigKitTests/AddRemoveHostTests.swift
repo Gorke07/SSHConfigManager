@@ -88,7 +88,9 @@ struct AddRemoveHostTests {
     }
 
     @Test func duplicateHostThrowsOnControlCharacterInAlias() throws {
-        var doc = ConfigDocument(parsing: "Host a\n  User u\n")
+        let text = "Host a\n  User u\n"
+        var doc = ConfigDocument(parsing: text)
         #expect(throws: ConfigEditError.controlCharacter) { try doc.duplicateHost(at: 0, newAlias: "a\nb") }
+        #expect(Array(doc.render().utf8) == Array(text.utf8))
     }
 }

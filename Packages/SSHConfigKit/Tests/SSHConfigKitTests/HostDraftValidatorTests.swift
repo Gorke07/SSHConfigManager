@@ -89,4 +89,9 @@ struct HostDraftValidatorTests {
         let found = issues(HostDraft(patterns: ["a", "A"]))
         #expect(found == [.duplicateAlias("A")])
     }
+
+    @Test func controlCharacterInPortValue() {
+        let found = issues(HostDraft(patterns: ["n"], directives: [DraftDirective(key: "Port", value: "22\n")]))
+        #expect(found.contains(.controlCharacter("Port")))
+    }
 }
