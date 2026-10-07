@@ -51,6 +51,7 @@
 | Dağıtım | Developer ID ile imzalı, notarize edilmiş, Hardened Runtime, `.dmg` | Şirket içi dağıtım için uygun. Sandbox'a geçiş gerekirse yalnızca dosya erişim katmanı değişir. |
 | Doğruluk kaynağı | Config dosyasının kendisi | Uygulama host verisini ayrıca saklamaz. Yalnızca ayarlar `UserDefaults` içinde tutulur. |
 | Parser stratejisi | Satır tabanlı, kayıpsız | Bayt bayt aynı kalma garantisi bu sayede sağlanır. |
+| Uygulama bağımlılıkları | `KeyboardShortcuts` (MIT), `STTextView` 2.x (**GPL v3 / ticari lisans**) | Yalnızca uygulama target'ında; `SSHConfigKit` paketi bağımlılıksız kalır. STTextView lisansı için bkz. §6.6. |
 
 ## 3. Mimari
 
@@ -252,6 +253,20 @@ Yapı olarak `NavigationSplitView` kullanılır. Sol kenar çubuğunda arama ala
 - Görsel tasarımda standart macOS 26 SwiftUI bileşenleri kullanılır; Liquid Glass bu bileşenlerde otomatik gelir. Özel glass efekti eklenmez.
 - Ana pencere kapatıldığında uygulama menü çubuğunda çalışmaya devam eder. Dock ikonu yalnızca bir pencere açıkken görünür (activation policy `.regular` ↔ `.accessory`).
 
+### 6.1a Metin görünümleri (STTextView)
+
+`STTextView` (TextKit 2, `STTextViewSwiftUI` modülündeki `TextView`) şu üç yerde, **salt okunur** olarak kullanılır:
+
+| Yer | İçerik | Özellikler |
+|---|---|---|
+| Kaydet → diff onay ekranı | Unified diff (`DiffHunk` listesi) | Satır numaraları (eski/yeni), eklenen satırlar yeşil, silinenler kırmızı arka plan, monospace |
+| Match 🔒 ve Dahil edilen 🔒 detayı | Bloğun ham metni | Satır numaraları, ssh_config renklendirmesi |
+| Yedekler ekranı | Seçilen yedek ile mevcut dosya arasındaki diff | Diff ekranıyla aynı görünüm |
+
+- **Renklendirme:** ssh_config için hazır bir TreeSitter grameri kullanılmaz. `SSHConfigKit`'in `LineKind` sınıflandırması üzerinden basit bir renklendirici yazılır: yorum, anahtar kelime (`Host`/`Match`/`Include`), direktif adı, değer, ⚠ anlaşılmayan satır. Böylece ekranda gösterilen renk, parser'ın gerçekten ne anladığını yansıtır.
+- **Düzenleme yok:** v1'de ham metin düzenleme yoktur; tüm düzenlemeler form üzerinden yapılır (kayıpsız düzenleme garantisi formun dokunduğu satırlarla sınırlıdır). STTextView'un düzenleme özellikleri kapalı tutulur (`isEditable = false`, seçme ve kopyalama açık).
+- **Paylaşılan bileşen:** Üç ekran da tek bir `CodeTextView` (SwiftUI sarmalayıcı) ve tek bir `DiffTextView` kullanır; görünüm kodu tekrarlanmaz.
+
 ### 6.2 Menü çubuğu
 
 - `MenuBarExtra`, `.window` stilinde. Açıldığında odak arama kutusundadır.
@@ -295,6 +310,13 @@ Yapı olarak `NavigationSplitView` kullanılır. Sol kenar çubuğunda arama ala
 - **ssh çıktısının dili:** Bağlantı testi sınıflandırması ssh'in İngilizce stderr metinlerine dayanır. OpenSSH mesajlarını yerelleştirmez; yine de alt süreçler `LC_ALL=C` ile çalıştırılarak bu garanti altına alınır.
 - **Türkçe I/İ tuzağı:** Parser ve `HostMatcher` gibi protokol/dosya formatı kodlarında locale'e duyarlı büyük/küçük harf işlemleri yasaktır (bkz. §4.2). Kullanıcıya yönelik arama (host listesi filtreleme) ise `localizedStandardContains` ile locale'e duyarlı yapılır.
 - **Eksik çeviri kontrolü:** Derlemede String Catalog'daki "needs review"/eksik Türkçe çeviriler uyarı olarak görünür; sürüm öncesi kontrol listesinde sıfır eksik çeviri şartı vardır.
+
+### 6.6 Üçüncü parti lisanslar
+
+| Paket | Lisans | Etkisi |
+|---|---|---|
+| `KeyboardShortcuts` | MIT | Yok (lisans metni "Hakkında" ekranında listelenir). |
+| `STTextView` | GPL v3 veya ticari lisans | Şirket içi kullanımda sorun yaratmaz. Uygulama şirket dışına **dağıtılırsa** iki yol vardır: uygulamanın kaynak kodunu GPL v3 ile yayımlamak ya da STTextView'un ticari lisansını almak. Dağıtım kararı (Plan 5) öncesinde bu seçim yapılmalıdır. |
 
 ## 7. Known Hosts penceresi
 
