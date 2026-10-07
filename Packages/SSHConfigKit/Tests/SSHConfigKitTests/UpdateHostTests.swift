@@ -111,4 +111,30 @@ struct UpdateHostTests {
         }
         #expect(out == "Host a\n  User u\n  Port 22")
     }
+
+    @Test func allRepeatedKeysChangedPreservesComments() throws {
+        let out = try update("Host a\n  IdentityFile k1 # c1\n  IdentityFile k2 # c2\n") {
+            $0.directives[0].value = "a"
+            $0.directives[1].value = "b"
+        }
+        #expect(out == "Host a\n  IdentityFile a # c1\n  IdentityFile b # c2\n")
+    }
+
+    @Test func reorderingRepeatedKeysIsNoOp() throws {
+        let text = "Host a\n  IdentityFile k1\n  IdentityFile k2\n"
+        let out = try update(text) {
+            $0.directives.reverse()
+        }
+        #expect(Array(out.utf8) == Array(text.utf8))
+    }
+
+    @Test func mixedRepeatedKeysWithRemoval() throws {
+        let out = try update("Host a\n  IdentityFile k1\n  IdentityFile k2\n  IdentityFile k3\n") {
+            $0.directives = [
+                DraftDirective(key: "IdentityFile", value: "k3"),
+                DraftDirective(key: "IdentityFile", value: "kx")
+            ]
+        }
+        #expect(out == "Host a\n  IdentityFile kx\n  IdentityFile k3\n")
+    }
 }
