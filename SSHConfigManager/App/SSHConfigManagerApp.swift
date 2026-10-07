@@ -10,7 +10,6 @@ struct SSHConfigManagerApp: App {
                 .frame(minWidth: 760, minHeight: 480)
                 .registersMainWindowOpener(appDelegate)
         }
-        .defaultLaunchBehavior(LaunchContext.startsInMenuBar ? .suppressed : .automatic)
         .commands {
             CommandGroup(replacing: .appInfo) {
                 Button(String(localized: "about.menu")) { AboutPanel.show() }

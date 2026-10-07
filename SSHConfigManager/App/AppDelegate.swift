@@ -16,12 +16,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// One-shot guard that closes a main window SwiftUI still shows on a login launch.
     private var loginLaunchGuard: (any NSObjectProtocol)?
 
-    func applicationWillFinishLaunching(_ notification: Notification) {
-        guard !TestEnvironment.isRunningTests, LaunchContext.currentLaunchIsLoginItem() else { return }
-        LaunchContext.startsInMenuBar = true
-        NSApp.setActivationPolicy(.accessory)
-    }
-
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !TestEnvironment.isRunningTests else { return }
         panelController = QuickConnectPanelController(
@@ -49,27 +43,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 NSApp.setActivationPolicy(.regular)
             }
         })
-        if LaunchContext.startsInMenuBar {
-            // Fallback if the scene still shows the main window: close it (once, within 3 s) and stay in the menu bar.
-            let deadline = Date().addingTimeInterval(3)
-            loginLaunchGuard = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main) { [weak self] note in
-                nonisolated(unsafe) let object = note.object
-                MainActor.assumeIsolated {
-                    guard let self, let window = object as? NSWindow,
-                          window.identifier?.rawValue.hasPrefix("main") == true else { return }
-                    if let token = self.loginLaunchGuard { NotificationCenter.default.removeObserver(token) }
-                    self.loginLaunchGuard = nil
-                    guard Date() <= deadline else { return }
-                    window.close()
-                    NSApp.setActivationPolicy(.accessory)
-                }
+        // The launch Apple Event only exists from here on (it is nil in applicationWillFinishLaunching).
+        if LaunchContext.currentLaunchIsLoginItem() { startInMenuBar() }
+    }
+
+    /// Login launch: menu bar only. Closes a main window that is already open and arms the one-shot guard
+    /// for one SwiftUI creates a moment later (closed once, within 3 s, then the guard disarms).
+    private func startInMenuBar() {
+        NSApp.setActivationPolicy(.accessory)
+        for window in NSApp.windows where window.identifier?.rawValue.hasPrefix("main") == true { window.close() }
+        let deadline = Date().addingTimeInterval(3)
+        loginLaunchGuard = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main) { [weak self] note in
+            nonisolated(unsafe) let object = note.object
+            MainActor.assumeIsolated {
+                guard let self, let window = object as? NSWindow,
+                      window.identifier?.rawValue.hasPrefix("main") == true else { return }
+                if let token = self.loginLaunchGuard { NotificationCenter.default.removeObserver(token) }
+                self.loginLaunchGuard = nil
+                guard Date() <= deadline else { return }
+                window.close()
+                NSApp.setActivationPolicy(.accessory)
             }
-            // Never leave the guard (and the Dock suppression) pending past the window.
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .seconds(3))
-                if let token = self?.loginLaunchGuard { NotificationCenter.default.removeObserver(token) }
-                self?.loginLaunchGuard = nil
-            }
+        }
+        // Never leave the guard (and the Dock suppression) pending past the window.
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            if let token = self?.loginLaunchGuard { NotificationCenter.default.removeObserver(token) }
+            self?.loginLaunchGuard = nil
         }
     }
 
