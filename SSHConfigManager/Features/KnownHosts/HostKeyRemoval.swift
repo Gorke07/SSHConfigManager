@@ -15,6 +15,8 @@ struct HostKeyRemoval: Equatable, Identifiable {
     var phase: Phase
     /// Store revision the matched entries belong to.
     var revision = 0
+    /// The store the entries were read from; a switched known_hosts file is a different store.
+    var store: ObjectIdentifier?
 }
 
 extension AppModel {
@@ -30,11 +32,19 @@ extension AppModel {
         let resolver = HostResolver(commandBuilder: commandBuilder, runner: processRunner)
         let phase: HostKeyRemoval.Phase
         var revision = 0
+        var store: ObjectIdentifier?
         do {
             let host = try await resolver.resolve(alias: alias)
             revision = knownHosts.revision
-            let entries = HostMatcher.entries(in: knownHosts.document, matchingAny: host.lookupNames)
-            phase = entries.isEmpty ? .nothingFound(host.lookupNames) : .confirm(entries)
+            store = ObjectIdentifier(knownHosts)
+            switch knownHosts.loadState {
+            case .notUTF8, .unreadable:
+                // An unreadable file has an empty document: "nothing found" would be a lie.
+                phase = .failed(Messages.knownHostsLoadText(for: knownHosts.loadState) ?? "")
+            case .loaded, .missing:
+                let entries = HostMatcher.entries(in: knownHosts.document, matchingAny: host.lookupNames)
+                phase = entries.isEmpty ? .nothingFound(host.lookupNames) : .confirm(entries)
+            }
         } catch is CancellationError {
             if hostKeyRemoval?.id == request.id { hostKeyRemoval = nil }
             return
@@ -45,11 +55,16 @@ extension AppModel {
         guard hostKeyRemoval?.id == request.id else { return }
         hostKeyRemoval?.phase = phase
         hostKeyRemoval?.revision = revision
+        hostKeyRemoval?.store = store
     }
 
     func confirmHostKeyRemoval() {
         guard let removal = hostKeyRemoval, case .confirm(let entries) = removal.phase else { return }
         hostKeyRemoval = nil
+        guard removal.store == ObjectIdentifier(knownHosts) else {
+            errorMessage = Messages.text(for: KnownHostsStoreError.staleSelection)
+            return
+        }
         do {
             try knownHosts.remove(lines: Set(entries.map(\.lineIndex)), ifRevision: removal.revision)
             connectionTests.dropResult(for: removal.alias)

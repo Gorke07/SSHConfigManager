@@ -102,4 +102,25 @@ struct HostKeyRemovalTests {
         await task.value
         #expect(model.hostKeyRemoval == nil)
     }
+
+    @Test func switchingTheFileWhileConfirmingDeletesNothing() async throws {
+        let tmp = try TempDir()
+        let model = make(tmp, sshG: "hostname web.example.com\nport 22\n")
+        let otherURL = try tmp.file("other_known_hosts", Self.knownHosts)
+        await model.requestHostKeyRemoval(alias: "web")
+        #expect(model.switchKnownHosts(to: otherURL.path))
+        model.confirmHostKeyRemoval()
+        #expect(try tmp.read(".ssh/known_hosts") == Self.knownHosts)
+        #expect(try String(contentsOf: otherURL, encoding: .utf8) == Self.knownHosts)
+        #expect(model.errorMessage == String(localized: "knownHosts.staleSelection"))
+    }
+
+    @Test func anUnreadableKnownHostsFileIsAnErrorNotNothingFound() async throws {
+        let tmp = try TempDir()
+        let model = make(tmp, sshG: "hostname web.example.com\nport 22\n")
+        try Data([0xFF, 0xFE]).write(to: tmp.url.appendingPathComponent(".ssh/known_hosts"))
+        model.knownHosts.load()
+        await model.requestHostKeyRemoval(alias: "web")
+        #expect(model.hostKeyRemoval?.phase == .failed(String(localized: "knownHosts.notUTF8")))
+    }
 }

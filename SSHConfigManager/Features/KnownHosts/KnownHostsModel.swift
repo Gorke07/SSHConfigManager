@@ -28,6 +28,7 @@ final class KnownHostsModel {
     /// Rows waiting for the user to confirm deletion, and the store revision they belong to.
     private(set) var pendingRemoval: [KnownHostRow]?
     @ObservationIgnored private var pendingRevision = 0
+    @ObservationIgnored private var pendingStore: ObjectIdentifier?
 
     init(app: AppModel) {
         self.app = app
@@ -65,12 +66,19 @@ final class KnownHostsModel {
         let chosen = allRows.filter { selection.contains($0.id) }
         guard !chosen.isEmpty else { return }
         pendingRevision = app.knownHosts.revision
+        pendingStore = ObjectIdentifier(app.knownHosts)
         pendingRemoval = chosen
     }
 
     func confirmRemoval() {
         guard let rows = pendingRemoval else { return }
         pendingRemoval = nil
+        // switchKnownHosts() builds a fresh store whose revision restarts: indices would hit another file.
+        guard pendingStore == ObjectIdentifier(app.knownHosts) else {
+            errorMessage = Messages.text(for: KnownHostsStoreError.staleSelection)
+            selection = []
+            return
+        }
         do {
             try app.knownHosts.remove(lines: Set(rows.map(\.id)), ifRevision: pendingRevision)
             errorMessage = nil

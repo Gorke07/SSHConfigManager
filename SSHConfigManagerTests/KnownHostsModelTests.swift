@@ -100,4 +100,18 @@ struct KnownHostsModelTests {
         #expect(model.pendingRemoval == nil)
         #expect(try tmp.read(".ssh/known_hosts") == Self.file)
     }
+
+    @Test func switchingTheFileBetweenRequestAndConfirmDeletesNothing() throws {
+        let tmp = try TempDir()
+        let model = make(tmp)
+        let otherURL = try tmp.file("other_known_hosts", Self.file)
+        model.selection = [0]
+        model.requestRemoveSelection()
+        #expect(model.app.switchKnownHosts(to: otherURL.path))
+        model.confirmRemoval()
+        #expect(try tmp.read(".ssh/known_hosts") == Self.file)
+        #expect(try String(contentsOf: otherURL, encoding: .utf8) == Self.file)
+        #expect(model.errorMessage == String(localized: "knownHosts.staleSelection"))
+        #expect(model.selection.isEmpty)
+    }
 }
