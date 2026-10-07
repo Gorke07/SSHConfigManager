@@ -11,6 +11,12 @@ struct SSHConfigManagerApp: App {
                 .frame(minWidth: 760, minHeight: 480)
                 .onAppear { appDelegate.model = model }
         }
+        Settings {
+            SettingsView(model: model)
+        }
+        Window(String(localized: "settings.backups"), id: "backups") {
+            BackupsView(model: model)
+        }
     }
 
     @MainActor

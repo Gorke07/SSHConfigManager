@@ -24,3 +24,9 @@ Her sürüm öncesi temiz bir test kullanıcısında veya `~/.ssh/config` yedeğ
 - [ ] Sistem dili Türkçe iken tüm metinler Türkçe; İngilizce iken İngilizce.
 - [ ] Koyu temada diff renkleri ve bantlar okunaklı.
 - [ ] Port `abc` iken pencere kapatılıp Dock'tan yeniden açılınca form `abc` ve hata satırıyla durur; ⌘Q → Kaydet çıkmaz, formdaki sorunu belirten uyarı gösterir; ⌘Q → Kaydetme çıkar.
+- [ ] Ayarlar (⌘,) → "Seç…" ile `~/dotfiles/ssh/config` seçilir → liste o dosyadan yüklenir, `-F` notu görünür; "~/.ssh/config Kullan" geri döndürür.
+- [ ] Kaydedilmemiş değişiklik varken config dosyası değiştirilmeye çalışılınca "atılsın mı?" onayı çıkar; vazgeçilirse hiçbir şey değişmez.
+- [ ] Yedek sayısı 2 yapılır, üç farklı kayıt yapılır → Yedekler penceresinde 2 yedek.
+- [ ] Yedekler penceresinde bir yedek seçilir → mevcut dosyadan yedeğe diff; "Düzenleyiciye Yükle" → kaydedilmemiş değişiklik olur, ⌘S ile normal kaydetme akışı.
+- [ ] Formda hatalı alan varken "Düzenleyiciye Yükle" önce "Formdaki değişiklikler atılsın mı?" onayı ister.
+- [ ] "Dil Ayarlarını Aç…" Sistem Ayarları'nın Dil ve Bölge sayfasını açar.

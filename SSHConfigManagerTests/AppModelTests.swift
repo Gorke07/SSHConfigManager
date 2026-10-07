@@ -55,6 +55,24 @@ struct AppModelTests {
         #expect(!model.commandBuilder.usesDefaultConfig)
     }
 
+    @Test func switchingConfigWithBlockedFormEditsNeedsConfirmation() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n")
+        try tmp.file("other/config", "Host b\n")
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        model.select(a)
+        let editor = try #require(model.editor(for: a))
+        editor.fields["Port"] = "abc"
+        #expect(!editor.commit())
+        #expect(model.hasPendingFormEdits)
+        #expect(!model.store.hasUnsavedChanges)
+
+        let other = tmp.url.appending(path: "other/config").path
+        #expect(model.switchConfig(to: other) == .needsConfirmation)
+        #expect(model.settings.configPath == "~/.ssh/config")
+        #expect(model.switchConfig(to: other, discardingUnsavedChanges: true) == .switched)
+    }
+
     @Test func switchingToTheSameFileIsUnchanged() throws {
         let tmp = try TempDir()
         let model = makeTestModel(tmp, config: "Host a\n")

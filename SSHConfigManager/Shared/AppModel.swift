@@ -101,7 +101,7 @@ final class AppModel {
             settings.setConfigPath(path)
             return .unchanged
         }
-        if store.hasUnsavedChanges && !discardingUnsavedChanges { return .needsConfirmation }
+        if (store.hasUnsavedChanges || hasPendingFormEdits) && !discardingUnsavedChanges { return .needsConfirmation }
         settings.setConfigPath(path)
         store = makeStore(url, backupManager)
         select(nil)

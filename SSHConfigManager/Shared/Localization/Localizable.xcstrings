@@ -645,6 +645,118 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Tekrar Dene" } }
       }
     },
+    "settings.configFile" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Config File" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Config Dosyası" } }
+      }
+    },
+    "settings.configFile.useDefault" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Use ~/.ssh/config" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "~/.ssh/config Kullan" } }
+      }
+    },
+    "settings.configFile.customNote" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Typing “ssh host” in a terminal does not use this file; the app connects with -F." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Terminalde doğrudan “ssh host” yazarsanız bu dosya kullanılmaz; uygulama -F ile bağlanır." } }
+      }
+    },
+    "settings.configFile.invalid" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose a file with an absolute path." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Mutlak yolu olan bir dosya seçin." } }
+      }
+    },
+    "settings.backups" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Backups" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yedekler" } }
+      }
+    },
+    "settings.backups.count %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Backups to keep: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Saklanacak yedek sayısı: %@" } }
+      }
+    },
+    "settings.backups.show" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show Backups…" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yedekleri Göster…" } }
+      }
+    },
+    "settings.language" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Language" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dil" } }
+      }
+    },
+    "settings.language.note" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The app follows the system language. You can choose a different language for this app in System Settings." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Uygulama sistem dilini kullanır. Bu uygulama için farklı bir dili Sistem Ayarları'ndan seçebilirsiniz." } }
+      }
+    },
+    "settings.language.open" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open Language Settings…" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dil Ayarlarını Aç…" } }
+      }
+    },
+    "settings.switch.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Discard unsaved changes?" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kaydedilmemiş değişiklikler atılsın mı?" } }
+      }
+    },
+    "settings.switch.discard" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Discard and Switch" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "At ve Değiştir" } }
+      }
+    },
+    "backups.empty" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No backups yet." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Henüz yedek yok." } }
+      }
+    },
+    "backups.restore" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Load into Editor" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Düzenleyiciye Yükle" } }
+      }
+    },
+    "backups.restore.note" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The backup is loaded as unsaved changes; review and save to apply it." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yedek kaydedilmemiş değişiklik olarak yüklenir; uygulamak için inceleyip kaydedin." } }
+      }
+    },
+    "backups.diffCaption" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Changes from the current file to this backup" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Mevcut dosyadan bu yedeğe değişiklikler" } }
+      }
+    },
     "discardForm.title" : {
       "extractionState" : "manual",
       "localizations" : {
