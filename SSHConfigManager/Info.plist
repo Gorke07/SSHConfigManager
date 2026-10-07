@@ -29,5 +29,7 @@
 	<string>public.app-category.developer-tools</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>SSH Config Manager opens your terminal and runs ssh for the host you choose.</string>
 </dict>
 </plist>

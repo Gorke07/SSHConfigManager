@@ -36,10 +36,12 @@ targets:
         CFBundleVersion: "1"
         LSApplicationCategoryType: public.app-category.developer-tools
         LSMinimumSystemVersion: "26.0"
+        NSAppleEventsUsageDescription: SSH Config Manager opens your terminal and runs ssh for the host you choose.
     entitlements:
       path: SSHConfigManager/SSHConfigManager.entitlements
       properties:
         com.apple.security.app-sandbox: false
+        com.apple.security.automation.apple-events: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: tr.com.mess.SSHConfigManager

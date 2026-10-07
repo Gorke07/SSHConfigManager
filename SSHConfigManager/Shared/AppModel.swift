@@ -27,9 +27,22 @@ final class AppModel {
     var pendingSelection: SidebarItem?
 
     @ObservationIgnored private let makeStore: StoreFactory
+    @ObservationIgnored let processRunner: any ProcessRunning
+    @ObservationIgnored private let launcherFactory: @MainActor (TerminalChoice) -> any TerminalLaunching
+    @ObservationIgnored private let terminalInstalled: @MainActor (TerminalChoice) -> Bool
+    /// Set when macOS denied Automation access; the main window explains how to allow it.
+    var automationDenied = false
 
-    init(settings: AppSettings, backupRoot: URL = BackupManager.defaultRoot, makeStore: @escaping StoreFactory = AppModel.liveStore) {
+    init(settings: AppSettings,
+         backupRoot: URL = BackupManager.defaultRoot,
+         processRunner: any ProcessRunning = ProcessRunner(),
+         launcherFactory: @escaping @MainActor (TerminalChoice) -> any TerminalLaunching = LiveTerminals.launcher(for:),
+         isTerminalInstalled: @escaping @MainActor (TerminalChoice) -> Bool = LiveTerminals.isInstalled,
+         makeStore: @escaping StoreFactory = AppModel.liveStore) {
         self.settings = settings
+        self.processRunner = processRunner
+        self.launcherFactory = launcherFactory
+        self.terminalInstalled = isTerminalInstalled
         let backups = BackupManager(rootDirectory: backupRoot, keep: settings.backupCount)
         self.backupManager = backups
         self.makeStore = makeStore
@@ -50,6 +63,53 @@ final class AppModel {
 
     var commandBuilder: SSHCommandBuilder {
         SSHCommandBuilder(configFile: store.fileURL, homeDirectory: settings.homeDirectory)
+    }
+
+    func isTerminalInstalled(_ choice: TerminalChoice) -> Bool { terminalInstalled(choice) }
+
+    /// The alias to connect to for a sidebar item (nil for patterns, Match blocks and missing hosts).
+    func connectableAlias(for item: SidebarItem) -> String? {
+        switch item {
+        case .host:
+            guard let entry = SidebarBuilder.hostEntry(for: item, in: store.document), !entry.isPattern else { return nil }
+            return entry.alias
+        case .included:
+            guard let host = SidebarBuilder.includedHost(for: item, in: store.includedHosts), !host.entry.isPattern else { return nil }
+            return host.entry.alias
+        case .match:
+            return nil
+        }
+    }
+
+    /// Every connectable alias once (case-insensitive, like ssh), file hosts first, then included ones.
+    var connectableAliases: [String] {
+        var seen = Set<String>()
+        let candidates = store.document.hosts.filter { !$0.isPattern }.map(\.alias)
+            + store.includedHosts.filter { !$0.entry.isPattern }.map(\.entry.alias)
+        return candidates.filter { seen.insert($0.lowercased()).inserted }
+    }
+
+    @discardableResult
+    func connect(alias: String) -> Connector.Outcome {
+        let builder = commandBuilder
+        let request = LaunchRequest(sshArguments: builder.sshArguments(alias: alias), shellCommand: builder.shellCommand(alias: alias))
+        guard !request.shellCommand.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7F }) else {
+            errorMessage = String(localized: "connect.invalidCommand")
+            return .failed(.failed("control character"))
+        }
+        let outcome = Connector(choice: settings.terminal, isInstalled: terminalInstalled, makeLauncher: launcherFactory).connect(request)
+        switch outcome {
+        case .launched:
+            break
+        case .fellBack(let from):
+            let name = from.displayName
+            errorMessage = String(localized: "connect.fellBack \(name)")
+        case .failed(.automationDenied):
+            automationDenied = true
+        case .failed(.failed(let detail)):
+            errorMessage = String(localized: "connect.failed \(detail)")
+        }
+        return outcome
     }
 
     func select(_ item: SidebarItem?) {

@@ -833,6 +833,27 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Some fields in the form have problems. Fix them or discard them before quitting." } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Formdaki bazı alanlarda sorun var. Çıkmadan önce düzeltin ya da atın." } }
       }
+    },
+    "connect.failed %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Could not open the terminal: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Terminal açılamadı: %@" } }
+      }
+    },
+    "connect.fellBack %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ could not be opened, so Terminal was used instead." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "%@ açılamadığı için bunun yerine Terminal kullanıldı." } }
+      }
+    },
+    "connect.invalidCommand" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This host can't be opened because its connection command contains invalid characters." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu host açılamıyor çünkü bağlantı komutu geçersiz karakterler içeriyor." } }
+      }
     }
   },
   "version" : "1.0"

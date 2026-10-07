@@ -49,10 +49,14 @@ struct FixedRunner: ProcessRunning {
 
 /// An AppModel wired to a temporary home, temporary backups and fake ssh validation.
 @MainActor
-func makeTestModel(_ tmp: TempDir, config: String? = nil, runner: FixedRunner = .valid) -> AppModel {
+func makeTestModel(_ tmp: TempDir, config: String? = nil, runner: FixedRunner = .valid,
+                   launcher: RecordingLauncher = RecordingLauncher()) -> AppModel {
     if let config { _ = try? tmp.file(".ssh/config", config) }
     let settings = AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url)
-    return AppModel(settings: settings, backupRoot: tmp.url.appending(path: "Backups")) { url, backups, kind in
+    return AppModel(settings: settings, backupRoot: tmp.url.appending(path: "Backups"),
+                    processRunner: runner,
+                    launcherFactory: { _ in launcher },
+                    isTerminalInstalled: { _ in true }) { url, backups, kind in
         ConfigStore(
             fileURL: url,
             writer: SafeFileWriter(backups: backups),
@@ -60,5 +64,17 @@ func makeTestModel(_ tmp: TempDir, config: String? = nil, runner: FixedRunner = 
             includeResolver: IncludeResolver(homeDirectory: tmp.url),
             watchForChanges: false,
             backupKind: kind)
+    }
+}
+
+/// Records launch requests instead of opening a terminal. Tests must never open real terminals.
+@MainActor
+final class RecordingLauncher: TerminalLaunching {
+    private(set) var requests: [LaunchRequest] = []
+    var error: LaunchError?
+
+    func launch(_ request: LaunchRequest) throws {
+        if let error { throw error }
+        requests.append(request)
     }
 }

@@ -11,12 +11,14 @@ final class AppSettings {
     private enum Keys {
         static let configPath = "configPath"
         static let backupCount = "backupCount"
+        static let terminal = "terminal"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
     let homeDirectory: URL
     private(set) var configPath: String
     private(set) var backupCount: Int
+    private(set) var terminal: TerminalChoice
 
     init(defaults: UserDefaults = .standard, homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser) {
         self.defaults = defaults
@@ -24,6 +26,7 @@ final class AppSettings {
         let stored = defaults.string(forKey: Keys.configPath)
         configPath = stored.flatMap { Self.isValidConfigPath($0) ? $0 : nil } ?? Self.defaultConfigPath
         backupCount = Self.clamp(defaults.object(forKey: Keys.backupCount) as? Int ?? Self.defaultBackupCount)
+        terminal = TerminalChoice(rawValue: defaults.string(forKey: Keys.terminal) ?? "") ?? .terminal
     }
 
     var configURL: URL { Self.expand(configPath, home: homeDirectory) }
@@ -36,6 +39,11 @@ final class AppSettings {
     func setBackupCount(_ count: Int) {
         backupCount = Self.clamp(count)
         defaults.set(backupCount, forKey: Keys.backupCount)
+    }
+
+    func setTerminal(_ choice: TerminalChoice) {
+        terminal = choice
+        defaults.set(choice.rawValue, forKey: Keys.terminal)
     }
 
     /// Shows paths under the home directory with a leading "~".
