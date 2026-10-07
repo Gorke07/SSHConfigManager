@@ -38,11 +38,13 @@ struct KeyFileInspectorTests {
         #expect(listed.stdout.split(separator: " ").map(String.init)[1] == info.fingerprint)
     }
 
-    @Test func publicKeyInfoRejectsGarbage() {
+    @Test func publicKeyInfoRejectsGarbage() throws {
         #expect(PublicKeyInfo(text: "") == nil)
         #expect(PublicKeyInfo(text: "ssh-ed25519") == nil)
         #expect(PublicKeyInfo(text: "ssh-ed25519 not*base64") == nil)
-        #expect(PublicKeyInfo(text: "\n\nssh-ed25519 \(KnownHostsDocumentTests.ed)\r\n")?.comment == nil)
+        let info = try #require(PublicKeyInfo(text: "\n\nssh-ed25519 \(KnownHostsDocumentTests.ed)\r\n"))
+        #expect(info.type == "ssh-ed25519")
+        #expect(info.comment == nil)
     }
 
     @Test func nonKeyFilesAreNotPrivateKeys() {
@@ -58,5 +60,43 @@ struct KeyFileInspectorTests {
         let tmp = try TempDir()
         let file = try tmp.file("big", String(repeating: "A", count: 10_000))
         #expect(try KeyFileInspector.readHead(of: file).count == KeyFileInspector.headLimit)
+    }
+
+    private static let magic = Array("openssh-key-v1".utf8) + [0]
+
+    private static func openSSHHead(_ bytes: [UInt8]) -> Data {
+        Data("-----BEGIN OPENSSH PRIVATE KEY-----\n\(Data(bytes).base64EncodedString())\n".utf8)
+    }
+
+    @Test func wellFormedOpenSSHHeadsAreRecognized() {
+        let none = Self.magic + [0, 0, 0, 4] + Array("none".utf8)
+        let aes = Self.magic + [0, 0, 0, 10] + Array("aes256-ctr".utf8)
+        #expect(KeyFileInspector.encryption(ofPrivateKeyHead: Self.openSSHHead(none)) == .unencrypted)
+        #expect(KeyFileInspector.encryption(ofPrivateKeyHead: Self.openSSHHead(aes)) == .encrypted)
+    }
+
+    @Test func malformedOpenSSHHeadsAreUnknown() {
+        let header = "-----BEGIN OPENSSH PRIVATE KEY-----\n"
+        let cases: [Data] = [
+            Data((header + "!!!!not*base64!!\n").utf8),
+            Self.openSSHHead(Array("openss".utf8)),
+            Self.openSSHHead(Array("wrong-magic-v1".utf8) + [0, 0, 0, 0, 4] + Array("none".utf8)),
+            Self.openSSHHead(Self.magic + [0, 0, 0, 0] + Array("none".utf8)),
+            Self.openSSHHead(Self.magic + [0x7F, 0xFF, 0xFF, 0xFF] + Array("none".utf8)),
+            Self.openSSHHead(Self.magic + [0xFF, 0xFF, 0xFF, 0xFF] + Array("none".utf8)),
+            Self.openSSHHead(Self.magic + [0, 0, 0, 4] + Array("no".utf8)),
+            Self.openSSHHead(Self.magic + [0, 0]),
+            Data(header.utf8),
+        ]
+        for head in cases {
+            #expect(KeyFileInspector.isPrivateKeyHeader(head))
+            #expect(KeyFileInspector.encryption(ofPrivateKeyHead: head) == .unknown)
+        }
+    }
+
+    @Test func crlfPEMHeadsAreDetected() {
+        #expect(KeyFileInspector.encryption(ofPrivateKeyHead: Data("-----BEGIN RSA PRIVATE KEY-----\r\nProc-Type: 4,ENCRYPTED\r\n".utf8)) == .encrypted)
+        #expect(KeyFileInspector.encryption(ofPrivateKeyHead: Data("-----BEGIN ENCRYPTED PRIVATE KEY-----\r\n".utf8)) == .encrypted)
+        #expect(KeyFileInspector.encryption(ofPrivateKeyHead: Data("-----BEGIN RSA PRIVATE KEY-----\r\nMIIE\r\n".utf8)) == .unencrypted)
     }
 }
