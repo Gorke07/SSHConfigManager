@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// A unique temporary directory that is removed when the object is released.
 final class TempDir {
@@ -42,4 +43,11 @@ struct SplitMix64: RandomNumberGenerator {
         z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
         return z ^ (z >> 31)
     }
+}
+
+final class TestClock: Sendable {
+    private let current: Mutex<Date>
+    init(_ start: Date) { current = Mutex(start) }
+    var now: Date { current.withLock { $0 } }
+    func advance(_ seconds: TimeInterval) { current.withLock { $0 += seconds } }
 }
