@@ -27,11 +27,16 @@ struct DiffTextView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView([.vertical, .horizontal]) {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(DiffPresenter.rows(for: hunks)) { row in
-                            DiffRowView(row: row)
+                // Rows fill the widest row (or the viewport, when wider) so the added/removed
+                // backgrounds end at the same edge.
+                GeometryReader { viewport in
+                    ScrollView([.vertical, .horizontal]) {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            ForEach(DiffPresenter.rows(for: hunks)) { row in
+                                DiffRowView(row: row)
+                            }
                         }
+                        .frame(minWidth: viewport.size.width, alignment: .leading)
                     }
                 }
             }
@@ -53,10 +58,10 @@ private struct DiffRowView: View {
                 .foregroundStyle(row.kind == .header || row.kind == .noNewline ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
                 .textSelection(.enabled)
                 .fixedSize(horizontal: true, vertical: false)
-            Spacer(minLength: 0)
         }
         .font(.system(.body, design: .monospaced))
         .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(background)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(row.accessibilityLabel)
