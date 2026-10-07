@@ -1,5 +1,6 @@
 import AppKit
 import KeyboardShortcuts
+import ServiceManagement
 import SwiftUI
 
 struct SettingsView: View {
@@ -72,9 +73,7 @@ struct SettingsView: View {
                 if loginItem.needsApproval {
                     Text(String(localized: "settings.launchAtLogin.needsApproval")).font(.footnote).foregroundStyle(.secondary)
                     Button(String(localized: "settings.launchAtLogin.openSettings")) {
-                        if let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") {
-                            NSWorkspace.shared.open(url)
-                        }
+                        SMAppService.openSystemSettingsLoginItems()
                     }
                 }
                 if let message = loginItem.errorMessage {

@@ -104,3 +104,4 @@ Elle denemede gerçek anahtarlarınıza dokunmamak için yeni anahtarları `dene
 - [ ] Sistem Ayarları → Giriş Öğeleri'nden kapatılınca Ayarlar'a dönüldüğünde anahtar kapalı görünüyor.
 - [ ] Yeni bir host ekleyip kaydetmeden seçince Bağlan/Test pasif ve "Bu host'a bağlanmak ya da test etmek için dosyayı kaydedin" notu var.
 - [ ] Kaydedilmemiş düzenleme varken config'ten bir host'u terminalden silin: o host artık menü çubuğu listesinde ve ⌥⌘S panelinde yok; "Dosya dışarıdan değişti" bandı görünüyor.
+- [ ] Girişte açılışta ana pencere bir an görünüp kaybolmuyor ve birkaç saniye sonra geri gelmiyor; menü çubuğundan 'Ana pencereyi aç' ile normal açılıyor ve Dock ikonu görünüyor.

@@ -13,10 +13,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var panelController: QuickConnectPanelController?
     private var observers: [any NSObjectProtocol] = []
 
-    private var launchedAsLoginItem = false
+    /// One-shot guard that closes a main window SwiftUI still shows on a login launch.
+    private var loginLaunchGuard: (any NSObjectProtocol)?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
-        launchedAsLoginItem = !TestEnvironment.isRunningTests && LaunchContext.currentLaunchIsLoginItem()
+        guard !TestEnvironment.isRunningTests, LaunchContext.currentLaunchIsLoginItem() else { return }
+        LaunchContext.startsInMenuBar = true
+        NSApp.setActivationPolicy(.accessory)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -41,14 +44,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             nonisolated(unsafe) let object = note.object  // delivered on the main queue
             MainActor.assumeIsolated {
                 guard let window = object as? NSWindow, Self.isAppWindow(window) else { return }
+                // A pending login-launch guard closes the main window instead of showing the Dock icon.
+                if self.loginLaunchGuard != nil, window.identifier?.rawValue.hasPrefix("main") == true { return }
                 NSApp.setActivationPolicy(.regular)
             }
         })
-        if launchedAsLoginItem {
-            // Started at login: stay in the menu bar; the main window opens from there or the Dock.
-            Task { @MainActor in
-                for window in NSApp.windows where window.identifier?.rawValue.hasPrefix("main") == true { window.close() }
-                NSApp.setActivationPolicy(.accessory)
+        if LaunchContext.startsInMenuBar {
+            // Fallback if the scene still shows the main window: close it (once, within 3 s) and stay in the menu bar.
+            let deadline = Date().addingTimeInterval(3)
+            loginLaunchGuard = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main) { [weak self] note in
+                nonisolated(unsafe) let object = note.object
+                MainActor.assumeIsolated {
+                    guard let self, let window = object as? NSWindow,
+                          window.identifier?.rawValue.hasPrefix("main") == true else { return }
+                    if let token = self.loginLaunchGuard { NotificationCenter.default.removeObserver(token) }
+                    self.loginLaunchGuard = nil
+                    guard Date() <= deadline else { return }
+                    window.close()
+                    NSApp.setActivationPolicy(.accessory)
+                }
+            }
+            // Never leave the guard (and the Dock suppression) pending past the window.
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(3))
+                if let token = self?.loginLaunchGuard { NotificationCenter.default.removeObserver(token) }
+                self?.loginLaunchGuard = nil
             }
         }
     }
