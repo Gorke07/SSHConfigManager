@@ -36,7 +36,14 @@ struct SSHCommandBuilderTests {
         ("a b", "'a b'"),
         ("~/x", "'~/x'"),
         ("", "''"),
-        ("-oProxyCommand=x", "-oProxyCommand=x"),
+        ("-oProxyCommand=x", "-oProxyCommand=x"), // bare because alias always follows --
+        ("=foo", "'=foo'"),
+        ("%self", "'%self'"),
+        ("a=b", "a=b"),
+        ("50%", "50%"),
+        ("'", "''\\'''"),
+        ("a\nb", "'a\nb'"),
+        ("ü", "'ü'"),
     ])
     func shellQuote(input: String, expected: String) {
         #expect(SSHCommandBuilder.shellQuote(input) == expected)

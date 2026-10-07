@@ -33,7 +33,13 @@ public struct SSHCommandBuilder: Equatable, Sendable {
 
     /// Leaves values made only of safe characters as-is; single-quotes everything else.
     public static func shellQuote(_ value: String) -> String {
-        if !value.isEmpty && value.unicodeScalars.allSatisfy(safeScalars.contains) { return value }
-        return "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        guard !value.isEmpty, value.unicodeScalars.allSatisfy(safeScalars.contains) else {
+            return "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        }
+        let firstScalar = value.unicodeScalars.first!
+        guard firstScalar != "=" && firstScalar != "%" else {
+            return "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        }
+        return value
     }
 }
