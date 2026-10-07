@@ -54,7 +54,15 @@ final class TestClock: Sendable {
 }
 
 final class FakeRunner: ProcessRunning {
+    struct Invocation: Sendable {
+        let executable: URL
+        let arguments: [String]
+        let environment: [String: String]
+        let timeout: Duration
+    }
+
     struct State {
+        var invocations: [Invocation] = []
         var calls: [[String]] = []
         var running = 0
         var maxRunning = 0
@@ -70,16 +78,18 @@ final class FakeRunner: ProcessRunning {
     }
 
     var calls: [[String]] { state.withLock { $0.calls } }
+    var invocations: [Invocation] { state.withLock { $0.invocations } }
     var maxConcurrent: Int { state.withLock { $0.maxRunning } }
 
     func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
         state.withLock {
             $0.calls.append(arguments)
+            $0.invocations.append(Invocation(executable: executable, arguments: arguments, environment: environment, timeout: timeout))
             $0.running += 1
             $0.maxRunning = max($0.maxRunning, $0.running)
         }
+        defer { state.withLock { $0.running -= 1 } }
         if delay > .zero { try await Task.sleep(for: delay) }
-        state.withLock { $0.running -= 1 }
         return respond(arguments)
     }
 }

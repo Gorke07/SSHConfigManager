@@ -41,64 +41,120 @@ public struct ProcessRunner: ProcessRunning {
         process.standardError = err
 
         let box = Unchecked(process)
-        let stdout = Buffer()
-        let stderr = Buffer()
-        let timedOut = Flag()
-        let group = DispatchGroup()
+        let state = RunState()
 
-        group.enter()
-        process.terminationHandler = { _ in group.leave() }
+        // Drain with readability handlers (not blocking reads): a grandchild that inherits
+        // the pipe can keep it open forever, so EOF alone must never gate completion.
+        for (pipe, isOut) in [(out, true), (err, false)] {
+            pipe.fileHandleForReading.readabilityHandler = { handle in
+                let data = handle.availableData
+                if data.isEmpty {
+                    handle.readabilityHandler = nil
+                    state.eof(isOut)
+                } else {
+                    state.append(data, isOut)
+                }
+            }
+        }
+        let handles = Unchecked([out.fileHandleForReading, err.fileHandleForReading])
+        state.onFinish = { for h in handles.value { h.readabilityHandler = nil } }
+
+        process.terminationHandler = { proc in
+            state.markExited(status: proc.terminationStatus)
+            // Grace period: a grandchild may still hold the pipes open.
+            DispatchQueue.global().asyncAfter(deadline: .now() + 1) { state.finish(.grace) }
+        }
         do {
             try process.run()
         } catch {
             process.terminationHandler = nil
-            group.leave()
+            for h in handles.value { h.readabilityHandler = nil }
             throw error
-        }
-
-        // Drain both pipes concurrently so a full pipe buffer never blocks the child.
-        for (pipe, buffer) in [(out, stdout), (err, stderr)] {
-            group.enter()
-            let reader = Unchecked(pipe.fileHandleForReading)
-            DispatchQueue.global().async {
-                buffer.set(reader.value.readDataToEndOfFile())
-                group.leave()
-            }
         }
 
         let seconds = Double(timeout.components.seconds) + Double(timeout.components.attoseconds) / 1e18
         DispatchQueue.global().asyncAfter(deadline: .now() + seconds) {
             guard box.value.isRunning else { return }
-            timedOut.set()
+            state.markTimedOut()
             box.value.terminate()
             DispatchQueue.global().asyncAfter(deadline: .now() + 1) {
                 if box.value.isRunning { kill(box.value.processIdentifier, SIGKILL) }
             }
         }
+        // Hard deadline: never hang, whatever the child or its descendants do.
+        DispatchQueue.global().asyncAfter(deadline: .now() + seconds + 3) { state.finish(.hard) }
 
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            group.notify(queue: .global()) { continuation.resume() }
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<ProcessResult, Never>) in
+                state.install(continuation)
+            }
+        } onCancel: {
+            if box.value.isRunning { box.value.terminate() }
         }
-
-        return ProcessResult(
-            exitCode: process.terminationStatus,
-            stdout: stdout.string,
-            stderr: stderr.string,
-            timedOut: timedOut.isSet)
     }
 }
 
-/// `Mutex` is non-copyable and cannot be captured by escaping closures; wrap it in a class.
-private final class Flag: Sendable {
-    private let value = Mutex(false)
-    func set() { value.withLock { $0 = true } }
-    var isSet: Bool { value.withLock { $0 } }
-}
+/// All mutable run state behind one lock. The continuation is resumed exactly once.
+private final class RunState: Sendable {
+    enum Mode { case normal, grace, hard }
 
-private final class Buffer: Sendable {
-    private let data = Mutex(Data())
-    func set(_ new: Data) { data.withLock { $0 = new } }
-    var string: String { data.withLock { String(decoding: $0, as: UTF8.self) } }
+    private struct Inner {
+        var stdout = Data()
+        var stderr = Data()
+        var outEOF = false
+        var errEOF = false
+        var exited = false
+        var status: Int32 = -1
+        var timedOut = false
+        var forced = false
+        var hard = false
+        var finished = false
+        var continuation: CheckedContinuation<ProcessResult, Never>?
+    }
+
+    private let inner = Mutex(Inner())
+    nonisolated(unsafe) var onFinish: (@Sendable () -> Void)?
+
+    func append(_ data: Data, _ isOut: Bool) {
+        inner.withLock { if isOut { $0.stdout.append(data) } else { $0.stderr.append(data) } }
+    }
+
+    func eof(_ isOut: Bool) {
+        inner.withLock { if isOut { $0.outEOF = true } else { $0.errEOF = true } }
+        finish(.normal)
+    }
+
+    func markExited(status: Int32) {
+        inner.withLock { $0.exited = true; $0.status = status }
+        finish(.normal)
+    }
+
+    func markTimedOut() { inner.withLock { $0.timedOut = true } }
+
+    func install(_ continuation: CheckedContinuation<ProcessResult, Never>) {
+        inner.withLock { $0.continuation = continuation }
+        finish(.normal)
+    }
+
+    func finish(_ mode: Mode) {
+        let resume: (CheckedContinuation<ProcessResult, Never>, ProcessResult)? = inner.withLock { s in
+            if mode == .grace { s.forced = true }
+            if mode == .hard { s.hard = true }
+            guard !s.finished, let continuation = s.continuation else { return nil }
+            guard s.hard || (s.exited && ((s.outEOF && s.errEOF) || s.forced)) else { return nil }
+            s.finished = true
+            s.continuation = nil
+            let result = ProcessResult(
+                exitCode: s.exited ? s.status : -1,
+                stdout: String(decoding: s.stdout, as: UTF8.self),
+                stderr: String(decoding: s.stderr, as: UTF8.self),
+                timedOut: s.timedOut)
+            return (continuation, result)
+        }
+        guard let (continuation, result) = resume else { return }
+        onFinish?()
+        continuation.resume(returning: result)
+    }
 }
 
 /// Foundation's Process/FileHandle are thread-safe for the calls used here but not marked Sendable.

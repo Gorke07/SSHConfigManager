@@ -46,4 +46,35 @@ struct ProcessRunnerTests {
         #expect(result.stdout.isEmpty)
         #expect(!result.timedOut)
     }
+
+    @Test func grandchildHoldingPipeDoesNotHang() async throws {
+        let clock = ContinuousClock()
+        let started = clock.now
+        let result = try await runner.run(URL(filePath: "/bin/sh"), arguments: ["-c", "(sleep 5 &); echo hi"], environment: [:], timeout: .seconds(10))
+        #expect(clock.now - started < .seconds(3))
+        #expect(result.stdout == "hi\n")
+        #expect(result.exitCode == 0)
+        #expect(!result.timedOut)
+    }
+
+    @Test func sigkillEscalation() async throws {
+        let clock = ContinuousClock()
+        let started = clock.now
+        let result = try await runner.run(URL(filePath: "/bin/sh"), arguments: ["-c", "trap '' TERM; sleep 10"], environment: [:], timeout: .milliseconds(200))
+        #expect(clock.now - started < .seconds(4))
+        #expect(result.timedOut)
+    }
+
+    @Test func cancellationTerminatesChild() async throws {
+        let runner = self.runner
+        let clock = ContinuousClock()
+        let started = clock.now
+        let task = Task {
+            try await runner.run(URL(filePath: "/bin/sleep"), arguments: ["10"], environment: [:], timeout: .seconds(30))
+        }
+        try await Task.sleep(for: .milliseconds(100))
+        task.cancel()
+        _ = try await task.value
+        #expect(clock.now - started < .seconds(3))
+    }
 }
