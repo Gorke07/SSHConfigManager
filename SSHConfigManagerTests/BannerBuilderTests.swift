@@ -41,7 +41,8 @@ struct BannerBuilderTests {
         let app = AppModel(settings: AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url),
                            backupRoot: tmp.url.appending(path: "Backups"),
                            launcherFactory: { _ in RecordingLauncher() },
-                           isTerminalInstalled: { _ in true }) { url, backups, kind in
+                           isTerminalInstalled: { _ in true },
+                           keyTools: RecordingKeyActions().tools(tmp)) { url, backups, kind in
             ConfigStore(fileURL: url, writer: SafeFileWriter(backups: backups),
                         validator: ConfigValidator(runner: FixedRunner.valid),
                         includeResolver: IncludeResolver(homeDirectory: tmp.url), watchForChanges: true, backupKind: kind)

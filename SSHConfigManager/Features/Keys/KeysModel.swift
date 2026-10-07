@@ -21,7 +21,9 @@ final class KeysModel {
     private(set) var isWorking = false
     @ObservationIgnored private var operationCount = 0
     var errorMessage: String?
-    var selection: Set<String> = []
+    var selection: String?
+    /// The last Create made the key but could not assign it (the sheet then suggests a fresh file name).
+    private(set) var createdButNotAssigned = false
 
     @ObservationIgnored let tools: KeyTools
     @ObservationIgnored weak var app: AppModel?
@@ -32,7 +34,18 @@ final class KeysModel {
     }
 
     var defaultComment: String {
-        "\(NSUserName())@\(ProcessInfo.processInfo.hostName)"
+        "\(NSUserName())@\(Self.hostName())"
+    }
+
+    /// `gethostname(3)`, like ssh-keygen's own default comment; `ProcessInfo.hostName` can block on reverse DNS.
+    private static func hostName() -> String {
+        var buffer = [CChar](repeating: 0, count: 256)
+        if gethostname(&buffer, buffer.count) == 0 {
+            let bytes = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+            let name = String(decoding: bytes, as: UTF8.self)
+            if !name.isEmpty { return name }
+        }
+        return ProcessInfo.processInfo.hostName
     }
 
     func suggestedFileName(for type: SSHKeyType) -> String {
@@ -56,15 +69,16 @@ final class KeysModel {
             KeyRow(
                 key: key,
                 usedBy: KeyUsage.hosts(using: key.fileURL, in: hosts, home: home),
-                inAgent: agent.map { loaded in key.publicKey.map { loaded.contains($0.fingerprint) } ?? false },
+                inAgent: agent.flatMap { loaded in key.publicKey.map { loaded.contains($0.fingerprint) } },
                 displayPath: app.settings.displayPath(for: key.fileURL))
         }
-        selection = selection.filter { id in rows.contains { $0.id == id } }
+        if let selected = selection, !rows.contains(where: { $0.id == selected }) { selection = nil }
     }
 
     /// Creates `~/.ssh/<fileName>`; optionally adds it to a host as an unsaved edit (saved by the Save flow).
     func generate(type: SSHKeyType, fileName: String, comment: String, passphrase: String, assignTo alias: String?) async -> Bool {
         guard let app else { return false }
+        createdButNotAssigned = false
         guard Self.isValidFileName(fileName) else {
             errorMessage = String(localized: "keys.error.invalidFileName")
             return false
@@ -76,10 +90,44 @@ final class KeysModel {
                 return false
             }
         }
-        return await perform {
+        var assignmentError: String?
+        let ok = await perform {
             try await tools.manager.generate(type: type, at: url, comment: comment, passphrase: passphrase)
-            if let alias { try app.assignIdentityFile(url, toAlias: alias) }
+            if let alias {
+                do { try app.assignIdentityFile(url, toAlias: alias) } catch { assignmentError = Messages.text(for: error) }
+            }
         }
+        if let assignmentError {
+            // The key exists now; the sheet stays open with a message and a fresh file name.
+            createdButNotAssigned = true
+            let shownPath = app.settings.displayPath(for: url)
+            errorMessage = String(localized: "keys.error.createdNotAssigned \(shownPath)") + assignmentError
+            return false
+        }
+        return ok
+    }
+
+    /// "Upload to Server…": the outcome is reported in this window's own state, not the main window's.
+    @discardableResult
+    func upload(_ row: KeyRow, alias: String) -> Connector.Outcome {
+        guard let app, let pub = row.key.publicURL else { return .failed(.failed("no public key")) }
+        let outcome = app.uploadKey(publicKey: pub, alias: alias)
+        switch outcome {
+        case .launched:
+            errorMessage = nil
+        case .fellBack:
+            errorMessage = app.fallbackNotice
+        case .failed(.automationDenied):
+            errorMessage = String(localized: "connect.automationDenied.message")
+        case .failed(.failed):
+            errorMessage = app.errorMessage
+        }
+        if case .launched = outcome {} else {
+            app.errorMessage = nil
+            app.fallbackNotice = nil
+            app.automationDenied = false
+        }
+        return outcome
     }
 
     func addToAgent(_ row: KeyRow, passphrase: String?) async -> Bool {
@@ -106,7 +154,14 @@ final class KeysModel {
 
     /// Moves the private key and its `.pub` to the Trash together (spec §8.3).
     func trash(_ row: KeyRow) async -> Bool {
-        let urls = [row.key.privateURL, row.key.publicURL].compactMap { $0 }
+        var urls = [row.key.privateURL, row.key.publicURL].compactMap { $0 }
+        // A `.pub` that did not parse is not in `publicURL`, but the dialog promises both files move.
+        if let privateURL = row.key.privateURL {
+            let sibling = URL(fileURLWithPath: privateURL.path + ".pub")
+            if FileManager.default.fileExists(atPath: sibling.path), !urls.contains(where: { $0.path == sibling.path }) {
+                urls.append(sibling)
+            }
+        }
         return await perform { try await tools.recycle(urls) }
     }
 
@@ -132,6 +187,7 @@ final class KeysModel {
 
     static func isValidFileName(_ name: String) -> Bool {
         !name.isEmpty && name == name.trimmingCharacters(in: .whitespacesAndNewlines) && !name.hasPrefix(".") && !name.contains("/")
+            && !name.hasSuffix(".pub") && !name.hasSuffix("-cert")
             && !name.unicodeScalars.contains { $0.value < 0x20 || $0.value == 0x7F }
     }
 }

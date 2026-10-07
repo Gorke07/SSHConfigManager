@@ -52,7 +52,7 @@ struct KeysWindow: View {
             }
         }
         .contextMenu(forSelectionType: String.self) { ids in
-            if let row = keys.rows.first(where: { ids.contains($0.id) }) { actions(for: row) }
+            if let id = ids.first, let row = keys.rows.first(where: { $0.id == id }) { actions(for: row) }
         }
         .overlay {
             if keys.rows.isEmpty && !keys.isRefreshing {
@@ -73,7 +73,7 @@ struct KeysWindow: View {
                 Menu {
                     if let row = selectedRow { actions(for: row) }
                 } label: {
-                    Label(String(localized: "keys.title"), systemImage: "ellipsis.circle")
+                    Label(String(localized: "keys.actions"), systemImage: "ellipsis.circle")
                 }
                 .disabled(selectedRow == nil)
             }
@@ -87,7 +87,7 @@ struct KeysWindow: View {
             }
         }
         .confirmationDialog(
-            String(localized: "keys.trash.title"),
+            trashTitle,
             isPresented: Binding(get: { trashing != nil }, set: { if !$0 { trashing = nil } }),
             presenting: trashing
         ) { row in
@@ -106,11 +106,19 @@ struct KeysWindow: View {
             Text(verbatim: keys.errorMessage ?? "")
         }
         .task { await keys.refresh() }
+        .onChange(of: app.store.savedDocument) { Task { await keys.refresh() } }
+        .onChange(of: app.store.fileURL) { Task { await keys.refresh() } }
+        .onChange(of: ObjectIdentifier(app.store)) { Task { await keys.refresh() } }
         .frame(minWidth: 900, minHeight: 420)
     }
 
+    private var trashTitle: String {
+        guard let shownPath = trashing?.displayPath else { return "" }
+        return String(localized: "keys.trash.which \(shownPath)")
+    }
+
     private var selectedRow: KeyRow? {
-        keys.rows.first { keys.selection.contains($0.id) }
+        keys.rows.first { $0.id == keys.selection }
     }
 
     @ViewBuilder
@@ -126,8 +134,9 @@ struct KeysWindow: View {
         }
         .disabled(!row.key.hasPrivateKey)
         Button(String(localized: "keys.upload")) { sheet = .upload(row) }
-            .disabled(row.key.publicURL == nil)
-            .help(row.key.publicURL == nil ? String(localized: "keys.upload.noPublicKey") : "")
+            .disabled(row.key.publicURL == nil || !row.key.hasPrivateKey)
+            .help(row.key.publicURL == nil ? String(localized: "keys.upload.noPublicKey")
+                  : row.key.hasPrivateKey ? "" : String(localized: "keys.upload.needsPrivateKey"))
         Button(String(localized: "keys.changePassphrase")) { sheet = .changePassphrase(row) }
             .disabled(!row.key.hasPrivateKey)
         Divider()

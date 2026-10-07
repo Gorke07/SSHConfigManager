@@ -26,7 +26,7 @@ struct NewKeySheet: View {
             if passphrase != passphraseRepeat {
                 Text(String(localized: "keys.form.passphraseMismatch")).font(.footnote).foregroundStyle(.red)
             } else if !KeyManager.isValidPassphrase(passphrase) {
-                Text(String(localized: "keys.error.passphraseTooShort")).font(.footnote).foregroundStyle(.red)
+                Text(Messages.text(for: KeyManager.passphraseError(passphrase))).font(.footnote).foregroundStyle(.red)
             }
             Picker(String(localized: "keys.form.assign"), selection: $alias) {
                 Text(String(localized: "keys.form.assignNone")).tag("")
@@ -41,7 +41,11 @@ struct NewKeySheet: View {
                 Button(String(localized: "keys.form.create")) {
                     Task {
                         if await keys.generate(type: type, fileName: fileName, comment: comment,
-                                               passphrase: passphrase, assignTo: alias.isEmpty ? nil : alias) { finish() }
+                                               passphrase: passphrase, assignTo: alias.isEmpty ? nil : alias) {
+                            finish()
+                        } else if keys.createdButNotAssigned {
+                            fileName = keys.suggestedFileName(for: type)   // the old name is taken now
+                        }
                     }
                 }
                 .keyboardShortcut(.defaultAction)
@@ -55,7 +59,10 @@ struct NewKeySheet: View {
             fileName = keys.suggestedFileName(for: type)
             comment = keys.defaultComment
         }
-        .onChange(of: type) { fileName = keys.suggestedFileName(for: type) }
+        .onChange(of: type) { old, new in
+            // Only replace a name that is still the previous suggestion; a typed name is the user's.
+            if fileName == keys.suggestedFileName(for: old) { fileName = keys.suggestedFileName(for: new) }
+        }
         .onDisappear { keys.errorMessage = nil }
     }
 
@@ -118,7 +125,7 @@ struct ChangePassphraseSheet: View {
             if new != newRepeat {
                 Text(String(localized: "keys.form.passphraseMismatch")).font(.footnote).foregroundStyle(.red)
             } else if !KeyManager.isValidPassphrase(new) {
-                Text(String(localized: "keys.error.passphraseTooShort")).font(.footnote).foregroundStyle(.red)
+                Text(Messages.text(for: KeyManager.passphraseError(new))).font(.footnote).foregroundStyle(.red)
             }
             if let message = keys.errorMessage { Text(verbatim: message).font(.footnote).foregroundStyle(.red) }
             HStack {
@@ -172,20 +179,27 @@ struct UploadKeySheet: View {
             if row.key.publicURL == nil {
                 Text(String(localized: "keys.upload.noPublicKey")).font(.footnote).foregroundStyle(.red)
             }
+            if !row.key.hasPrivateKey {
+                Text(String(localized: "keys.upload.needsPrivateKey")).font(.footnote).foregroundStyle(.red)
+            }
+            if let message = app.keys.errorMessage { Text(verbatim: message).font(.footnote).foregroundStyle(.red) }
             HStack {
                 Spacer()
                 Button(String(localized: "action.cancel"), role: .cancel) { close() }.keyboardShortcut(.cancelAction)
                 Button(String(localized: "keys.upload")) {
-                    guard let pub = row.key.publicURL else { return }
-                    app.uploadKey(publicKey: pub, alias: alias)
-                    close()
+                    // A terminal was opened (launched or fell back): close; the window shows any notice.
+                    switch app.keys.upload(row, alias: alias) {
+                    case .launched, .fellBack: close()
+                    case .failed: break   // the error shows inline
+                    }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(alias.isEmpty || row.key.publicURL == nil)
+                .disabled(alias.isEmpty || row.key.publicURL == nil || !row.key.hasPrivateKey)
             }
         }
         .formStyle(.grouped)
         .frame(width: 420)
+        .onAppear { app.keys.errorMessage = nil }
         .onDisappear { app.keys.errorMessage = nil }
     }
 }

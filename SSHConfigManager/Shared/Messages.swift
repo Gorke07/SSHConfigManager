@@ -92,6 +92,7 @@ enum Messages {
         switch error {
         case .fileExists(let path): String(localized: "keys.error.fileExists \(path)")
         case .passphraseTooShort: String(localized: "keys.error.passphraseTooShort")
+        case .invalidPassphrase: String(localized: "keys.error.invalidPassphrase")
         case .wrongPassphrase: String(localized: "keys.error.wrongPassphrase")
         case .noAgent: String(localized: "keys.error.noAgent")
         case .timedOut: String(localized: "keys.error.timedOut")

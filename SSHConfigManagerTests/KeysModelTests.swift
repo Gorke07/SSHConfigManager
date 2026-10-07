@@ -34,7 +34,7 @@ struct KeysModelTests {
         #expect(await model.keys.generate(type: .ed25519, fileName: "taken", comment: "c", passphrase: "", assignTo: nil) == false)
         #expect(try tmp.read(".ssh/taken.pub") == "keep\n")
         #expect(model.keys.errorMessage == String(localized: "keys.error.fileExists \(tmp.url.appending(path: ".ssh/taken.pub").path)"))
-        for bad in ["", "  ", " k", "k ", "../x", "a/b", ".hidden"] {
+        for bad in ["", "  ", " k", "k ", "../x", "a/b", ".hidden", "x.pub", "x-cert"] {
             model.keys.errorMessage = nil
             #expect(await model.keys.generate(type: .ed25519, fileName: bad, comment: "c", passphrase: "", assignTo: nil) == false)
             #expect(model.keys.errorMessage == String(localized: "keys.error.invalidFileName"))
@@ -108,5 +108,98 @@ struct KeysModelTests {
         #expect(await model.keys.changePassphrase(row, old: "yanlis123", new: "") == false)
         #expect(model.keys.errorMessage == String(localized: "keys.error.wrongPassphrase"))
         #expect(await model.keys.changePassphrase(row, old: "parola123", new: ""))
+    }
+
+    private func keyRow(_ model: AppModel) async throws -> KeyRow {
+        _ = await model.keys.generate(type: .ed25519, fileName: "k", comment: "c", passphrase: "", assignTo: nil)
+        await model.keys.refresh()
+        return try #require(model.keys.rows.first)
+    }
+
+    @Test func uploadFailuresShowInTheKeysWindowAndClearTheMainWindowCopies() async throws {
+        let tmp = try TempDir()
+        let launcher = RecordingLauncher()
+        let model = makeTestModel(tmp, config: "Host web\n", launcher: launcher)
+        let row = try await keyRow(model)
+
+        launcher.error = .automationDenied
+        #expect(model.keys.upload(row, alias: "web") == .failed(.automationDenied))
+        #expect(model.keys.errorMessage == String(localized: "connect.automationDenied.message"))
+        #expect(!model.automationDenied && model.errorMessage == nil && model.fallbackNotice == nil)
+
+        launcher.error = .failed("x")
+        #expect(model.keys.upload(row, alias: "web") == .failed(.failed("x")))
+        #expect(model.keys.errorMessage == String(localized: "connect.failed \("x")"))
+        #expect(!model.automationDenied && model.errorMessage == nil && model.fallbackNotice == nil)
+        #expect(launcher.requests.isEmpty)
+    }
+
+    @Test func uploadFallbackNoticeShowsInTheKeysWindowAndSuccessClearsIt() async throws {
+        let tmp = try TempDir()
+        let launcher = RecordingLauncher()
+        let model = makeTestModel(tmp, config: "Host web\n", launcher: launcher, isTerminalInstalled: { $0 == .terminal })
+        model.settings.setTerminal(.ghostty)
+        let row = try await keyRow(model)
+        #expect(model.keys.upload(row, alias: "web") == .fellBack(from: .ghostty))
+        #expect(model.keys.errorMessage == String(localized: "connect.fellBack \(TerminalChoice.ghostty.displayName)"))
+        #expect(model.fallbackNotice == nil && model.errorMessage == nil)
+        #expect(launcher.requests.count == 1)
+
+        model.settings.setTerminal(.terminal)
+        #expect(model.keys.upload(row, alias: "web") == .launched(.terminal))
+        #expect(model.keys.errorMessage == nil)
+        #expect(launcher.requests.count == 2)
+    }
+
+    @Test func trashAlsoMovesAPubFileThatDidNotParse() async throws {
+        let tmp = try TempDir()
+        let actions = RecordingKeyActions()
+        let model = makeTestModel(tmp, config: "Host web\n", keyActions: actions)
+        _ = await model.keys.generate(type: .ed25519, fileName: "k", comment: "c", passphrase: "", assignTo: nil)
+        try tmp.file(".ssh/k.pub", "not a public key\n")
+        await model.keys.refresh()
+        let row = try #require(model.keys.rows.first)
+        #expect(row.key.publicURL == nil)
+        #expect(await model.keys.trash(row))
+        let moved = try #require(actions.recycled.first).map(\.lastPathComponent)
+        #expect(moved == ["k", "k.pub"])
+    }
+
+    @Test func agentStateIsUnknownForAKeyWithoutPublicFile() async throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\n")
+        _ = await model.keys.generate(type: .ed25519, fileName: "k", comment: "c", passphrase: "", assignTo: nil)
+        try FileManager.default.removeItem(at: tmp.url.appending(path: ".ssh/k.pub"))
+        await model.keys.refresh()
+        #expect(model.keys.rows.first?.inAgent == nil)
+    }
+
+    @Test func createdButNotAssignedKeepsTheSheetConsistent() async throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\n  HostName 10.0.0.1\n")
+        let item = SidebarItem.host(alias: "web", occurrence: 0)
+        model.select(item)
+        let editor = try #require(model.editor(for: item))
+        let keys = model.keys
+        // rsa 4096 takes long enough to dirty the form while ssh-keygen runs (the main actor is free meanwhile).
+        let task = Task { await keys.generate(type: .rsa, fileName: "deploy", comment: "c", passphrase: "", assignTo: "web") }
+        let privateKey = tmp.url.appending(path: ".ssh/deploy").path
+        while !FileManager.default.fileExists(atPath: privateKey) { await Task.yield() }
+        editor.fields["Port"] = "abc"
+        #expect(!editor.commit())
+        #expect(await task.value == false)
+        #expect(keys.createdButNotAssigned)
+        let prefix = String(localized: "keys.error.createdNotAssigned \("~/.ssh/deploy")")
+        #expect(keys.errorMessage == prefix + String(localized: "keys.error.pendingFormEdits"))
+        #expect(FileManager.default.fileExists(atPath: privateKey))
+        #expect(keys.suggestedFileName(for: .rsa) == "id_rsa")   // a fresh name, so Create again cannot hit "file exists"
+        #expect(!model.store.hasUnsavedChanges)
+    }
+
+    @Test func fileNamesEndingInPubOrCertAreRejected() {
+        #expect(!KeysModel.isValidFileName("x.pub"))
+        #expect(!KeysModel.isValidFileName("x-cert"))
+        #expect(KeysModel.isValidFileName("x_cert"))
+        #expect(KeysModel.isValidFileName("deploy"))
     }
 }

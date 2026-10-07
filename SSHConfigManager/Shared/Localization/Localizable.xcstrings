@@ -330,6 +330,34 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Agent'a Ekle…" } }
       }
     },
+    "keys.actions" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Actions" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "İşlemler" } }
+      }
+    },
+    "keys.upload.needsPrivateKey" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ssh-copy-id needs the private key next to the .pub file." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "ssh-copy-id, .pub dosyasının yanında özel anahtarı ister." } }
+      }
+    },
+    "keys.error.createdNotAssigned %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The key was created at %@ but not assigned: " } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Anahtar %@ konumunda oluşturuldu ancak atanmadı: " } }
+      }
+    },
+    "keys.error.invalidPassphrase" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Passphrases cannot contain line breaks." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Parola satır sonu içeremez." } }
+      }
+    },
     "keys.upload" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -351,11 +379,11 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Çöp Kutusuna Taşı…" } }
       }
     },
-    "keys.trash.title" : {
+    "keys.trash.which %@" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Move this key to the Trash?" } },
-        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu anahtar çöp kutusuna taşınsın mı?" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Move “%@” to the Trash?" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "“%@” çöp kutusuna taşınsın mı?" } }
       }
     },
     "keys.trash.message" : {
