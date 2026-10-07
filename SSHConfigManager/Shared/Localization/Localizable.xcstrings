@@ -316,6 +316,55 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Vazgeç" } }
       }
     },
+    "action.connect" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connect" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bağlan" } }
+      }
+    },
+    "action.test" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Test" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Test Et" } }
+      }
+    },
+    "toolbar.testAll" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Test All" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Tümünü Test Et" } }
+      }
+    },
+    "toolbar.stopTesting" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Stop Testing" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Testi Durdur" } }
+      }
+    },
+    "connect.automationDenied.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Permission Needed to Control the Terminal" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Terminali Kontrol Etmek İçin İzin Gerekiyor" } }
+      }
+    },
+    "connect.automationDenied.message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Allow SSH Config Manager under Privacy & Security → Automation, then try again." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Gizlilik ve Güvenlik → Otomasyon altında SSH Config Manager'a izin verin ve tekrar deneyin." } }
+      }
+    },
+    "connect.automationDenied.open" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open Privacy Settings" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Gizlilik Ayarlarını Aç" } }
+      }
+    },
     "action.close" : {
       "extractionState" : "manual",
       "localizations" : {

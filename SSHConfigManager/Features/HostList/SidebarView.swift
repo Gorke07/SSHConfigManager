@@ -48,7 +48,13 @@ struct SidebarView: View {
             Section(title) {
                 ForEach(rows) { row in
                     VStack(alignment: .leading, spacing: 2) {
-                        Label(row.title, systemImage: icon)
+                        HStack {
+                            Label(row.title, systemImage: icon)
+                            if let alias = model.connectableAlias(for: row.item) {
+                                Spacer()
+                                ConnectionStatusBadge(model: model.connectionTests, alias: alias, showsTitle: false)
+                            }
+                        }
                         if !row.subtitle.isEmpty {
                             Text(verbatim: row.subtitle)
                                 .font(.caption)
@@ -57,8 +63,24 @@ struct SidebarView: View {
                         }
                     }
                     .tag(row.item)
-                    .contextMenu { if editable { menu(for: row.item) } }
+                    .contextMenu {
+                        connectItems(for: row.item)
+                        if editable {
+                            Divider()
+                            menu(for: row.item)
+                        }
+                    }
                 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func connectItems(for item: SidebarItem) -> some View {
+        if let alias = model.connectableAlias(for: item) {
+            Button(String(localized: "action.connect")) { model.connect(alias: alias) }
+            Button(String(localized: "action.test")) {
+                Task { await model.connectionTests.test(alias, using: model.commandBuilder) }
             }
         }
     }

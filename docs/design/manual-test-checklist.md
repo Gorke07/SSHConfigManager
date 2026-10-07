@@ -31,3 +31,11 @@ Her sürüm öncesi temiz bir test kullanıcısında veya `~/.ssh/config` yedeğ
 - [ ] Kaydedilmemiş değişiklik veya formda hatalı alan varken "Düzenleyiciye Yükle" önce "değiştirilsin mi?" onayı ister; başka config dosyasına geçince Yedekler penceresi o dosyanın yedeklerini gösterir.
 - [ ] "Dil Ayarlarını Aç…" Sistem Ayarları'nın Dil ve Bölge sayfasını açar.
 - [ ] Dış değişiklik bandında "Yeniden Yükle", kaydedilmemiş değişiklik veya formda bekleyen düzenleme varken önce "atılsın mı?" onayı ister; değişiklik yoksa doğrudan yeniden yükler.
+
+## Plan 2b — Bağlanma
+
+- [ ] `demo` host'u (127.0.0.1, Port 1) seçili → ⌘↩ → Terminal'de `ssh -- demo` açılır ve "Connection refused" ile biter.
+- [ ] İlk bağlanmada macOS Otomasyon izni ister; "İzin Verme" seçilirse uygulama "Terminali Kontrol Etmek İçin İzin Gerekiyor" uyarısını ve "Gizlilik Ayarlarını Aç" düğmesini gösterir.
+- [ ] Ayarlar'da iTerm2 ve Ghostty seçilip ayrı ayrı bağlanılır; yüklü olmayan bir terminal seçiliyse Terminal kullanılır ve bu söylenir.
+- [ ] Test Et → rozet "Bağlantı reddedildi" ve ssh'in mesajı; Tümünü Test Et → tüm hostlarda rozet; Testi Durdur yarıda keser.
+- [ ] Sağ tık → Bağlan / Test Et, dahil edilen (🔒) hostlarda da çalışır.

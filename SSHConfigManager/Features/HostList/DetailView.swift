@@ -16,11 +16,19 @@ struct DetailView: View {
     private func content(for item: SidebarItem) -> some View {
         switch item {
         case .host:
-            HostEditorContainer(model: model)
-                .id(model.editorToken)
+            VStack(spacing: 0) {
+                ConnectionBar(model: model, alias: model.connectableAlias(for: item))
+                Divider()
+                HostEditorContainer(model: model)
+                    .id(model.editorToken)
+            }
         case .included:
             if let host = SidebarBuilder.includedHost(for: item, in: model.store.includedHosts) {
-                IncludedHostView(host: host, displayPath: model.settings.displayPath(for: host.file))
+                VStack(spacing: 0) {
+                    ConnectionBar(model: model, alias: model.connectableAlias(for: item))
+                    Divider()
+                    IncludedHostView(host: host, displayPath: model.settings.displayPath(for: host.file))
+                }
             } else {
                 empty
             }

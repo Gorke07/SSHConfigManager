@@ -42,6 +42,22 @@ struct MainWindow: View {
                 }
             }
             ToolbarItem(placement: .primaryAction) {
+                if model.connectionTests.isTestingAll {
+                    Button {
+                        model.connectionTests.cancelAll()
+                    } label: {
+                        Label(String(localized: "toolbar.stopTesting"), systemImage: "stop.circle")
+                    }
+                } else {
+                    Button {
+                        model.connectionTests.testAll(model.connectableAliases, using: model.commandBuilder)
+                    } label: {
+                        Label(String(localized: "toolbar.testAll"), systemImage: "bolt.horizontal.circle")
+                    }
+                    .disabled(model.connectableAliases.isEmpty)
+                }
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button {
                     if model.hasPendingFormEdits {
                         confirmSaveWithPending = true
@@ -78,6 +94,16 @@ struct MainWindow: View {
         }
         .sheet(isPresented: $showExternalDiff) {
             ExternalDiffSheet(store: model.store) { showExternalDiff = false }
+        }
+        .alert(String(localized: "connect.automationDenied.title"), isPresented: $model.automationDenied) {
+            Button(String(localized: "connect.automationDenied.open")) {
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+            Button(String(localized: "action.close"), role: .cancel) {}
+        } message: {
+            Text(String(localized: "connect.automationDenied.message"))
         }
         .alert(
             String(localized: "error.title"),

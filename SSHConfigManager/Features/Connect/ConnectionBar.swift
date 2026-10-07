@@ -1,0 +1,58 @@
+import SSHConfigKit
+import SwiftUI
+
+/// Status badge for one alias: spinner while testing, then the last result.
+struct ConnectionStatusBadge: View {
+    let model: ConnectionTestsModel
+    let alias: String
+    let showsTitle: Bool
+
+    var body: some View {
+        if model.running.contains(alias) {
+            badge(ConnectionStatusStyle.testing, detail: nil)
+        } else if let result = model.results[alias] {
+            badge(ConnectionStatusStyle.style(for: result.status), detail: result.detail)
+        }
+    }
+
+    private func badge(_ style: ConnectionStatusStyle, detail: String?) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: style.symbol).foregroundStyle(style.tint)
+            if showsTitle { Text(style.title) }
+        }
+        .help(detail.map { style.title + "\n" + $0 } ?? style.title)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(style.title)
+    }
+}
+
+/// Above the host form: status, Test and Connect (⌘↩). Patterns and Match blocks pass `alias: nil`.
+struct ConnectionBar: View {
+    let model: AppModel
+    let alias: String?
+
+    var body: some View {
+        HStack {
+            if let alias {
+                ConnectionStatusBadge(model: model.connectionTests, alias: alias, showsTitle: true)
+                if let detail = model.connectionTests.results[alias]?.detail, !detail.isEmpty {
+                    Text(verbatim: detail).font(.caption).foregroundStyle(.secondary).lineLimit(1).textSelection(.enabled)
+                }
+            }
+            Spacer()
+            Button(String(localized: "action.test")) {
+                guard let alias else { return }
+                Task { await model.connectionTests.test(alias, using: model.commandBuilder) }
+            }
+            .disabled(alias == nil || model.connectionTests.running.contains(alias ?? ""))
+            Button(String(localized: "action.connect")) {
+                if let alias { model.connect(alias: alias) }
+            }
+            .keyboardShortcut(.return, modifiers: .command)
+            .buttonStyle(.borderedProminent)
+            .disabled(alias == nil)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+    }
+}
