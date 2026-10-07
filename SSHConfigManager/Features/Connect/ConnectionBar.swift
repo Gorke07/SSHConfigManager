@@ -26,12 +26,26 @@ struct ConnectionStatusBadge: View {
     }
 }
 
-/// Above the host form: status, Test and Connect (⌘↩). Patterns and Match blocks pass `alias: nil`.
+/// Above the host form: status, Test and Connect (⌘↩). Patterns, Match blocks and hosts that are
+/// not in the saved file pass `alias: nil`.
 struct ConnectionBar: View {
     let model: AppModel
     let alias: String?
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            buttons
+            if alias != nil && model.store.hasUnsavedChanges {
+                Text(String(localized: "connect.usesSavedFile"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+    }
+
+    private var buttons: some View {
         HStack {
             if let alias {
                 ConnectionStatusBadge(model: model.connectionTests, alias: alias, showsTitle: true)
@@ -52,7 +66,5 @@ struct ConnectionBar: View {
             .buttonStyle(.borderedProminent)
             .disabled(alias == nil)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
     }
 }

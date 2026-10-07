@@ -310,6 +310,33 @@ struct ConfigStoreTests {
         #expect(runner.calls.first?.last == "probe-me")
     }
 
+    @Test func savedDocumentFollowsDiskNotEdits() async throws {
+        let tmp = try TempDir()
+        try tmp.file(".ssh/extra", "Host inc\n")
+        try tmp.file("config", "Host a\n")
+        let runner = FakeRunner { _ in ProcessResult(exitCode: 0, stdout: "", stderr: "", timedOut: false) }
+        let store = makeStore(tmp, validator: ConfigValidator(runner: runner))
+        var notified = 0
+        store.onDiskStateChange = { notified += 1 }
+
+        try store.apply { $0 = ConfigDocument(parsing: "Include extra\nHost a\nHost b\n") }
+        #expect(store.savedDocument.hosts.map(\.alias) == ["a"])
+        #expect(store.savedIncludedHosts.isEmpty)
+        #expect(store.includedHosts.map(\.entry.alias) == ["inc"])
+        #expect(notified == 0)
+
+        try await store.save()
+        #expect(store.savedDocument.hosts.map(\.alias) == ["a", "b"])
+        #expect(store.savedIncludedHosts.map(\.entry.alias) == ["inc"])
+        #expect(notified == 1)
+
+        try tmp.file("config", "Host c\n")
+        store.discardChanges()
+        #expect(store.savedDocument.hosts.map(\.alias) == ["c"])
+        #expect(store.savedIncludedHosts.isEmpty)
+        #expect(notified == 2)
+    }
+
     @Test func isWatchingReflectsWatcherCreation() throws {
         let tmp = try TempDir()
         try tmp.file("config", "Host a\n")

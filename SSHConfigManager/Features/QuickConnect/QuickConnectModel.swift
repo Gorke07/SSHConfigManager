@@ -29,14 +29,10 @@ final class QuickConnectModel {
         self.openMainWindow = openMainWindow
     }
 
+    /// Hosts of the saved file only: Connect and Test act on what ssh reads, not on unsaved edits.
     var entries: [QuickConnectEntry] {
-        var seen = Set<String>()
-        var result: [QuickConnectEntry] = []
-        for entry in app.store.document.hosts where !entry.isPattern && seen.insert(entry.alias.lowercased()).inserted {
-            result.append(QuickConnectEntry(alias: entry.alias, subtitle: SidebarBuilder.subtitle(for: entry), isIncluded: false))
-        }
-        for host in app.store.includedHosts where !host.entry.isPattern && seen.insert(host.entry.alias.lowercased()).inserted {
-            result.append(QuickConnectEntry(alias: host.entry.alias, subtitle: SidebarBuilder.subtitle(for: host.entry), isIncluded: true))
+        let result = app.savedConnectableHosts.map {
+            QuickConnectEntry(alias: $0.entry.alias, subtitle: SidebarBuilder.subtitle(for: $0.entry), isIncluded: $0.isIncluded)
         }
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return result }

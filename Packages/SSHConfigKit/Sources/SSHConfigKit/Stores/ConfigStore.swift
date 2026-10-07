@@ -38,6 +38,10 @@ public final class ConfigStore {
     public let backupKind: String
     public private(set) var document: ConfigDocument = .empty
     public private(set) var diskText = ""
+    /// `diskText` parsed: what ssh actually reads. Re-parsed only when the disk text changes.
+    public private(set) var savedDocument: ConfigDocument = .empty
+    /// Hosts from the Include files of the saved file (`includedHosts` follows unsaved Include edits).
+    public private(set) var savedIncludedHosts: [IncludedHost] = []
     public private(set) var loadState: ConfigLoadState = .missing
     public private(set) var includedHosts: [IncludedHost] = []
     public private(set) var externalChangePending = false
@@ -52,6 +56,8 @@ public final class ConfigStore {
     @ObservationIgnored private let includeResolver: IncludeResolver
     @ObservationIgnored private var watcher: FileWatcher?
     @ObservationIgnored private var loadGeneration = 0
+    /// Called after the file was (re)loaded from disk or saved, i.e. whenever the saved state may have changed.
+    @ObservationIgnored public var onDiskStateChange: (@MainActor () -> Void)?
 
     public init(
         fileURL: URL,
@@ -103,9 +109,12 @@ public final class ConfigStore {
         }
         document = ConfigDocument(parsing: text)
         diskText = text
+        savedDocument = document
         diskFingerprint = FileFingerprint(data: data)
         loadState = .loaded
         includedHosts = includeResolver.includedHosts(of: document, rootFile: fileURL)
+        savedIncludedHosts = includedHosts
+        onDiskStateChange?()
     }
 
     public func createFile() throws {
@@ -179,9 +188,12 @@ public final class ConfigStore {
         }
 
         diskText = text
+        savedDocument = ConfigDocument(parsing: text)
         diskFingerprint = FileFingerprint(data: Data(text.utf8))
         externalChangePending = false
-        includedHosts = includeResolver.includedHosts(of: ConfigDocument(parsing: text), rootFile: fileURL)
+        includedHosts = includeResolver.includedHosts(of: savedDocument, rootFile: fileURL)
+        savedIncludedHosts = includedHosts
+        onDiskStateChange?()
     }
 
     func fileDidChange() {
@@ -206,9 +218,12 @@ public final class ConfigStore {
     private func reset(state: ConfigLoadState) {
         document = .empty
         diskText = ""
+        savedDocument = .empty
         diskFingerprint = nil
         includedHosts = []
+        savedIncludedHosts = []
         loadState = state
+        onDiskStateChange?()
     }
 
     private func startWatching() {

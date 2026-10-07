@@ -50,6 +50,16 @@ final class AppModel {
         self.backupManager = backups
         self.makeStore = makeStore
         self.store = makeStore(settings.configURL, backups, Self.backupKind(for: settings.configURL, home: settings.homeDirectory))
+        observeSavedState()
+    }
+
+    /// The saved file changed (save, reload, external change): the connectable hosts must be rebuilt.
+    private func observeSavedState() {
+        store.onDiskStateChange = { [weak self] in self?.savedStateDidChange() }
+    }
+
+    private func savedStateDidChange() {
+        savedHostsCache = nil
     }
 
     static func liveStore(url: URL, backups: BackupManager, backupKind: String) -> ConfigStore {
@@ -70,30 +80,77 @@ final class AppModel {
 
     func isTerminalInstalled(_ choice: TerminalChoice) -> Bool { terminalInstalled(choice) }
 
-    /// The alias to connect to for a sidebar item (nil for patterns, Match blocks and missing hosts).
+    /// One connectable host of the saved file (or its saved Include files).
+    struct SavedHost: Equatable {
+        let entry: HostEntry
+        let isIncluded: Bool
+    }
+
+    /// Connect and Test act on the saved file (that is what ssh reads), so only hosts in it are offered.
+    private struct SavedHosts {
+        let store: ObjectIdentifier
+        let hosts: [SavedHost]
+        /// Lowercased alias → alias as written in the saved file (ssh matches aliases case-insensitively).
+        let aliases: [String: String]
+    }
+    @ObservationIgnored private var savedHostsCache: SavedHosts?
+
+    /// Rebuilt only after the store was loaded or saved (`savedStateDidChange`), not on every view update.
+    private var savedHosts: SavedHosts {
+        let id = ObjectIdentifier(store)
+        // Register observation of the saved state so views update after a save or reload.
+        _ = store.savedDocument
+        _ = store.savedIncludedHosts
+        if let cache = savedHostsCache, cache.store == id { return cache }
+        var aliases: [String: String] = [:]
+        var hosts: [SavedHost] = []
+        let candidates = store.savedDocument.hosts.map { SavedHost(entry: $0, isIncluded: false) }
+            + store.savedIncludedHosts.map { SavedHost(entry: $0.entry, isIncluded: true) }
+        for host in candidates where !host.entry.isPattern {
+            let key = host.entry.alias.lowercased()
+            guard aliases[key] == nil else { continue }
+            aliases[key] = host.entry.alias
+            hosts.append(host)
+        }
+        let built = SavedHosts(store: id, hosts: hosts, aliases: aliases)
+        savedHostsCache = built
+        return built
+    }
+
+    /// Every connectable host of the saved file once (case-insensitive, like ssh), file hosts first.
+    var savedConnectableHosts: [SavedHost] { savedHosts.hosts }
+
+    /// `alias` as written in the saved file, or nil when the saved file has no such (non-pattern) host.
+    func savedAlias(_ alias: String) -> String? {
+        savedHosts.aliases[alias.lowercased()]
+    }
+
+    /// The alias to connect to for a sidebar item: nil for patterns, Match blocks, missing hosts
+    /// and hosts that are not in the saved file yet.
     func connectableAlias(for item: SidebarItem) -> String? {
         switch item {
         case .host:
             guard let entry = SidebarBuilder.hostEntry(for: item, in: store.document), !entry.isPattern else { return nil }
-            return entry.alias
+            return savedAlias(entry.alias)
         case .included:
             guard let host = SidebarBuilder.includedHost(for: item, in: store.includedHosts), !host.entry.isPattern else { return nil }
-            return host.entry.alias
+            return savedAlias(host.entry.alias)
         case .match:
             return nil
         }
     }
 
-    /// Every connectable alias once (case-insensitive, like ssh), file hosts first, then included ones.
+    /// Every connectable alias of the saved file once, file hosts first, then included ones.
     var connectableAliases: [String] {
-        var seen = Set<String>()
-        let candidates = store.document.hosts.filter { !$0.isPattern }.map(\.alias)
-            + store.includedHosts.filter { !$0.entry.isPattern }.map(\.entry.alias)
-        return candidates.filter { seen.insert($0.lowercased()).inserted }
+        savedHosts.hosts.map(\.entry.alias)
     }
 
     @discardableResult
-    func connect(alias: String) -> Connector.Outcome {
+    func connect(alias requested: String) -> Connector.Outcome {
+        guard let alias = savedAlias(requested) else {
+            errorMessage = String(localized: "connect.notSaved")
+            return .failed(.failed("not in the saved file"))
+        }
         let builder = commandBuilder
         let request = LaunchRequest(sshArguments: builder.sshArguments(alias: alias), shellCommand: builder.shellCommand(alias: alias))
         guard !request.shellCommand.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7F }) else {
@@ -175,7 +232,10 @@ final class AppModel {
         }
         if (store.hasUnsavedChanges || hasPendingFormEdits) && !discardingUnsavedChanges { return .needsConfirmation }
         settings.setConfigPath(path)
+        store.onDiskStateChange = nil
         store = makeStore(url, backupManager, Self.backupKind(for: url, home: settings.homeDirectory))
+        observeSavedState()
+        savedHostsCache = nil
         select(nil)
         connectionTests.clear()
         searchText = ""

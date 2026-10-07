@@ -144,13 +144,54 @@ struct TerminalLaunchingTests {
     @Test func controlCharactersInAliasAreRejectedBeforeLaunching() throws {
         let tmp = try TempDir()
         let launcher = RecordingLauncher()
-        let app = makeTestModel(tmp, config: "Host x\n", launcher: launcher)
-        for alias in ["a\nrm -rf ~", "a\u{1B}x"] {
-            app.errorMessage = nil
-            #expect(app.connect(alias: alias) == .failed(.failed("control character")))
-            #expect(launcher.requests.isEmpty)
-            #expect(app.errorMessage == String(localized: "connect.invalidCommand"))
+        let app = makeTestModel(tmp, config: "Host a\u{1B}x\n", launcher: launcher)
+        #expect(app.connectableAliases == ["a\u{1B}x"])
+        #expect(app.connect(alias: "a\u{1B}x") == .failed(.failed("control character")))
+        #expect(launcher.requests.isEmpty)
+        #expect(app.errorMessage == String(localized: "connect.invalidCommand"))
+    }
+
+    @Test func hostAddedButNotSavedCannotBeConnectedOrTested() throws {
+        let tmp = try TempDir()
+        let launcher = RecordingLauncher()
+        let app = makeTestModel(tmp, config: "Host a\n", launcher: launcher)
+        try app.store.apply { _ = try $0.addHost(HostDraft(patterns: ["prod"], directives: [DraftDirective(key: "HostName", value: "10.0.0.5")])) }
+        let prod = SidebarItem.host(alias: "prod", occurrence: 0)
+        #expect(SidebarBuilder.hostEntry(for: prod, in: app.store.document) != nil)
+
+        #expect(app.connectableAliases == ["a"])
+        #expect(app.connectableAlias(for: prod) == nil)
+        #expect(QuickConnectModel(app: app).entries.map(\.alias) == ["a"])
+        #expect(app.connect(alias: "prod") == .failed(.failed("not in the saved file")))
+        #expect(launcher.requests.isEmpty)
+        #expect(app.errorMessage == String(localized: "connect.notSaved"))
+    }
+
+    @Test func savedHostEditedWithoutSavingConnectsWithTheSavedAlias() throws {
+        let tmp = try TempDir()
+        let launcher = RecordingLauncher()
+        let app = makeTestModel(tmp, config: "Host Web\n  HostName 10.0.0.1\n", launcher: launcher)
+        try app.store.apply { doc in
+            let entry = doc.hosts[0]
+            var draft = HostDraft(entry)
+            draft.patterns = ["renamed"]
+            try doc.updateHost(at: entry.headerLine, to: draft)
         }
+        #expect(app.store.hasUnsavedChanges)
+        #expect(app.connectableAlias(for: .host(alias: "renamed", occurrence: 0)) == nil)
+        #expect(app.connectableAliases == ["Web"])
+        #expect(app.connect(alias: "web") == .launched(.terminal))
+        #expect(launcher.requests.first?.sshArguments == ["--", "Web"])
+    }
+
+    @Test func savingMakesANewHostConnectable() async throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\n")
+        try app.store.apply { _ = try $0.addHost(HostDraft(patterns: ["b"])) }
+        #expect(app.connectableAliases == ["a"])
+        try await app.store.save()
+        #expect(app.connectableAliases == ["a", "b"])
+        #expect(app.connectableAlias(for: .host(alias: "b", occurrence: 0)) == "b")
     }
 
     @Test func customConfigUsesDashF() throws {

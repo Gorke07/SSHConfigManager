@@ -1050,6 +1050,20 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Testing…" } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Test ediliyor…" } }
       }
+    },
+    "connect.usesSavedFile" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unsaved changes — Connect and Test use the saved file." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kaydedilmemiş değişiklikler var — Bağlan ve Test kaydedilmiş dosyayı kullanır." } }
+      }
+    },
+    "connect.notSaved" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This host isn't in the saved file yet. Save your changes to connect to it." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu host henüz kaydedilmiş dosyada yok. Bağlanmak için değişikliklerinizi kaydedin." } }
+      }
     }
   },
   "version" : "1.0"
