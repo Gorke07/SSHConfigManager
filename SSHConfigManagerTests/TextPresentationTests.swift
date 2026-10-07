@@ -48,4 +48,10 @@ struct TextPresentationTests {
         #expect(DiffPresenter.unifiedText(for: hunks) == "@@ -1,2 +1,2 @@\n a\n-b\n\\ No newline at end of file\n+c\n")
         #expect(DiffPresenter.unifiedText(for: []) == "")
     }
+
+    @Test func flagsOnlyUnknownLines() {
+        #expect(CodeHighlighter.isFlagged(ConfigLine(raw: "=bad")))
+        #expect(CodeHighlighter.isFlagged(ConfigLine(raw: "\u{FEFF}Host bom")))
+        #expect(!CodeHighlighter.isFlagged(ConfigLine(raw: "Host a")))
+    }
 }

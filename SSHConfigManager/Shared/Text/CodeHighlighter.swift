@@ -9,6 +9,9 @@ struct HighlightSpan: Equatable, Sendable {
 
 /// Colors follow the parser's own classification, so what is shown is what was understood.
 enum CodeHighlighter {
+    /// Lines ssh does not understand get a non-color marker too.
+    static func isFlagged(_ line: ConfigLine) -> Bool { line.kind == .unknown }
+
     static func spans(for line: ConfigLine) -> [HighlightSpan] {
         var raw = line.raw
         if raw.unicodeScalars.last == "\r" { raw = String(raw.unicodeScalars.dropLast()) }

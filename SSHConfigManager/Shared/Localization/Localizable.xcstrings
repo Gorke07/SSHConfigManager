@@ -245,6 +245,13 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "No changes." } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Değişiklik yok." } }
       }
+    },
+    "code.a11y.unknown %@ %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Line %@, not understood by ssh: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Satır %@, ssh tarafından anlaşılmıyor: %@" } }
+      }
     }
   },
   "version" : "1.0"

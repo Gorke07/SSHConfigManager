@@ -25,21 +25,34 @@ struct CodeTextView: View {
             ScrollView([.vertical, .horizontal]) {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
+                        let flagged = CodeHighlighter.isFlagged(line)
                         HStack(alignment: .firstTextBaseline, spacing: 12) {
                             Text(verbatim: String(index + 1))
                                 .monospacedDigit()
                                 .foregroundStyle(.secondary)
                                 .frame(minWidth: 32, alignment: .trailing)
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                                .opacity(flagged ? 1 : 0)
+                                .frame(width: 16)
+                                .accessibilityHidden(true)
                             Text(Self.attributed(CodeHighlighter.spans(for: line)))
                                 .textSelection(.enabled)
                                 .fixedSize(horizontal: true, vertical: false)
                         }
+                        .modifier(UnknownLineAccessibility(label: flagged ? Self.unknownLabel(number: index + 1, line: line) : nil))
                         .font(.system(.body, design: .monospaced))
                         .padding(.horizontal, 8)
                     }
                 }
             }
         }
+    }
+
+    private static func unknownLabel(number: Int, line: ConfigLine) -> String {
+        let n = String(number)
+        let text = CodeHighlighter.spans(for: line).map(\.text).joined()
+        return String(localized: "code.a11y.unknown \(n) \(text)")
     }
 
     static func attributed(_ spans: [HighlightSpan]) -> AttributedString {
@@ -56,5 +69,17 @@ struct CodeTextView: View {
             result += part
         }
         return result
+    }
+}
+
+private struct UnknownLineAccessibility: ViewModifier {
+    let label: String?
+
+    func body(content: Content) -> some View {
+        if let label {
+            content.accessibilityElement(children: .ignore).accessibilityLabel(label)
+        } else {
+            content
+        }
     }
 }
