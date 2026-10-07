@@ -1,0 +1,116 @@
+import Foundation
+import Testing
+@testable import SSHConfigKit
+
+struct KeyManagerTests {
+    /// Never the user's agent: an unreachable socket unless a TestAgent is given.
+    func manager(_ tmp: TempDir, agent: TestAgent? = nil) -> KeyManager {
+        KeyManager(agentSocket: agent?.socket ?? "/tmp/sshcm-none-\(UUID().uuidString.prefix(8))", askPassDirectory: tmp.url)
+    }
+
+    func askPassLeftovers(_ tmp: TempDir) throws -> [String] {
+        try FileManager.default.contentsOfDirectory(atPath: tmp.url.path).filter { $0.hasPrefix("sshcm-askpass-") }
+    }
+
+    @Test func generatesAnEd25519KeyWithoutPassphrase() async throws {
+        let tmp = try TempDir()
+        let url = tmp.url.appending(path: "keys/id_ed25519")
+        try await manager(tmp).generate(type: .ed25519, at: url, comment: "me@mac", passphrase: "")
+        #expect(KeyFileInspector.encryption(ofPrivateKeyHead: try KeyFileInspector.readHead(of: url)) == .unencrypted)
+        #expect(PublicKeyInfo(text: try tmp.read("keys/id_ed25519.pub"))?.comment == "me@mac")
+        let mode = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int
+        #expect(mode == 0o600)
+        let dirMode = try FileManager.default.attributesOfItem(atPath: tmp.url.appending(path: "keys").path)[.posixPermissions] as? Int
+        #expect(dirMode == 0o700)
+    }
+
+    @Test func generatesAnEncryptedRSA4096Key() async throws {
+        let tmp = try TempDir()
+        let url = tmp.url.appending(path: "id_rsa")
+        try await manager(tmp).generate(type: .rsa, at: url, comment: "c", passphrase: "parola123")
+        #expect(KeyFileInspector.encryption(ofPrivateKeyHead: try KeyFileInspector.readHead(of: url)) == .encrypted)
+        let keys = await KeyScanner().scan(directories: [tmp.url], extraPrivateKeys: [])
+        #expect(keys.first?.bits == 4096)
+    }
+
+    @Test func neverOverwritesAndRejectsShortPassphrases() async throws {
+        let tmp = try TempDir()
+        let existing = try tmp.file("id_ed25519.pub", "keep me\n")
+        await #expect(throws: KeyManagerError.fileExists(existing.path)) {
+            try await manager(tmp).generate(type: .ed25519, at: tmp.url.appending(path: "id_ed25519"), comment: "c", passphrase: "")
+        }
+        #expect(try tmp.read("id_ed25519.pub") == "keep me\n")
+        #expect(!FileManager.default.fileExists(atPath: tmp.url.appending(path: "id_ed25519").path))
+        await #expect(throws: KeyManagerError.passphraseTooShort) {
+            try await manager(tmp).generate(type: .ed25519, at: tmp.url.appending(path: "k"), comment: "c", passphrase: "abcd")
+        }
+        #expect(KeyManager.isValidPassphrase("") && KeyManager.isValidPassphrase("abcde") && !KeyManager.isValidPassphrase("abcd"))
+    }
+
+    @Test func nextAvailableNameSkipsPrivateAndPublicFiles() throws {
+        let tmp = try TempDir()
+        #expect(KeyManager.nextAvailableURL(fileName: "id_ed25519", in: tmp.url).lastPathComponent == "id_ed25519")
+        try tmp.file("id_ed25519.pub", "x")
+        #expect(KeyManager.nextAvailableURL(fileName: "id_ed25519", in: tmp.url).lastPathComponent == "id_ed25519_2")
+        try tmp.file("id_ed25519_2", "x")
+        #expect(KeyManager.nextAvailableURL(fileName: "id_ed25519", in: tmp.url).lastPathComponent == "id_ed25519_3")
+    }
+
+    @Test func changesThePassphraseAndReportsAWrongOne() async throws {
+        let tmp = try TempDir()
+        let url = tmp.url.appending(path: "k")
+        let keys = manager(tmp)
+        try await keys.generate(type: .ed25519, at: url, comment: "c", passphrase: "eski12345")
+        await #expect(throws: KeyManagerError.wrongPassphrase) {
+            try await keys.changePassphrase(at: url, old: "yanlis123", new: "yeni12345")
+        }
+        try await keys.changePassphrase(at: url, old: "eski12345", new: "")
+        #expect(KeyFileInspector.encryption(ofPrivateKeyHead: try KeyFileInspector.readHead(of: url)) == .unencrypted)
+    }
+
+    @Test func addsToAPrivateAgentAndNeverHangsOnAWrongPassphrase() async throws {
+        let tmp = try TempDir()
+        let agent = try TestAgent()
+        let keys = manager(tmp, agent: agent)
+        let url = tmp.url.appending(path: "k")
+        try await keys.generate(type: .ed25519, at: url, comment: "c", passphrase: "dogru1234")
+        #expect(await keys.agentFingerprints() == [])
+
+        let started = ContinuousClock.now
+        await #expect(throws: KeyManagerError.wrongPassphrase) {
+            try await keys.addToAgent(url, passphrase: "yanlis123", useKeychain: false)
+        }
+        #expect(ContinuousClock.now - started < .seconds(10))
+        #expect(try askPassLeftovers(tmp).isEmpty)
+
+        try await keys.addToAgent(url, passphrase: "dogru1234", useKeychain: false)
+        let fingerprint = try #require(PublicKeyInfo(text: try tmp.read("k.pub"))?.fingerprint)
+        #expect(await keys.agentFingerprints() == [fingerprint])
+        #expect(try askPassLeftovers(tmp).isEmpty)
+    }
+
+    @Test func unencryptedKeysNeedNoPassphrase() async throws {
+        let tmp = try TempDir()
+        let agent = try TestAgent()
+        let keys = manager(tmp, agent: agent)
+        let url = tmp.url.appending(path: "k")
+        try await keys.generate(type: .ed25519, at: url, comment: "c", passphrase: "")
+        try await keys.addToAgent(url, passphrase: nil, useKeychain: false)
+        #expect(await keys.agentFingerprints()?.count == 1)
+    }
+
+    @Test func noAgentIsReported() async throws {
+        let tmp = try TempDir()
+        let keys = manager(tmp)
+        let url = tmp.url.appending(path: "k")
+        try await keys.generate(type: .ed25519, at: url, comment: "c", passphrase: "")
+        #expect(await keys.agentFingerprints() == nil)
+        await #expect(throws: KeyManagerError.noAgent) { try await keys.addToAgent(url, passphrase: nil, useKeychain: false) }
+    }
+
+    @Test func parsesAgentListings() {
+        let output = "256 SHA256:aaa c (ED25519)\n4096 SHA256:bbb other comment (RSA)\n"
+        #expect(KeyManager.parseAgentList(output) == ["SHA256:aaa", "SHA256:bbb"])
+        #expect(KeyManager.parseAgentList("") == [])
+    }
+}
