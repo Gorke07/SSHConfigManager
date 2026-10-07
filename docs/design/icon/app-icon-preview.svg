@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b3445"/><stop offset="1" stop-color="#0e131c"/></linearGradient>
+    <linearGradient id="screen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#121a26"/><stop offset="1" stop-color="#0a0f16"/></linearGradient>
+    <filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000" flood-opacity="0.5"/></filter>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  <rect x="100.5" y="100.5" width="823" height="823" rx="185" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="3"/>
+  <g filter="url(#sh)">
+    <rect x="190" y="215" width="644" height="560" rx="56" fill="url(#screen)" stroke="#3a4558" stroke-width="4"/>
+    <path d="M190 271 a56 56 0 0 1 56 -56 h532 a56 56 0 0 1 56 56 v34 h-644 z" fill="#232c3b"/>
+    <circle cx="248" cy="262" r="15" fill="#ff5f57"/><circle cx="296" cy="262" r="15" fill="#febc2e"/><circle cx="344" cy="262" r="15" fill="#28c840"/>
+  </g>
+  <g font-family="Menlo, SF Mono, monospace" font-weight="700" font-size="56">
+    <text x="245" y="390" fill="#c084fc">Host</text><text x="400" y="390" fill="#e5e7eb">prod</text>
+    <rect x="285" y="420" width="250" height="22" rx="11" fill="#64748b"/>
+    <rect x="285" y="462" width="180" height="22" rx="11" fill="#475569"/>
+    <text x="245" y="560" fill="#c084fc">Host</text><text x="400" y="560" fill="#e5e7eb">dev</text>
+    <rect x="285" y="590" width="220" height="22" rx="11" fill="#64748b"/>
+  </g>
+  <g filter="url(#glow)" stroke="#4ade80" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <polyline points="250,655 310,700 250,745" transform="translate(0 -20)"/>
+    <line x1="345" y1="725" x2="420" y2="725"/>
+  </g>
+<g filter="url(#sh)" transform="translate(712 682) scale(0.84)">
+  <defs>
+    <linearGradient id="gm" x1="0" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#dfe6f3"/><stop offset="0.5" stop-color="#9aa8c4"/><stop offset="1" stop-color="#5d6b88"/></linearGradient>
+    <linearGradient id="gr" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#c9d3e6"/><stop offset="1" stop-color="#6f7d99"/></linearGradient>
+  </defs>
+  <path d="M-22.84,-115.77 L-19.73,-148.70 L19.73,-148.70 L22.84,-115.77 L49.57,-107.08 L71.44,-131.90 L103.37,-108.70 L86.52,-80.23 L103.04,-57.50 L135.32,-64.72 L147.52,-27.18 L117.16,-14.05 L117.16,14.05 L147.52,27.18 L135.32,64.72 L103.04,57.50 L86.52,80.23 L103.37,108.70 L71.44,131.90 L49.57,107.08 L22.84,115.77 L19.73,148.70 L-19.73,148.70 L-22.84,115.77 L-49.57,107.08 L-71.44,131.90 L-103.37,108.70 L-86.52,80.23 L-103.04,57.50 L-135.32,64.72 L-147.52,27.18 L-117.16,14.05 L-117.16,-14.05 L-147.52,-27.18 L-135.32,-64.72 L-103.04,-57.50 L-86.52,-80.23 L-103.37,-108.70 L-71.44,-131.90 L-49.57,-107.08 Z" fill="url(#gm)" stroke="url(#gm)" stroke-width="18" stroke-linejoin="round"/>
+  <circle r="96" fill="none" stroke="#000" stroke-opacity="0.12" stroke-width="6"/>
+  <circle r="58" fill="url(#gr)"/>
+  <circle r="40" fill="#0e141e"/>
+  <path d="M-22.84,-115.77 L-19.73,-148.70 L19.73,-148.70 L22.84,-115.77 L49.57,-107.08 L71.44,-131.90 L103.37,-108.70 L86.52,-80.23 L103.04,-57.50 L135.32,-64.72 L147.52,-27.18 L117.16,-14.05 L117.16,14.05 L147.52,27.18 L135.32,64.72 L103.04,57.50 L86.52,80.23 L103.37,108.70 L71.44,131.90 L49.57,107.08 L22.84,115.77 L19.73,148.70 L-19.73,148.70 L-22.84,115.77 L-49.57,107.08 L-71.44,131.90 L-103.37,108.70 L-86.52,80.23 L-103.04,57.50 L-135.32,64.72 L-147.52,27.18 L-117.16,14.05 L-117.16,-14.05 L-147.52,-27.18 L-135.32,-64.72 L-103.04,-57.50 L-86.52,-80.23 L-103.37,-108.70 L-71.44,-131.90 L-49.57,-107.08 Z" fill="none" stroke="#fff" stroke-opacity="0.35" stroke-width="3" stroke-linejoin="round" transform="scale(1.02)"/>
+</g>
+</svg>

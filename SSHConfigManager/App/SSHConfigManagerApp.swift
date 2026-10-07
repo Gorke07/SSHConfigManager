@@ -21,7 +21,7 @@ struct SSHConfigManagerApp: App {
         MenuBarExtra(isInserted: .constant(!TestEnvironment.isRunningTests)) {
             MenuBarContent(appDelegate: appDelegate)
         } label: {
-            Image(systemName: "terminal")
+            Image("MenuBarIcon")
                 .accessibilityLabel(String(localized: "app.title"))
                 .registersMainWindowOpener(appDelegate)
         }
