@@ -51,7 +51,7 @@
 | Dağıtım | Developer ID ile imzalı, notarize edilmiş, Hardened Runtime, `.dmg` | Şirket içi dağıtım için uygun. Sandbox'a geçiş gerekirse yalnızca dosya erişim katmanı değişir. |
 | Doğruluk kaynağı | Config dosyasının kendisi | Uygulama host verisini ayrıca saklamaz. Yalnızca ayarlar `UserDefaults` içinde tutulur. |
 | Parser stratejisi | Satır tabanlı, kayıpsız | Bayt bayt aynı kalma garantisi bu sayede sağlanır. |
-| Uygulama bağımlılıkları | `KeyboardShortcuts` (MIT), `STTextView` 2.x (**GPL v3 / ticari lisans**) | Yalnızca uygulama target'ında; `SSHConfigKit` paketi bağımlılıksız kalır. STTextView lisansı için bkz. §6.6. |
+| Uygulama bağımlılıkları | Yalnızca `KeyboardShortcuts` (MIT) | Uygulama target'ında; `SSHConfigKit` paketi bağımlılıksız kalır. Metin görünümleri kendi SwiftUI bileşenlerimizdir (bkz. §6.1a). |
 
 ## 3. Mimari
 
@@ -253,19 +253,21 @@ Yapı olarak `NavigationSplitView` kullanılır. Sol kenar çubuğunda arama ala
 - Görsel tasarımda standart macOS 26 SwiftUI bileşenleri kullanılır; Liquid Glass bu bileşenlerde otomatik gelir. Özel glass efekti eklenmez.
 - Ana pencere kapatıldığında uygulama menü çubuğunda çalışmaya devam eder. Dock ikonu yalnızca bir pencere açıkken görünür (activation policy `.regular` ↔ `.accessory`).
 
-### 6.1a Metin görünümleri (STTextView)
+### 6.1a Metin görünümleri
 
-`STTextView` (TextKit 2, `STTextViewSwiftUI` modülündeki `TextView`) şu üç yerde, **salt okunur** olarak kullanılır:
+Diff ve ham metin ekranları dış kütüphane kullanmadan, SwiftUI ile yazılan iki küçük bileşenle gösterilir. Hepsi **salt okunur**dur.
 
-| Yer | İçerik | Özellikler |
+| Yer | Bileşen | İçerik |
 |---|---|---|
-| Kaydet → diff onay ekranı | Unified diff (`DiffHunk` listesi) | Satır numaraları (eski/yeni), eklenen satırlar yeşil, silinenler kırmızı arka plan, monospace |
-| Match 🔒 ve Dahil edilen 🔒 detayı | Bloğun ham metni | Satır numaraları, ssh_config renklendirmesi |
-| Yedekler ekranı | Seçilen yedek ile mevcut dosya arasındaki diff | Diff ekranıyla aynı görünüm |
+| Kaydet → diff onay ekranı | `DiffTextView` | Unified diff (`DiffHunk` listesi): eski/yeni satır numaraları, eklenen satırlar yeşil, silinenler kırmızı arka plan, hunk başlıkları |
+| Match 🔒 ve Dahil edilen 🔒 detayı | `CodeTextView` | Bloğun ham metni, satır numaraları, renklendirme |
+| Yedekler ekranı | `DiffTextView` | Seçilen yedek ile mevcut dosya arasındaki diff |
 
-- **Renklendirme:** ssh_config için hazır bir TreeSitter grameri kullanılmaz. `SSHConfigKit`'in `LineKind` sınıflandırması üzerinden basit bir renklendirici yazılır: yorum, anahtar kelime (`Host`/`Match`/`Include`), direktif adı, değer, ⚠ anlaşılmayan satır. Böylece ekranda gösterilen renk, parser'ın gerçekten ne anladığını yansıtır.
-- **Düzenleme yok:** v1'de ham metin düzenleme yoktur; tüm düzenlemeler form üzerinden yapılır (kayıpsız düzenleme garantisi formun dokunduğu satırlarla sınırlıdır). STTextView'un düzenleme özellikleri kapalı tutulur (`isEditable = false`, seçme ve kopyalama açık).
-- **Paylaşılan bileşen:** Üç ekran da tek bir `CodeTextView` (SwiftUI sarmalayıcı) ve tek bir `DiffTextView` kullanır; görünüm kodu tekrarlanmaz.
+- **Yapı:** `ScrollView([.vertical, .horizontal])` içinde `LazyVStack`; her satır bir `HStack` (sağa hizalı, `monospacedDigit` satır numarası + monospace `Text(AttributedString)`). Uzun satırlar kaydırılır, satır kırılmaz. `LazyVStack` sayesinde binlerce satırlık dosyalar da akıcı kalır.
+- **Renklendirme:** `SSHConfigKit`'in `LineKind` sınıflandırması üzerinden: yorum, anahtar kelime (`Host`/`Match`/`Include`), direktif adı, değer, ⚠ anlaşılmayan satır. Renkler sistem renklerinden (`.secondary`, `.accentColor`, `.orange` …) gelir; açık ve koyu temada otomatik uyumludur. Ekrandaki renk, parser'ın satırı gerçekte nasıl anladığını gösterir.
+- **Seçme ve kopyalama:** Her satırda `.textSelection(.enabled)`. SwiftUI'da seçim satırlar arasında süremediği için başlıkta bir **"Tümünü kopyala"** butonu bulunur (diff ekranında unified diff metnini kopyalar).
+- **Erişilebilirlik:** Her satırın VoiceOver etiketi "Satır 12, eklendi: Port 2222" biçimindedir (çevirili).
+- **Düzenleme yok:** v1'de ham metin düzenleme yoktur; tüm düzenlemeler form üzerinden yapılır.
 
 ### 6.2 Menü çubuğu
 
@@ -316,7 +318,6 @@ Yapı olarak `NavigationSplitView` kullanılır. Sol kenar çubuğunda arama ala
 | Paket | Lisans | Etkisi |
 |---|---|---|
 | `KeyboardShortcuts` | MIT | Yok (lisans metni "Hakkında" ekranında listelenir). |
-| `STTextView` | GPL v3 veya ticari lisans | Şirket içi kullanımda sorun yaratmaz. Uygulama şirket dışına **dağıtılırsa** iki yol vardır: uygulamanın kaynak kodunu GPL v3 ile yayımlamak ya da STTextView'un ticari lisansını almak. Dağıtım kararı (Plan 5) öncesinde bu seçim yapılmalıdır. |
 
 ## 7. Known Hosts penceresi
 
