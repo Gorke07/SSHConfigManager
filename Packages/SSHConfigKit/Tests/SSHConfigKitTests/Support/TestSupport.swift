@@ -1,5 +1,6 @@
 import Foundation
 import Synchronization
+@testable import SSHConfigKit
 
 /// A unique temporary directory that is removed when the object is released.
 final class TempDir {
@@ -50,4 +51,35 @@ final class TestClock: Sendable {
     init(_ start: Date) { current = Mutex(start) }
     var now: Date { current.withLock { $0 } }
     func advance(_ seconds: TimeInterval) { current.withLock { $0 += seconds } }
+}
+
+final class FakeRunner: ProcessRunning {
+    struct State {
+        var calls: [[String]] = []
+        var running = 0
+        var maxRunning = 0
+    }
+
+    private let state = Mutex(State())
+    private let respond: @Sendable ([String]) -> ProcessResult
+    private let delay: Duration
+
+    init(delay: Duration = .zero, respond: @escaping @Sendable ([String]) -> ProcessResult) {
+        self.delay = delay
+        self.respond = respond
+    }
+
+    var calls: [[String]] { state.withLock { $0.calls } }
+    var maxConcurrent: Int { state.withLock { $0.maxRunning } }
+
+    func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
+        state.withLock {
+            $0.calls.append(arguments)
+            $0.running += 1
+            $0.maxRunning = max($0.maxRunning, $0.running)
+        }
+        if delay > .zero { try await Task.sleep(for: delay) }
+        state.withLock { $0.running -= 1 }
+        return respond(arguments)
+    }
 }
