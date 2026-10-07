@@ -21,6 +21,188 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "No Host Selected" } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Host Seçilmedi" } }
       }
+    },
+    "issue.controlCharacter %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "“%@” contains a line break or control character." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "“%@” satır sonu veya kontrol karakteri içeriyor." } }
+      }
+    },
+    "issue.emptyAlias" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The alias cannot be empty." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Alias boş olamaz." } }
+      }
+    },
+    "issue.aliasHasWhitespace" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The alias cannot contain spaces." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Alias boşluk içeremez." } }
+      }
+    },
+    "issue.duplicateAlias %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Another host already uses “%@”." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "“%@” başka bir host tarafından kullanılıyor." } }
+      }
+    },
+    "issue.invalidPort %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "“%@” is not a valid port (1–65535)." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "“%@” geçerli bir port değil (1–65535)." } }
+      }
+    },
+    "issue.invalidDirectiveKey %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "“%@” is not a valid option name." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "“%@” geçerli bir seçenek adı değil." } }
+      }
+    },
+    "issue.forbiddenDirectiveKey %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "“%@” cannot be added as an option here." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "“%@” burada seçenek olarak eklenemez." } }
+      }
+    },
+    "issue.emptyDirectiveValue %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "“%@” needs a value." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "“%@” için bir değer gerekli." } }
+      }
+    },
+    "issue.identityFileMissing %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Key file not found: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Anahtar dosyası bulunamadı: %@" } }
+      }
+    },
+    "edit.hostNotFound" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This host no longer exists in the file." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu host artık dosyada yok." } }
+      }
+    },
+    "edit.controlCharacter" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Values cannot contain line breaks or control characters." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Değerler satır sonu veya kontrol karakteri içeremez." } }
+      }
+    },
+    "edit.invalidAlias %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "“%@” is not a valid alias." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "“%@” geçerli bir alias değil." } }
+      }
+    },
+    "store.notEditable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The file can't be edited in its current state." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dosya şu anki durumunda düzenlenemez." } }
+      }
+    },
+    "store.conflict" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The file was changed by another program." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dosya başka bir program tarafından değiştirildi." } }
+      }
+    },
+    "store.validationFailed %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ssh rejected the configuration:\n%@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "ssh yapılandırmayı reddetti:\n%@" } }
+      }
+    },
+    "store.validationTimedOut" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Validation with ssh timed out." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "ssh ile doğrulama zaman aşımına uğradı." } }
+      }
+    },
+    "store.backupFailed %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The backup could not be created, so nothing was written: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yedek oluşturulamadığı için hiçbir şey yazılmadı: %@" } }
+      }
+    },
+    "store.writeFailed %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The file could not be written: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dosya yazılamadı: %@" } }
+      }
+    },
+    "store.saveCancelled" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saving was cancelled because the file was reloaded." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dosya yeniden yüklendiği için kaydetme iptal edildi." } }
+      }
+    },
+    "store.saveInProgress" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "A save is already in progress." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Zaten bir kaydetme işlemi sürüyor." } }
+      }
+    },
+    "store.validatorUnavailable %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ssh could not be run to validate the file: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dosyayı doğrulamak için ssh çalıştırılamadı: %@" } }
+      }
+    },
+    "load.missing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The config file does not exist yet." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Config dosyası henüz yok." } }
+      }
+    },
+    "load.notUTF8" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The file is not valid UTF-8. It is shown read-only and will never be rewritten." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dosya geçerli UTF-8 değil. Salt okunur gösteriliyor ve asla yeniden yazılmayacak." } }
+      }
+    },
+    "load.unreadable %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The file could not be read: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dosya okunamadı: %@" } }
+      }
+    },
+    "validation.valid" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ssh accepts this configuration." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "ssh bu yapılandırmayı kabul ediyor." } }
+      }
+    },
+    "error.generic %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unexpected error: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Beklenmeyen hata: %@" } }
+      }
     }
   },
   "version" : "1.0"
