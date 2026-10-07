@@ -627,8 +627,8 @@
     "editor.stale" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "This host was changed outside the editor. Select it again to continue editing." } },
-        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu host düzenleyici dışında değiştirildi. Düzenlemeye devam etmek için yeniden seçin." } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This host was changed outside the editor." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu host düzenleyici dışında değiştirildi." } }
       }
     },
     "editor.stale.reload" : {
@@ -643,6 +643,41 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Try Again" } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Tekrar Dene" } }
+      }
+    },
+    "discardForm.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Discard the changes in the form?" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Formdaki değişiklikler atılsın mı?" } }
+      }
+    },
+    "discardForm.message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Some fields have problems, so these changes were never applied." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bazı alanlarda sorun olduğu için bu değişiklikler uygulanmadı." } }
+      }
+    },
+    "discardForm.discard" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Discard" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "At" } }
+      }
+    },
+    "saveWithPending.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save the other changes anyway?" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Diğer değişiklikler yine de kaydedilsin mi?" } }
+      }
+    },
+    "saveWithPending.message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The form has problems; those fields will not be saved." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Formda sorunlar var; o alanlar kaydedilmeyecek." } }
       }
     }
   },

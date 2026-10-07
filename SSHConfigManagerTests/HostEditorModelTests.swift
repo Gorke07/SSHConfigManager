@@ -157,4 +157,38 @@ struct HostEditorModelTests {
         #expect(HostEditorModel.identityFileExists(tmp.url.appending(path: ".ssh/id_ok").path, home: tmp.url))
         #expect(HostEditorModel.identityFileExists("relative/key", home: tmp.url))   // not checked
     }
+
+    @Test func renameCallsOnItemChangeExactlyOnce() throws {
+        let tmp = try TempDir()
+        let app = model(tmp, "Host web\n  User u\nHost db\n")
+        let editor = try #require(HostEditorModel(item: .host(alias: "web", occurrence: 0), store: app.store, homeDirectory: tmp.url))
+        var received: [SidebarItem] = []
+        editor.onItemChange = { received.append($0) }
+        editor.aliasText = "web-prod"
+        #expect(editor.commit())
+        #expect(received == [.host(alias: "web-prod", occurrence: 0)])
+        // An edit that keeps the identity does not call back.
+        editor.fields["HostName"] = "x"
+        #expect(editor.commit())
+        #expect(received.count == 1)
+    }
+
+    @Test func hasPendingChangesTracksBlockedCommits() throws {
+        let tmp = try TempDir()
+        let app = model(tmp, "Host web\n  User u\n")
+        let editor = try #require(HostEditorModel(item: .host(alias: "web", occurrence: 0), store: app.store, homeDirectory: tmp.url))
+        #expect(!editor.hasPendingChanges)
+        editor.fields["Port"] = "abc"
+        #expect(!editor.commit())
+        #expect(editor.hasPendingChanges)
+        editor.fields["Port"] = "22"
+        #expect(editor.commit())
+        #expect(!editor.hasPendingChanges)
+        // Reverting a blocked edit back to the baseline is not pending either.
+        editor.fields["Port"] = "abc"
+        #expect(!editor.commit())
+        editor.fields["Port"] = "22"
+        #expect(editor.commit())
+        #expect(!editor.hasPendingChanges)
+    }
 }

@@ -118,4 +118,42 @@ struct AppModelTests {
         #expect(model.switchConfig(to: tmp.url.appending(path: "other/config").path, discardingUnsavedChanges: true) == .switched)
         #expect(old == nil)
     }
+
+    @Test func requestSelectWithoutPendingEditsSelectsDirectly() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\nHost b\n")
+        let b = SidebarItem.host(alias: "b", occurrence: 0)
+        model.requestSelect(b)
+        #expect(model.selection == b)
+        #expect(model.pendingSelection == nil)
+    }
+
+    @Test func requestSelectWithPendingEditsAsksFirst() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\nHost b\n")
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        let b = SidebarItem.host(alias: "b", occurrence: 0)
+        model.select(a)
+        let token = model.editorToken
+        let editor = try #require(HostEditorModel(item: a, store: model.store, homeDirectory: tmp.url))
+        model.activeEditor = editor
+        editor.fields["Port"] = "abc"
+        #expect(!editor.commit())
+        #expect(model.hasPendingFormEdits)
+
+        model.requestSelect(b)
+        #expect(model.pendingSelection == b)
+        #expect(model.selection == a)
+        #expect(model.editorToken == token)
+
+        model.cancelPendingSelection()
+        #expect(model.pendingSelection == nil)
+        #expect(model.selection == a)
+
+        model.requestSelect(b)
+        model.confirmPendingSelection()
+        #expect(model.selection == b)
+        #expect(model.pendingSelection == nil)
+        #expect(model.editorToken != token)
+    }
 }
