@@ -4,7 +4,8 @@ import SwiftUI
 struct BackupsView: View {
     @State private var backups: BackupsModel
     @State private var confirmingRestore: Backup?
-    @State private var confirmingKnownHostsRestore: Backup?
+    /// The backup and the known_hosts revision/store the confirmation was opened for.
+    @State private var confirmingKnownHostsRestore: (backup: Backup, seen: BackupsModel.KnownHostsSnapshot)?
 
     init(model: AppModel) {
         _backups = State(initialValue: BackupsModel(model: model))
@@ -43,7 +44,7 @@ struct BackupsView: View {
                         Spacer()
                         Button(String(localized: "backups.restore")) {
                             if backups.fileKind == .knownHosts {
-                                confirmingKnownHostsRestore = backup
+                                confirmingKnownHostsRestore = (backup, backups.knownHostsSnapshot())
                             } else if backups.model.store.hasUnsavedChanges || backups.model.hasPendingFormEdits {
                                 confirmingRestore = backup
                             } else {
@@ -72,8 +73,8 @@ struct BackupsView: View {
             String(localized: "backups.restore.knownHosts.title"),
             isPresented: Binding(get: { confirmingKnownHostsRestore != nil }, set: { if !$0 { confirmingKnownHostsRestore = nil } }),
             presenting: confirmingKnownHostsRestore
-        ) { backup in
-            Button(String(localized: "backups.restore.confirm.action"), role: .destructive) { restore(backup) }
+        ) { pending in
+            Button(String(localized: "backups.restore.confirm.action"), role: .destructive) { restore(pending.backup, seen: pending.seen) }
         } message: { _ in
             Text(String(localized: "backups.restore.knownHosts.message"))
         }
@@ -95,7 +96,7 @@ struct BackupsView: View {
         }
     }
 
-    private func restore(_ backup: Backup) {
-        do { try backups.restore(backup) } catch { backups.model.errorMessage = Messages.text(for: error) }
+    private func restore(_ backup: Backup, seen: BackupsModel.KnownHostsSnapshot? = nil) {
+        do { try backups.restore(backup, seen: seen) } catch { backups.model.errorMessage = Messages.text(for: error) }
     }
 }

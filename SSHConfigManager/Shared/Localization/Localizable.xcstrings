@@ -116,8 +116,8 @@
     "knownHosts.notUTF8" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The known_hosts file is not valid UTF-8, so it is shown read-only and never rewritten." } },
-        "tr" : { "stringUnit" : { "state" : "translated", "value" : "known_hosts dosyası geçerli UTF-8 değil; salt okunur gösterilir ve hiçbir zaman yeniden yazılmaz." } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The known_hosts file is not valid UTF-8. Its entries cannot be shown, and it is never rewritten." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "known_hosts dosyası geçerli UTF-8 değil. Kayıtları gösterilemez ve dosya hiçbir zaman yeniden yazılmaz." } }
       }
     },
     "knownHosts.unreadable %@" : {

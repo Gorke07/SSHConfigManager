@@ -60,17 +60,31 @@ final class BackupsModel {
         return LineDiff.hunks(old: currentText, new: contents)
     }
 
+    /// The known_hosts file as the user saw it when a restore confirmation opened.
+    struct KnownHostsSnapshot {
+        let revision: Int
+        weak var store: KnownHostsStore?
+    }
+
+    func knownHostsSnapshot() -> KnownHostsSnapshot {
+        KnownHostsSnapshot(revision: model.knownHosts.revision, store: model.knownHosts)
+    }
+
     /// Config: loads the backup into the editor (the Save flow writes it).
-    /// known_hosts: no drafts, so it is written now (the current file is backed up first).
-    func restore(_ backup: Backup) throws {
+    /// known_hosts: no drafts, so it is written now (the current file is backed up first). `seen` is
+    /// the file the confirmation was shown for: a reload or a switched file since then refuses.
+    func restore(_ backup: Backup, seen: KnownHostsSnapshot? = nil) throws {
         let contents = try model.backupManager.contents(of: backup)
         switch fileKind {
         case .config:
             try model.store.apply { $0 = ConfigDocument(parsing: contents) }
             model.resetEditor()
         case .knownHosts:
-            // The known_hosts file was switched since the list was built: this backup belongs to another file.
-            guard listedKind == model.knownHosts.backupKind else {
+            // Switched file (the backup belongs to another file), a backup no longer listed, or a reload
+            // since the confirmation opened (the user approved another diff): nothing is written.
+            guard listedKind == model.knownHosts.backupKind, backups.contains(where: { $0.url == backup.url }),
+                  let seen, let store = seen.store,
+                  store === model.knownHosts, seen.revision == store.revision else {
                 refresh()
                 throw KnownHostsStoreError.staleSelection
             }

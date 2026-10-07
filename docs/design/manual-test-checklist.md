@@ -78,3 +78,4 @@ Elle denemede gerçek `~/.ssh/known_hosts` kullanılmaz: `defaults write tr.com.
 - [ ] Eşleşen kayıt yoksa denenen adlar (`host` / `[host]:port`) gösteriliyor.
 - [ ] Yedekler: üstteki seçiciyle "known_hosts" seçilince known_hosts yedekleri listeleniyor; diff mevcut dosyaya göre; Geri Yükle onay istiyor ve dosyayı hemen yazıyor (önce mevcut dosyanın yedeği alınıyor).
 - [ ] Ayarlar → known_hosts dosyası: Seç… ile başka dosya seçilince Known Hosts penceresi o dosyayı gösteriyor; "~/.ssh/known_hosts kullan" geri alıyor. Config dosyası seçimi hâlâ çalışıyor.
+- [ ] Not: ssh bir host anahtarını tam silme anında eklerse (çok nadir) eklenen satır kaybolabilir; ssh bir sonraki bağlantıda yeniden sorar.

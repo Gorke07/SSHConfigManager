@@ -97,7 +97,7 @@ struct BackupsModelTests {
 
         let backup = try #require(backups.backups.first)
         #expect(!backups.hunks(for: backup).isEmpty)
-        try backups.restore(backup)
+        try backups.restore(backup, seen: backups.knownHostsSnapshot())
         #expect(try tmp.read(".ssh/known_hosts") == "a.example.com ssh-ed25519 \(ed)\nb.example.com ssh-ed25519 \(ed)\n")
         backups.refresh()
         #expect(backups.backups.count == 2)   // restoring backed up the current file first
@@ -112,11 +112,32 @@ struct BackupsModelTests {
         let backups = BackupsModel(model: model)
         backups.fileKind = .knownHosts
         let backup = try #require(backups.backups.first)
+        let seen = backups.knownHostsSnapshot()
 
         let otherText = "c.example.com ssh-ed25519 \(ed)\n"
         let other = try tmp.file("other_known_hosts", otherText)
         #expect(model.switchKnownHosts(to: other.path))
-        #expect(throws: KnownHostsStoreError.staleSelection) { try backups.restore(backup) }
+        #expect(throws: KnownHostsStoreError.staleSelection) { try backups.restore(backup, seen: seen) }
+        #expect(throws: KnownHostsStoreError.staleSelection) { try backups.restore(backup, seen: backups.knownHostsSnapshot()) }
         #expect(try String(contentsOf: other, encoding: .utf8) == otherText)
+    }
+
+    @Test func aKnownHostsRestoreIsRefusedWhenTheFileReloadedSinceTheConfirmationOpened() throws {
+        let tmp = try TempDir()
+        let ed = KnownHostsModelTests.ed
+        _ = try tmp.file(".ssh/known_hosts", "a.example.com ssh-ed25519 \(ed)\nb.example.com ssh-ed25519 \(ed)\n")
+        let model = makeTestModel(tmp, config: "Host x\n")
+        try model.knownHosts.remove(lines: [0], ifRevision: model.knownHosts.revision)
+        let backups = BackupsModel(model: model)
+        backups.fileKind = .knownHosts
+        let backup = try #require(backups.backups.first)
+        let seen = backups.knownHostsSnapshot()
+
+        let appended = "b.example.com ssh-ed25519 \(ed)\nnew.example.com ssh-ed25519 \(ed)\n"
+        try tmp.file(".ssh/known_hosts", appended)   // ssh added a key while the dialog was open
+        model.knownHosts.load()
+        #expect(throws: KnownHostsStoreError.staleSelection) { try backups.restore(backup, seen: seen) }
+        #expect(try tmp.read(".ssh/known_hosts") == appended)
+        #expect(throws: KnownHostsStoreError.staleSelection) { try backups.restore(backup) }   // no snapshot: refused
     }
 }
