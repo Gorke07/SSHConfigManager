@@ -15,8 +15,26 @@ struct HostKeyRemoval: Equatable, Identifiable {
     var phase: Phase
     /// Store revision the matched entries belong to.
     var revision = 0
-    /// The store the entries were read from; a switched known_hosts file is a different store.
-    var store: ObjectIdentifier?
+    /// The store the entries were read from; a switched known_hosts file is a different store
+    /// (compared by identity, never by address: a freed store's address can be reused).
+    weak var store: KnownHostsStore?
+    /// ssh -G reported `checkhostip yes`: the host's IP entries are not part of this lookup.
+    var checkHostIP = false
+    /// ssh's first UserKnownHostsFile when none of them is the file this app manages.
+    var otherKnownHostsFile: String?
+
+    /// Secondary notes shown in the sheet.
+    var notes: [String] {
+        var notes: [String] = []
+        if checkHostIP { notes.append(String(localized: "hostKeyRemoval.checkHostIPNote")) }
+        if let file = otherKnownHostsFile { notes.append(String(localized: "hostKeyRemoval.otherFileNote \(file)")) }
+        return notes
+    }
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.id == rhs.id && lhs.alias == rhs.alias && lhs.phase == rhs.phase && lhs.revision == rhs.revision
+            && lhs.store === rhs.store && lhs.checkHostIP == rhs.checkHostIP && lhs.otherKnownHostsFile == rhs.otherKnownHostsFile
+    }
 }
 
 extension AppModel {
@@ -32,11 +50,15 @@ extension AppModel {
         let resolver = HostResolver(commandBuilder: commandBuilder, runner: processRunner)
         let phase: HostKeyRemoval.Phase
         var revision = 0
-        var store: ObjectIdentifier?
+        var store: KnownHostsStore?
+        var checkHostIP = false
+        var otherFile: String?
         do {
             let host = try await resolver.resolve(alias: alias)
             revision = knownHosts.revision
-            store = ObjectIdentifier(knownHosts)
+            store = knownHosts
+            checkHostIP = host.checkHostIP
+            otherFile = otherKnownHostsFile(sshReads: host.userKnownHostsFiles)
             switch knownHosts.loadState {
             case .notUTF8, .unreadable:
                 // An unreadable file has an empty document: "nothing found" would be a lie.
@@ -56,17 +78,28 @@ extension AppModel {
         hostKeyRemoval?.phase = phase
         hostKeyRemoval?.revision = revision
         hostKeyRemoval?.store = store
+        hostKeyRemoval?.checkHostIP = checkHostIP
+        hostKeyRemoval?.otherKnownHostsFile = otherFile
+    }
+
+    /// ssh's first UserKnownHostsFile when none of them (`~` expanded against the settings' home)
+    /// is the known_hosts file this app manages; nil when one is, or when ssh printed none.
+    func otherKnownHostsFile(sshReads files: [String]) -> String? {
+        guard let first = files.first else { return nil }
+        let managed = knownHosts.fileURL.standardizedFileURL.path
+        let reads = files.contains { AppSettings.expand($0, home: settings.homeDirectory).standardizedFileURL.path == managed }
+        return reads ? nil : first
     }
 
     func confirmHostKeyRemoval() {
         guard let removal = hostKeyRemoval, case .confirm(let entries) = removal.phase else { return }
         hostKeyRemoval = nil
-        guard removal.store == ObjectIdentifier(knownHosts) else {
+        guard let store = removal.store, store === knownHosts else {
             errorMessage = Messages.text(for: KnownHostsStoreError.staleSelection)
             return
         }
         do {
-            try knownHosts.remove(lines: Set(entries.map(\.lineIndex)), ifRevision: removal.revision)
+            try store.remove(lines: Set(entries.map(\.lineIndex)), ifRevision: removal.revision)
             connectionTests.dropResult(for: removal.alias)
         } catch {
             errorMessage = Messages.text(for: error)

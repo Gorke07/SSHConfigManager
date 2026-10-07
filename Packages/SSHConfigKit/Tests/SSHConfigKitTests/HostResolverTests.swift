@@ -27,13 +27,26 @@ struct HostResolverTests {
 
     @Test func parsesHostnamePortAndAlias() {
         let host = HostResolver.parse(Self.output)
-        #expect(host == ResolvedHost(hostname: "example.com", port: 2222, hostKeyAlias: "myalias"))
+        #expect(host == ResolvedHost(hostname: "example.com", port: 2222, hostKeyAlias: "myalias",
+                                     userKnownHostsFiles: ["/h/.ssh/known_hosts", "/h/.ssh/known_hosts2"]))
         #expect(host?.lookupNames == ["myalias", "[example.com]:2222"])
     }
 
     @Test func withoutAliasOnlyTheHostName() {
         let host = HostResolver.parse("hostname 10.0.0.1\nport 22\n")
         #expect(host?.lookupNames == ["10.0.0.1"])
+    }
+
+    @Test func checkHostIPIsReadFromTheYesValue() {
+        #expect(HostResolver.parse("hostname a\nport 22\ncheckhostip yes\n")?.checkHostIP == true)
+        #expect(HostResolver.parse("hostname a\nport 22\ncheckhostip no\n")?.checkHostIP == false)
+        #expect(HostResolver.parse("hostname a\nport 22\n")?.checkHostIP == false)
+    }
+
+    @Test func userKnownHostsFilesAreSplitOnSpaces() {
+        let host = HostResolver.parse("hostname a\nport 22\nuserknownhostsfile ~/.ssh/known_hosts ~/.ssh/known_hosts2\n")
+        #expect(host?.userKnownHostsFiles == ["~/.ssh/known_hosts", "~/.ssh/known_hosts2"])
+        #expect(HostResolver.parse("hostname a\nport 22\n")?.userKnownHostsFiles == [])
     }
 
     @Test func parseReturnsNilWithoutHostnameOrWithBadPort() {

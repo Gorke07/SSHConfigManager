@@ -1330,6 +1330,20 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "ssh -G returned output that could not be read." } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "ssh -G okunamayan bir çıktı verdi." } }
       }
+    },
+    "hostKeyRemoval.checkHostIPNote" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "CheckHostIP is on: entries for the host's IP address are not included. Search the IP address in Known Hosts." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "CheckHostIP açık: host'un IP adresine ait kayıtlar dahil değil. IP adresini Known Hosts'ta arayın." } }
+      }
+    },
+    "hostKeyRemoval.otherFileNote %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ssh reads %@, not the known_hosts file this app manages." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "ssh bu uygulamanın yönettiği known_hosts dosyasını değil, %@ dosyasını okuyor." } }
+      }
     }
   },
   "version" : "1.0"

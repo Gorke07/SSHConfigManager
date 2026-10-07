@@ -28,6 +28,12 @@ struct HostKeyRemovalSheet: View {
             case .failed(let message):
                 Text(verbatim: message).foregroundStyle(.red)
             }
+            ForEach(removal.notes, id: \.self) { note in
+                Label { Text(verbatim: note) } icon: { Image(systemName: "info.circle") }
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             HStack {
                 Spacer()
                 Button(String(localized: "action.cancel"), role: .cancel) { model.cancelHostKeyRemoval() }

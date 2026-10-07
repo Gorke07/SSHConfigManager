@@ -123,4 +123,37 @@ struct HostKeyRemovalTests {
         await model.requestHostKeyRemoval(alias: "web")
         #expect(model.hostKeyRemoval?.phase == .failed(String(localized: "knownHosts.notUTF8")))
     }
+
+    @Test func checkHostIPAddsANote() async throws {
+        let tmp = try TempDir()
+        let model = make(tmp, sshG: "hostname web.example.com\nport 22\ncheckhostip yes\nuserknownhostsfile ~/.ssh/known_hosts ~/.ssh/known_hosts2\n")
+        await model.requestHostKeyRemoval(alias: "web")
+        #expect(model.hostKeyRemoval?.checkHostIP == true)
+        #expect(model.hostKeyRemoval?.notes == [String(localized: "hostKeyRemoval.checkHostIPNote")])
+    }
+
+    @Test func noNotesWhenSshReadsTheManagedFile() async throws {
+        let tmp = try TempDir()
+        let model = make(tmp, sshG: "hostname web.example.com\nport 22\ncheckhostip no\nuserknownhostsfile ~/.ssh/known_hosts ~/.ssh/known_hosts2\n")
+        await model.requestHostKeyRemoval(alias: "web")
+        #expect(model.hostKeyRemoval?.otherKnownHostsFile == nil)
+        #expect(model.hostKeyRemoval?.notes == [])
+    }
+
+    @Test func anotherUserKnownHostsFileAddsANote() async throws {
+        let tmp = try TempDir()
+        let model = make(tmp, sshG: "hostname web.example.com\nport 22\nuserknownhostsfile ~/.ssh/other_hosts /etc/ssh/extra\n")
+        await model.requestHostKeyRemoval(alias: "web")
+        #expect(model.hostKeyRemoval?.otherKnownHostsFile == "~/.ssh/other_hosts")
+        let file = "~/.ssh/other_hosts"
+        #expect(model.hostKeyRemoval?.notes == [String(localized: "hostKeyRemoval.otherFileNote \(file)")])
+    }
+
+    @Test func anAbsoluteUserKnownHostsFileIsComparedStandardized() async throws {
+        let tmp = try TempDir()
+        let path = tmp.url.path + "/.ssh/../.ssh/known_hosts"
+        let model = make(tmp, sshG: "hostname web.example.com\nport 22\nuserknownhostsfile \(path)\n")
+        await model.requestHostKeyRemoval(alias: "web")
+        #expect(model.hostKeyRemoval?.otherKnownHostsFile == nil)
+    }
 }

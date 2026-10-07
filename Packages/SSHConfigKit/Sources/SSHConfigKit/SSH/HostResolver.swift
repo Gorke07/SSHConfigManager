@@ -4,11 +4,17 @@ public struct ResolvedHost: Equatable, Sendable {
     public let hostname: String
     public let port: Int
     public let hostKeyAlias: String?
+    /// `CheckHostIP yes`: ssh also keeps and checks an entry for the host's IP address.
+    public let checkHostIP: Bool
+    /// The `UserKnownHostsFile` paths as ssh prints them (`~` not expanded).
+    public let userKnownHostsFiles: [String]
 
-    public init(hostname: String, port: Int, hostKeyAlias: String?) {
+    public init(hostname: String, port: Int, hostKeyAlias: String?, checkHostIP: Bool = false, userKnownHostsFiles: [String] = []) {
         self.hostname = hostname
         self.port = port
         self.hostKeyAlias = hostKeyAlias
+        self.checkHostIP = checkHostIP
+        self.userKnownHostsFiles = userKnownHostsFiles
     }
 
     /// Names to look up in known_hosts: the HostKeyAlias as written (ssh uses it instead of the
@@ -68,6 +74,8 @@ public struct HostResolver: Sendable {
         guard let hostname = values["hostname"], !hostname.isEmpty,
               let port = Int(values["port"] ?? "22"), (1...65535).contains(port) else { return nil }
         let alias = values["hostkeyalias"].flatMap { $0.isEmpty || $0 == "none" ? nil : $0 }
-        return ResolvedHost(hostname: hostname, port: port, hostKeyAlias: alias)
+        let checkHostIP = values["checkhostip"]?.asciiLowercased == "yes"
+        let files = (values["userknownhostsfile"] ?? "").split(separator: " ").map(String.init)
+        return ResolvedHost(hostname: hostname, port: port, hostKeyAlias: alias, checkHostIP: checkHostIP, userKnownHostsFiles: files)
     }
 }
