@@ -44,3 +44,5 @@ Her sürüm öncesi temiz bir test kullanıcısında veya `~/.ssh/config` yedeğ
 - [ ] Dahil edilen hostlar 🔒 ile listede; desenler (`*`) yok; aynı alias bir kez.
 - [ ] Ana pencere kapatılınca Dock simgesi kaybolur, menü çubuğu kalır; "SSH Config Yöneticisini Aç" pencereyi ve Dock simgesini geri getirir.
 - [ ] Menüden "Çık" kaydedilmemiş değişiklik varken kaydetme uyarısını gösterir.
+- [ ] Herhangi bir uygulamadayken ⌥⌘S → ekranın ortasında hızlı bağlanma paneli, arama kutusu odaklı; ↩ bağlar ve panel kapanır; esc ve başka yere tıklamak paneli kapatır; ⌥⌘S ikinci kez basınca kapanır.
+- [ ] Ayarlar'da kısayol değiştirilir (ör. ⌃⌥Space) → yeni kısayol çalışır, eskisi çalışmaz; kaydedici temizlenirse kısayol devre dışı kalır.

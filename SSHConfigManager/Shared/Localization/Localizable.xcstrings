@@ -813,6 +813,13 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bağlantı" } }
       }
     },
+    "settings.shortcut" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Quick connect shortcut" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Hızlı bağlanma kısayolu" } }
+      }
+    },
     "settings.terminal" : {
       "extractionState" : "manual",
       "localizations" : {

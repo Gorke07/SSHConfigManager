@@ -1,4 +1,5 @@
 import AppKit
+import KeyboardShortcuts
 import SwiftUI
 
 struct SettingsView: View {
@@ -42,6 +43,7 @@ struct SettingsView: View {
                     }
                 }
                 Toggle(String(localized: "settings.launchAtLogin"), isOn: Binding(get: { loginItem.isOn }, set: { loginItem.set($0) }))
+                KeyboardShortcuts.Recorder(String(localized: "settings.shortcut"), name: .quickConnect)
                 if let message = loginItem.errorMessage {
                     Text(message).font(.footnote).foregroundStyle(.red)
                 }

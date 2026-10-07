@@ -18,6 +18,9 @@ settings:
 packages:
   SSHConfigKit:
     path: Packages/SSHConfigKit
+  KeyboardShortcuts:
+    url: https://github.com/sindresorhus/KeyboardShortcuts
+    from: 2.0.0
 targets:
   SSHConfigManager:
     type: application
@@ -26,6 +29,7 @@ targets:
       - path: SSHConfigManager
     dependencies:
       - package: SSHConfigKit
+      - package: KeyboardShortcuts
     info:
       path: SSHConfigManager/Info.plist
       properties:

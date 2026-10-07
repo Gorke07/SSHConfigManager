@@ -1,4 +1,5 @@
 import AppKit
+import KeyboardShortcuts
 
 /// Quitting (or closing the last window) with unsaved edits asks Save / Cancel / Don't Save.
 @MainActor
@@ -8,10 +9,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var openMainWindow: (() -> Void)?
     private(set) lazy var quickConnect = QuickConnectModel(app: model, openMainWindow: { [unowned self] in openMainWindow?() })
 
+    var panelController: QuickConnectPanelController?
     private var observers: [any NSObjectProtocol] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !TestEnvironment.isRunningTests else { return }
+        panelController = QuickConnectPanelController(
+            model: quickConnect,
+            openMainWindow: { [weak self] in self?.openMainWindow?() },
+            openSettings: { NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) })
+        KeyboardShortcuts.onKeyUp(for: .quickConnect) { [weak self] in
+            MainActor.assumeIsolated { self?.panelController?.toggle() }
+        }
         // The Dock icon is shown only while the main window is open (spec §6.2).
         observers.append(NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { note in
             nonisolated(unsafe) let object = note.object  // delivered on the main queue
