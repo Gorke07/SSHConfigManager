@@ -50,6 +50,7 @@ final class AppSettings {
     /// Only absolute paths, "~" and "~/..." are accepted; anything else would resolve against the CWD.
     static func isValidConfigPath(_ path: String) -> Bool {
         guard !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        guard !path.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7F }) else { return false }
         return path.hasPrefix("/") || path == "~" || path.hasPrefix("~/")
     }
 

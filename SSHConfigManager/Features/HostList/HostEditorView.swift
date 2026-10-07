@@ -81,7 +81,7 @@ struct HostEditorView: View {
         }
         .formStyle(.grouped)
         .onChange(of: editor.draft) { editor.commit() }
-        .fileImporter(isPresented: $importingIdentity, allowedContentTypes: [.item]) { result in
+        .fileImporter(isPresented: $importingIdentity, allowedContentTypes: [.data]) { result in
             if case .success(let url) = result {
                 let path = url.standardizedFileURL.path
                 let home = homeDirectory.standardizedFileURL.path

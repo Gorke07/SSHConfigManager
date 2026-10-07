@@ -53,7 +53,7 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 520)
-        .fileImporter(isPresented: $importing, allowedContentTypes: [.item]) { result in
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.data]) { result in
             if case .success(let url) = result { requestSwitch(model.settings.displayPath(for: url)) }
         }
         .confirmationDialog(

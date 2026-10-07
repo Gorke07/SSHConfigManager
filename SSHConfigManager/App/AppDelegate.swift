@@ -3,8 +3,8 @@ import AppKit
 /// Quitting (or closing the last window) with unsaved edits asks Save / Cancel / Don't Save.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    var model: AppModel?
-    /// Set by the main window; reopens it when the Dock icon is clicked or after a failed quit-save.
+    let model: AppModel = AppDelegate.makeModel()
+    /// Set by every scene (registersMainWindowOpener); reopens it when the Dock icon is clicked or after a failed quit-save.
     var openMainWindow: (() -> Void)?
 
     /// Closing the window keeps the app running (the menu bar item arrives in plan 2b).
@@ -18,7 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard let model, model.store.hasUnsavedChanges || model.hasPendingFormEdits else { return .terminateNow }
+        guard model.store.hasUnsavedChanges || model.hasPendingFormEdits else { return .terminateNow }
         let alert = NSAlert()
         alert.messageText = String(localized: "quit.unsaved.title")
         alert.informativeText = String(localized: "quit.unsaved.message")
@@ -51,5 +51,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         default:
             return .terminateCancel
         }
+    }
+
+    static func makeModel() -> AppModel {
+        guard TestEnvironment.isRunningTests else { return AppModel(settings: AppSettings()) }
+        // Unit tests are hosted by the app: use a throwaway home so the real ~/.ssh is never read.
+        let home = FileManager.default.temporaryDirectory.appending(path: "SSHConfigManagerTestHost-\(UUID().uuidString)")
+        let suite = "SSHConfigManagerTestHost-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        UserDefaults().removePersistentDomain(forName: suite)
+        return AppModel(settings: AppSettings(defaults: defaults, homeDirectory: home),
+                        backupRoot: home.appending(path: "Backups"))
     }
 }

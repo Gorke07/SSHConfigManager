@@ -3,6 +3,7 @@
 # Extra arguments are passed to xcodebuild (e.g. -only-testing:SSHConfigManagerTests/LocalizationTests).
 set -euo pipefail
 cd "$(dirname "$0")/.."
+python3 -m unittest scripts/test_check_localization.py
 python3 scripts/check-localization.py
 xcodegen generate --spec project.yml --quiet
 xcodebuild test \

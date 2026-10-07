@@ -4,11 +4,9 @@ import SwiftUI
 
 struct MainWindow: View {
     @Bindable var model: AppModel
-    let appDelegate: AppDelegate
     @State private var saveFlow: SaveFlowModel?
     @State private var showExternalDiff = false
     @State private var confirmSaveWithPending = false
-    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         NavigationSplitView {
@@ -25,7 +23,6 @@ struct MainWindow: View {
             // Keep a form with blocked edits; the stale guard still protects against external changes.
             if !model.hasPendingFormEdits { model.resetEditor() }
         }
-        .onAppear { appDelegate.openMainWindow = { openWindow(id: "main") } }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {

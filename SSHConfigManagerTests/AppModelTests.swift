@@ -236,4 +236,11 @@ struct AppModelTests {
         #expect(model.searchText.isEmpty)
         #expect(model.errorMessage == nil)
     }
+
+    @Test func configPathsWithControlCharactersAreInvalid() {
+        #expect(!AppSettings.isValidConfigPath("/tmp/a\nb"))
+        #expect(!AppSettings.isValidConfigPath("~/x\u{7F}"))
+        #expect(!AppSettings.isValidConfigPath("/tmp/a\tb"))
+        #expect(AppSettings.isValidConfigPath("/tmp/with space/config"))
+    }
 }
