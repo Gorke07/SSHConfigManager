@@ -1422,6 +1422,20 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Giriş öğesi değiştirilemedi: %@" } }
       }
     },
+    "settings.launchAtLogin.needsApproval" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "macOS needs your approval in System Settings → General → Login Items." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "macOS'un Sistem Ayarları → Genel → Giriş Öğeleri'nde onayınız gerekiyor." } }
+      }
+    },
+    "settings.launchAtLogin.openSettings" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open Login Items" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Giriş Öğelerini Aç" } }
+      }
+    },
     "settings.language" : {
       "extractionState" : "manual",
       "localizations" : {

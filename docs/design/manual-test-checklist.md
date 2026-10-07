@@ -96,3 +96,11 @@ Elle denemede gerçek anahtarlarınıza dokunmamak için yeni anahtarları `dene
 - [ ] Agent çalışmıyorken (`SSH_AUTH_SOCK` geçersiz bir oturumda) Agent sütunu "?" gösteriyor ve uygulama donmuyor.
 - [ ] Koyu tema ve Türkçe arayüz.
 - [ ] Host formunda IdentityFile → "Seç…" önce bilinen özel anahtarları (`~/.ssh/…`), ardından "Başka Dosya…" seçeneğini gösteriyor; seçilen yol listeye bir kez ekleniyor.
+
+## Plan 5 — Son rötuşlar
+
+- [ ] Girişte açıl açıkken oturumu kapatıp açın: uygulama ana pencere açmadan yalnızca menü çubuğunda başlıyor; Dock'ta ikon yok.
+- [ ] Girişte açıl'ı açınca macOS onay isterse Ayarlar'da açıklama ve "Giriş Öğelerini Aç" görünüyor; onayladıktan sonra Ayarlar'a dönünce anahtar açık.
+- [ ] Sistem Ayarları → Giriş Öğeleri'nden kapatılınca Ayarlar'a dönüldüğünde anahtar kapalı görünüyor.
+- [ ] Yeni bir host ekleyip kaydetmeden seçince Bağlan/Test pasif ve "Bu host'a bağlanmak ya da test etmek için dosyayı kaydedin" notu var.
+- [ ] Kaydedilmemiş düzenleme varken config'ten bir host'u terminalden silin: o host artık menü çubuğu listesinde ve ⌥⌘S panelinde yok; "Dosya dışarıdan değişti" bandı görünüyor.

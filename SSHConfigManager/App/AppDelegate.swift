@@ -13,6 +13,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var panelController: QuickConnectPanelController?
     private var observers: [any NSObjectProtocol] = []
 
+    private var launchedAsLoginItem = false
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        launchedAsLoginItem = !TestEnvironment.isRunningTests && LaunchContext.currentLaunchIsLoginItem()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !TestEnvironment.isRunningTests else { return }
         panelController = QuickConnectPanelController(
@@ -38,6 +44,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 NSApp.setActivationPolicy(.regular)
             }
         })
+        if launchedAsLoginItem {
+            // Started at login: stay in the menu bar; the main window opens from there or the Dock.
+            Task { @MainActor in
+                for window in NSApp.windows where window.identifier?.rawValue.hasPrefix("main") == true { window.close() }
+                NSApp.setActivationPolicy(.accessory)
+            }
+        }
     }
 
     /// A normal window that warrants a Dock icon: main-capable, and neither the quick connect

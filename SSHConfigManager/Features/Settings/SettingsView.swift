@@ -69,6 +69,14 @@ struct SettingsView: View {
                 }
                 Toggle(String(localized: "settings.launchAtLogin"), isOn: Binding(get: { loginItem.isOn }, set: { loginItem.set($0) }))
                 KeyboardShortcuts.Recorder(String(localized: "settings.shortcut"), name: .quickConnect)
+                if loginItem.needsApproval {
+                    Text(String(localized: "settings.launchAtLogin.needsApproval")).font(.footnote).foregroundStyle(.secondary)
+                    Button(String(localized: "settings.launchAtLogin.openSettings")) {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                }
                 if let message = loginItem.errorMessage {
                     Text(message).font(.footnote).foregroundStyle(.red)
                 }
@@ -97,6 +105,8 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear { loginItem.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in loginItem.refresh() }
         .frame(width: 520)
         .fileImporter(
             isPresented: $importing,
