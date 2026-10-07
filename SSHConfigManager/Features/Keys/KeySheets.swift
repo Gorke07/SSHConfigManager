@@ -56,6 +56,7 @@ struct NewKeySheet: View {
             comment = keys.defaultComment
         }
         .onChange(of: type) { fileName = keys.suggestedFileName(for: type) }
+        .onDisappear { keys.errorMessage = nil }
     }
 
     private func finish() {
@@ -89,6 +90,7 @@ struct AddToAgentSheet: View {
         .formStyle(.grouped)
         .frame(width: 420)
         .onAppear { keys.errorMessage = nil }
+        .onDisappear { keys.errorMessage = nil }
     }
 
     private func finish() {
@@ -132,6 +134,7 @@ struct ChangePassphraseSheet: View {
         .formStyle(.grouped)
         .frame(width: 420)
         .onAppear { keys.errorMessage = nil }
+        .onDisappear { keys.errorMessage = nil }
     }
 
     private func finish() {
@@ -146,13 +149,24 @@ struct UploadKeySheet: View {
     let app: AppModel
     let row: KeyRow
     let close: () -> Void
-    @State private var alias = ""
+    @State private var alias: String
+
+    init(app: AppModel, row: KeyRow, close: @escaping () -> Void) {
+        self.app = app
+        self.row = row
+        self.close = close
+        _alias = State(initialValue: app.connectableAliases.first ?? "")
+    }
 
     var body: some View {
         Form {
             Text(verbatim: row.displayPath).font(.headline)
-            Picker(String(localized: "keys.form.host"), selection: $alias) {
-                ForEach(app.connectableAliases, id: \.self) { Text(verbatim: $0).tag($0) }
+            if app.connectableAliases.isEmpty {
+                Text(String(localized: "keys.upload.noHosts")).font(.footnote).foregroundStyle(.secondary)
+            } else {
+                Picker(String(localized: "keys.form.host"), selection: $alias) {
+                    ForEach(app.connectableAliases, id: \.self) { Text(verbatim: $0).tag($0) }
+                }
             }
             Text(String(localized: "keys.form.uploadNote")).font(.footnote).foregroundStyle(.secondary)
             if row.key.publicURL == nil {
@@ -172,6 +186,6 @@ struct UploadKeySheet: View {
         }
         .formStyle(.grouped)
         .frame(width: 420)
-        .onAppear { alias = app.connectableAliases.first ?? "" }
+        .onDisappear { app.keys.errorMessage = nil }
     }
 }

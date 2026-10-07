@@ -491,6 +491,13 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Anahtarlar" } }
       }
     },
+    "keys.upload.noHosts" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save a host in the config file first." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Önce config dosyasına bir host kaydedin." } }
+      }
+    },
     "keys.upload.noPublicKey" : {
       "extractionState" : "manual",
       "localizations" : {
