@@ -266,7 +266,7 @@ Yapı olarak `NavigationSplitView` kullanılır. Sol kenar çubuğunda arama ala
 
 ### 6.4 Bağlantı testi
 
-- `ConnectionTester` şu komutu çalıştırır: `ssh [-F] -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=yes -- <alias> exit`.
+- `ConnectionTester` şu komutu çalıştırır: `ssh [-F] -T -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=yes -o ControlPath=none -- <alias> exit`. `-T` stdin terminal olmadığında ssh'in stderr'e yazdığı "Pseudo-terminal will not be allocated" uyarısını engeller; `ControlPath=none` mevcut bir multiplex bağlantısının testi yanıltmasını önler.
 - Toplam süre sınırı 10 saniyedir.
 - **Sınıflandırma:**
 
@@ -287,7 +287,7 @@ Yapı olarak `NavigationSplitView` kullanılır. Sol kenar çubuğunda arama ala
 
 - **Diller:** İngilizce kaynak dil ve varsayılan; Türkçe ikinci dil. Bu dokümandaki arayüz metinleri Türkçe çevirilerdir; kodda kaynak metinler İngilizce yazılır.
 - **Altyapı:** Xcode String Catalog (`Localizable.xcstrings`). SwiftUI `Text("…")` / `LocalizedStringKey` ve SwiftUI dışındaki kodda `String(localized:)` kullanılır. Kullanıcıya görünen hiçbir metin kodda sabit (çevrilemez) string olarak bırakılmaz.
-- **`SSHConfigKit` paketi:** Paketin kendi `Localizable.xcstrings` dosyası olur (`defaultLocalization: "en"`), kullanıcıya dönen hata ve sınıflandırma metinleri `String(localized:bundle: .module)` ile çevrilir.
+- **`SSHConfigKit` paketi:** Pakette kullanıcıya görünen metin yoktur. Hatalar ve sonuçlar tipli değerler olarak döner (`ConnectionStatus`, `DraftIssue`, `ConfigStoreError` …); bunların çevirisi uygulama katmanındaki String Catalog'da yapılır. Böylece paket `swift test` ile, kaynak derleme gerektirmeden test edilir.
 - **Dil seçimi:** Sistem dili takip edilir. Sistem dili Türkçe değilse uygulama İngilizce açılır. Uygulama içinde ayrı bir dil seçici yoktur. Kullanıcı macOS'un uygulama başına dil ayarını kullanabilir (Sistem Ayarları → Genel → Dil ve Bölge → Uygulamalar); Ayarlar ekranında bu ekrana bir kısayol bulunur.
 - **Çoğul ifadeler:** "4 host", "3 kayıt seçili" gibi metinler String Catalog'un çoğul varyantlarıyla yazılır.
 - **Tarih ve sayılar:** Yedek tarihleri ve sayılar `FormatStyle` ile kullanıcının locale'ine göre biçimlendirilir. Yedek **dosya adlarındaki** zaman damgası locale'den bağımsızdır (`YYYYMMDD-HHMMSS`).
@@ -375,7 +375,7 @@ Host formundaki `IdentityFile` → "Seç…" butonu önce bilinen anahtarların 
 
 ### 9.1 Komut
 
-`SSHCommandBuilder` şu komutu üretir: `ssh [-F '<config>'] -- '<alias>'`. Tüm değerler tek tırnakla korunur (`'` karakteri `'\''` olarak kaçırılır). Komut metni hiçbir durumda kullanıcı girdisinin olduğu gibi birleştirilmesiyle oluşturulmaz.
+`SSHCommandBuilder` şu komutu üretir: `ssh [-F '<config>'] -- '<alias>'`. Yalnızca güvenli karakterlerden (`A–Z a–z 0–9 _ @ % + = : , . / -`) oluşmayan her değer tek tırnakla korunur (`'` karakteri `'\''` olarak kaçırılır); alias her zaman `--` sonrasında yer aldığı için `-` ile başlayan bir alias seçenek olarak yorumlanamaz. Komut metni hiçbir durumda kullanıcı girdisinin olduğu gibi birleştirilmesiyle oluşturulmaz.
 
 ### 9.2 Başlatıcılar
 
@@ -396,6 +396,8 @@ Host formundaki `IdentityFile` → "Seç…" butonu önce bilinen anahtarların 
 | Durum | Davranış |
 |---|---|
 | Anlaşılmayan config veya known_hosts satırı | Parser hata vermez. Satır korunur, UI'da ⚠ ile gösterilir. |
+| Dosya UTF-8 BOM ile başlıyor | OpenSSH böyle bir dosyayı okuyamaz. BOM sessizce silinmez; ilk satır ⚠ ile gösterilir ve uyarı bandında "BOM'u kaldır" eylemi sunulur. Kaldırılana kadar `ssh -G` doğrulaması kaydı engeller. |
+| Dosya UTF-8 değil | Dosya salt okunur açılır, hiçbir zaman yeniden yazılmaz; uyarı bandında açıklama gösterilir. |
 | Dosya yok veya okunamıyor | Uyarı bandı ve eylemler: "Oluştur", "Başka dosya seç", "İzinleri göster". |
 | `ssh -G` doğrulaması başarısız | Diff ekranında stderr gösterilir, Kaydet pasif olur. |
 | Kaydederken çakışma | Seçenekler: "Diskteki sürümü yükle (değişikliklerim gider)", "Üzerine yaz", "Farkı göster". |
