@@ -397,4 +397,36 @@ struct ConfigStoreTests {
         }
         #expect(store.document.hosts.first?.alias == "z")
     }
+
+    @Test func externalChangeWithLocalEditsRefreshesWhatSshReads() async throws {
+        let tmp = try TempDir()
+        try tmp.file("config", "Host a\n  User u\nHost gone\n  User x\n")
+        let store = makeStore(tmp)
+        var notified = 0
+        store.onDiskStateChange = { notified += 1 }
+        try addPort(store)
+        try tmp.file("config", "Host a\n  User u\nHost added\n  User y\n")
+
+        store.fileDidChange()
+
+        #expect(store.externalChangePending)
+        #expect(store.savedDocument.hosts.map(\.alias) == ["a", "added"])
+        #expect(notified == 1)
+        // The edit and the conflict guard are untouched.
+        #expect(store.document.hosts.map(\.alias) == ["a", "gone"])
+        #expect(store.diskText == "Host a\n  User u\nHost gone\n  User x\n")
+        await #expect(throws: ConfigStoreError.conflict) { try await store.save() }
+        #expect(try tmp.read("config") == "Host a\n  User u\nHost added\n  User y\n")
+    }
+
+    @Test func externalChangeToInvalidUTF8KeepsTheOldSavedView() throws {
+        let tmp = try TempDir()
+        try tmp.file("config", "Host a\n")
+        let store = makeStore(tmp)
+        try addPort(store)
+        try Data([0xFF, 0xFE]).write(to: tmp.url.appending(path: "config"))
+        store.fileDidChange()
+        #expect(store.externalChangePending)
+        #expect(store.savedDocument.hosts.map(\.alias) == ["a"])
+    }
 }

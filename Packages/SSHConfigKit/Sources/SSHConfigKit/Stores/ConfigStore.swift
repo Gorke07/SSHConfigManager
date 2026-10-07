@@ -201,9 +201,20 @@ public final class ConfigStore {
         guard current != diskFingerprint else { return }
         if hasUnsavedChanges {
             externalChangePending = true
+            refreshSavedView()
         } else {
             load()
         }
+    }
+
+    /// The file changed under unsaved edits: keep `diskText` and the fingerprint (so Save still
+    /// detects the conflict) but show what ssh now reads, so Connect/Test never offer removed hosts.
+    private func refreshSavedView() {
+        guard let data = try? Data(contentsOf: fileURL),
+              let text = String(validating: data, as: UTF8.self) else { return }
+        savedDocument = ConfigDocument(parsing: text)
+        savedIncludedHosts = includeResolver.includedHosts(of: savedDocument, rootFile: fileURL)
+        onDiskStateChange?()
     }
 
     private func validate(_ text: String, probeAlias: String?) async -> ValidationOutcome {
