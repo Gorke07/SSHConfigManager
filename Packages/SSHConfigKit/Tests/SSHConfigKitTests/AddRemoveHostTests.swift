@@ -13,8 +13,10 @@ struct AddRemoveHostTests {
 
     @Test func addInsertsBeforeMatchAll() {
         var doc = ConfigDocument(parsing: "Host a\n  User u\nMatch all\n  User d\n")
-        doc.addHost(draft)
+        let header = doc.addHost(draft)
         #expect(doc.render() == "Host a\n  User u\n\nHost new\n  HostName n.example\n\nMatch all\n  User d\n")
+        #expect(header == 3)
+        #expect(doc.hostEntry(at: header)?.alias == "new")
     }
 
     @Test func addAppendsWhenThereIsNoCatchAll() {
@@ -58,6 +60,12 @@ struct AddRemoveHostTests {
         var doc = ConfigDocument(parsing: "Host a\n  X 1\n")
         try doc.removeHost(at: 0)
         #expect(doc.render() == "")
+    }
+
+    @Test func footerCommentSurvivesRemovingLastHost() throws {
+        var doc = ConfigDocument(parsing: "Host a\n  X 1\n\nHost b\n  Y 2\n\n# footer\n")
+        try doc.removeHost(at: 3)
+        #expect(doc.render() == "Host a\n  X 1\n\n# footer\n")
     }
 
     @Test func duplicateInsertsCopyAfterBlock() throws {
