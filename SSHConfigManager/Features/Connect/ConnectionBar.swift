@@ -31,10 +31,16 @@ struct ConnectionStatusBadge: View {
 struct ConnectionBar: View {
     let model: AppModel
     let alias: String?
+    var showsSaveHint = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             buttons
+            if showsSaveHint {
+                Text(String(localized: "connect.saveToConnect"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             if alias != nil && model.store.hasUnsavedChanges {
                 Text(String(localized: "connect.usesSavedFile"))
                     .font(.caption)

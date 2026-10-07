@@ -161,6 +161,14 @@ final class AppModel {
     /// Every connectable host of the saved file once (case-insensitive, like ssh), file hosts first.
     var savedConnectableHosts: [SavedHost] { savedHosts.hosts }
 
+    /// An editable, non-pattern host that is not in the saved file yet (new or renamed):
+    /// Connect and Test are off until it is saved.
+    func isUnsavedHost(_ item: SidebarItem) -> Bool {
+        guard case .host = item,
+              let entry = SidebarBuilder.hostEntry(for: item, in: store.document), !entry.isPattern else { return false }
+        return savedAlias(entry.alias) == nil
+    }
+
     /// `alias` as written in the saved file, or nil when the saved file has no such (non-pattern) host.
     func savedAlias(_ alias: String) -> String? {
         savedHosts.aliases[alias.lowercased()]

@@ -331,4 +331,14 @@ struct AppModelTests {
         #expect(launcher.requests.isEmpty)
         #expect(model.errorMessage == String(localized: "connect.notSaved"))
     }
+
+    @Test func unsavedHostsAreRecognizedButPatternsAndSavedHostsAreNot() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host saved\n  HostName 10.0.0.1\nHost *\n  User me\n")
+        let added = try HostCommands.addHost(to: model.store)
+        #expect(model.isUnsavedHost(added))
+        #expect(!model.isUnsavedHost(.host(alias: "saved", occurrence: 0)))
+        #expect(!model.isUnsavedHost(.host(alias: "*", occurrence: 0)))
+        #expect(!model.isUnsavedHost(.match(index: 0)))
+    }
 }

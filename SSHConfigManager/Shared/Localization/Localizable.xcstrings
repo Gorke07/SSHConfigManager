@@ -1674,6 +1674,13 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Test ediliyor…" } }
       }
     },
+    "connect.saveToConnect" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save the file to connect to or test this host." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu host'a bağlanmak ya da test etmek için dosyayı kaydedin." } }
+      }
+    },
     "connect.usesSavedFile" : {
       "extractionState" : "manual",
       "localizations" : {

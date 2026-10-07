@@ -17,7 +17,7 @@ struct DetailView: View {
         switch item {
         case .host:
             VStack(spacing: 0) {
-                ConnectionBar(model: model, alias: model.connectableAlias(for: item))
+                ConnectionBar(model: model, alias: model.connectableAlias(for: item), showsSaveHint: model.isUnsavedHost(item))
                 Divider()
                 HostEditorContainer(model: model)
                     .id(model.editorToken)
