@@ -2,15 +2,14 @@ import SwiftUI
 
 @main
 struct SSHConfigManagerApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model: AppModel = SSHConfigManagerApp.makeModel()
 
     var body: some Scene {
         Window(String(localized: "app.title"), id: "main") {
-            ContentUnavailableView(
-                String(localized: "detail.empty.title"),
-                systemImage: "server.rack",
-                description: Text(String(localized: "detail.empty.message")))
-                .frame(minWidth: 720, minHeight: 440)
+            MainWindow(model: model)
+                .frame(minWidth: 760, minHeight: 480)
+                .onAppear { appDelegate.model = model }
         }
     }
 
