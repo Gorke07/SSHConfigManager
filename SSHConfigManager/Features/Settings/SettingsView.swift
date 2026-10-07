@@ -6,7 +6,9 @@ struct SettingsView: View {
     @Bindable var model: AppModel
     @Environment(\.openWindow) private var openWindow
     private enum ImportTarget { case config, knownHosts }
-    @State private var importTarget: ImportTarget?
+    @State private var importing = false
+    @State private var lastImportTarget: ImportTarget?
+    @State private var knownHostsInvalid = false
     @State private var pendingPath: String?
     @State private var invalidMessage: String?
     @State private var loginItem = LoginItemToggle(item: MainAppLoginItem())
@@ -18,7 +20,7 @@ struct SettingsView: View {
                     Text(verbatim: model.settings.configPath).textSelection(.enabled)
                 }
                 HStack {
-                    Button(String(localized: "action.choose")) { importTarget = .config }
+                    Button(String(localized: "action.choose")) { lastImportTarget = .config; importing = true }
                     Button(String(localized: "settings.configFile.useDefault")) { requestSwitch(AppSettings.defaultConfigPath) }
                         .disabled(model.commandBuilder.usesDefaultConfig)
                 }
@@ -37,11 +39,14 @@ struct SettingsView: View {
                     Text(verbatim: model.settings.knownHostsPath).textSelection(.enabled)
                 }
                 HStack {
-                    Button(String(localized: "action.choose")) { importTarget = .knownHosts }
+                    Button(String(localized: "action.choose")) { lastImportTarget = .knownHosts; importing = true }
                     Button(String(localized: "settings.knownHostsFile.useDefault")) {
-                        model.switchKnownHosts(to: AppSettings.defaultKnownHostsPath)
+                        switchKnownHosts(AppSettings.defaultKnownHostsPath)
                     }
                     .disabled(model.settings.knownHostsPath == AppSettings.defaultKnownHostsPath)
+                }
+                if knownHostsInvalid {
+                    Text(String(localized: "settings.knownHostsFile.invalid")).font(.footnote).foregroundStyle(.red)
                 }
                 if model.settings.knownHostsPath != AppSettings.defaultKnownHostsPath {
                     Text(String(localized: "settings.knownHostsFile.customNote"))
@@ -94,14 +99,14 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .frame(width: 520)
         .fileImporter(
-            isPresented: Binding(get: { importTarget != nil }, set: { if !$0 { importTarget = nil } }),
+            isPresented: $importing,
             allowedContentTypes: [.data]
         ) { result in
-            guard case .success(let url) = result, let target = importTarget else { return }
+            guard case .success(let url) = result, let target = lastImportTarget else { return }
             let path = model.settings.displayPath(for: url)
             switch target {
             case .config: requestSwitch(path)
-            case .knownHosts: model.switchKnownHosts(to: path)
+            case .knownHosts: switchKnownHosts(path)
             }
         }
         .confirmationDialog(
@@ -113,6 +118,10 @@ struct SettingsView: View {
                 _ = model.switchConfig(to: path, discardingUnsavedChanges: true)
             }
         }
+    }
+
+    private func switchKnownHosts(_ path: String) {
+        knownHostsInvalid = !model.switchKnownHosts(to: path)
     }
 
     private func requestSwitch(_ path: String) {

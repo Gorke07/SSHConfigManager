@@ -63,6 +63,11 @@ struct BackupsView: View {
         .onChange(of: ObjectIdentifier(backups.model.store)) { backups.refresh() }
         .onChange(of: backups.model.store.diskText) { backups.refresh() }
         .onChange(of: backups.model.knownHosts.revision) { backups.refresh() }
+        .onChange(of: ObjectIdentifier(backups.model.knownHosts)) {
+            confirmingKnownHostsRestore = nil
+            if backups.fileKind == .knownHosts { backups.selectedURL = nil }
+            backups.refresh()
+        }
         .confirmationDialog(
             String(localized: "backups.restore.knownHosts.title"),
             isPresented: Binding(get: { confirmingKnownHostsRestore != nil }, set: { if !$0 { confirmingKnownHostsRestore = nil } }),

@@ -925,6 +925,13 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Terminalde doğrudan “ssh host” yazarsanız bu dosya kullanılmaz; uygulama -F ile bağlanır." } }
       }
     },
+    "settings.knownHostsFile.invalid" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This path cannot be used. Choose an absolute path." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu yol kullanılamaz. Mutlak bir yol seçin." } }
+      }
+    },
     "settings.configFile.invalid" : {
       "extractionState" : "manual",
       "localizations" : {

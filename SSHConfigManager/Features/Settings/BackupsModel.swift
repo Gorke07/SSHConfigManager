@@ -39,7 +39,11 @@ final class BackupsModel {
 
     var selected: Backup? { backups.first { $0.url == selectedURL } }
 
+    /// The backup kind the current list was built for.
+    @ObservationIgnored private var listedKind: String?
+
     func refresh() {
+        listedKind = backupKind
         do {
             backups = try model.backupManager.list(kind: backupKind)
             errorMessage = nil
@@ -65,6 +69,11 @@ final class BackupsModel {
             try model.store.apply { $0 = ConfigDocument(parsing: contents) }
             model.resetEditor()
         case .knownHosts:
+            // The known_hosts file was switched since the list was built: this backup belongs to another file.
+            guard listedKind == model.knownHosts.backupKind else {
+                refresh()
+                throw KnownHostsStoreError.staleSelection
+            }
             try model.knownHosts.restore(text: contents)
             refresh()
         }

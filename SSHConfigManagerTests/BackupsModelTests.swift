@@ -102,4 +102,21 @@ struct BackupsModelTests {
         backups.refresh()
         #expect(backups.backups.count == 2)   // restoring backed up the current file first
     }
+
+    @Test func aKnownHostsBackupIsNotRestoredIntoASwitchedFile() throws {
+        let tmp = try TempDir()
+        let ed = KnownHostsModelTests.ed
+        _ = try tmp.file(".ssh/known_hosts", "a.example.com ssh-ed25519 \(ed)\nb.example.com ssh-ed25519 \(ed)\n")
+        let model = makeTestModel(tmp, config: "Host x\n")
+        try model.knownHosts.remove(lines: [0], ifRevision: model.knownHosts.revision)
+        let backups = BackupsModel(model: model)
+        backups.fileKind = .knownHosts
+        let backup = try #require(backups.backups.first)
+
+        let otherText = "c.example.com ssh-ed25519 \(ed)\n"
+        let other = try tmp.file("other_known_hosts", otherText)
+        #expect(model.switchKnownHosts(to: other.path))
+        #expect(throws: KnownHostsStoreError.staleSelection) { try backups.restore(backup) }
+        #expect(try String(contentsOf: other, encoding: .utf8) == otherText)
+    }
 }
