@@ -1,5 +1,6 @@
 import Foundation
 import SSHConfigKit
+@testable import SSH_Config_Manager
 
 /// A unique temporary directory that is removed when the object is released.
 final class TempDir {
@@ -38,5 +39,21 @@ struct FixedRunner: ProcessRunning {
 
     func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
         result
+    }
+}
+
+/// An AppModel wired to a temporary home, temporary backups and fake ssh validation.
+@MainActor
+func makeTestModel(_ tmp: TempDir, config: String? = nil, runner: FixedRunner = .valid) -> AppModel {
+    if let config { _ = try? tmp.file(".ssh/config", config) }
+    let defaults = UserDefaults(suiteName: "SSHConfigManagerTests-\(UUID().uuidString)")!
+    let settings = AppSettings(defaults: defaults, homeDirectory: tmp.url)
+    return AppModel(settings: settings, backupRoot: tmp.url.appending(path: "Backups")) { url, backups in
+        ConfigStore(
+            fileURL: url,
+            writer: SafeFileWriter(backups: backups),
+            validator: ConfigValidator(runner: runner),
+            includeResolver: IncludeResolver(homeDirectory: tmp.url),
+            watchForChanges: false)
     }
 }

@@ -56,7 +56,6 @@ targets:
       - path: SSHConfigManagerTests
     dependencies:
       - target: SSHConfigManager
-      - package: SSHConfigKit
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

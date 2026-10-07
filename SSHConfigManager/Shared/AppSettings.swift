@@ -1,0 +1,58 @@
+import Foundation
+import Observation
+
+@MainActor
+@Observable
+final class AppSettings {
+    static let defaultConfigPath = "~/.ssh/config"
+    static let defaultBackupCount = 10
+    static let backupCountRange = 1...50
+
+    private enum Keys {
+        static let configPath = "configPath"
+        static let backupCount = "backupCount"
+    }
+
+    @ObservationIgnored private let defaults: UserDefaults
+    let homeDirectory: URL
+    private(set) var configPath: String
+    private(set) var backupCount: Int
+
+    init(defaults: UserDefaults = .standard, homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser) {
+        self.defaults = defaults
+        self.homeDirectory = homeDirectory
+        configPath = defaults.string(forKey: Keys.configPath) ?? Self.defaultConfigPath
+        backupCount = Self.clamp(defaults.object(forKey: Keys.backupCount) as? Int ?? Self.defaultBackupCount)
+    }
+
+    var configURL: URL { Self.expand(configPath, home: homeDirectory) }
+
+    func setConfigPath(_ path: String) {
+        configPath = path
+        defaults.set(path, forKey: Keys.configPath)
+    }
+
+    func setBackupCount(_ count: Int) {
+        backupCount = Self.clamp(count)
+        defaults.set(backupCount, forKey: Keys.backupCount)
+    }
+
+    /// Shows paths under the home directory with a leading "~".
+    func displayPath(for url: URL) -> String {
+        let path = url.standardizedFileURL.path
+        let home = homeDirectory.standardizedFileURL.path
+        if path == home { return "~" }
+        if path.hasPrefix(home + "/") { return "~" + path.dropFirst(home.count) }
+        return path
+    }
+
+    static func expand(_ path: String, home: URL) -> URL {
+        if path == "~" { return home }
+        if path.hasPrefix("~/") { return home.appending(path: String(path.dropFirst(2))) }
+        return URL(filePath: path)
+    }
+
+    private static func clamp(_ value: Int) -> Int {
+        min(max(value, backupCountRange.lowerBound), backupCountRange.upperBound)
+    }
+}
