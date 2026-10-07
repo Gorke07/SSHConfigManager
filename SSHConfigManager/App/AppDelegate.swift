@@ -21,28 +21,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         KeyboardShortcuts.onKeyUp(for: .quickConnect) { [weak self] in
             MainActor.assumeIsolated { self?.panelController?.toggle() }
         }
-        // The Dock icon is shown only while the main window is open (spec §6.2).
+        // The Dock icon is shown only while an app window (main, Settings, Backups) is open (spec §6.1).
         observers.append(NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { note in
             nonisolated(unsafe) let object = note.object  // delivered on the main queue
             MainActor.assumeIsolated {
-                guard Self.isMainWindow(object) else { return }
-                NSApp.setActivationPolicy(.accessory)
+                guard let closing = object as? NSWindow, Self.isAppWindow(closing) else { return }
+                let othersOpen = NSApp.windows.contains { $0 !== closing && ($0.isVisible || $0.isMiniaturized) && Self.isAppWindow($0) }
+                if !othersOpen { NSApp.setActivationPolicy(.accessory) }
             }
         })
         observers.append(NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main) { note in
             nonisolated(unsafe) let object = note.object  // delivered on the main queue
             MainActor.assumeIsolated {
-                guard Self.isMainWindow(object) else { return }
+                guard let window = object as? NSWindow, Self.isAppWindow(window) else { return }
                 NSApp.setActivationPolicy(.regular)
             }
         })
     }
 
-    /// Closing the window keeps the app running (the menu bar item stays).
-    private static func isMainWindow(_ object: Any?) -> Bool {
-        (object as? NSWindow)?.identifier?.rawValue.hasPrefix("main") ?? false
+    /// A normal window that warrants a Dock icon: main-capable, and neither the quick connect
+    /// panel nor the menu bar extra's window (both are panels).
+    private static func isAppWindow(_ window: NSWindow) -> Bool {
+        window.canBecomeMain && !(window is NSPanel)
+            && !String(describing: type(of: window)).contains("MenuBarExtra")
     }
 
+    /// Closing the window keeps the app running (the menu bar item stays).
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
     }

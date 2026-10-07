@@ -46,3 +46,9 @@ Her sürüm öncesi temiz bir test kullanıcısında veya `~/.ssh/config` yedeğ
 - [ ] Menüden "Çık" kaydedilmemiş değişiklik varken kaydetme uyarısını gösterir.
 - [ ] Herhangi bir uygulamadayken ⌥⌘S → ekranın ortasında hızlı bağlanma paneli, arama kutusu odaklı; ↩ bağlar ve panel kapanır; esc ve başka yere tıklamak paneli kapatır; ⌥⌘S ikinci kez basınca kapanır.
 - [ ] Ayarlar'da kısayol değiştirilir (ör. ⌃⌥Space) → yeni kısayol çalışır, eskisi çalışmaz; kaydedici temizlenirse kısayol devre dışı kalır.
+
+### Plan 2b — Son inceleme düzeltmeleri
+
+- [ ] Ayarlar açıkken ana pencere kapatılır → Dock simgesi kalır; Ayarlar da kapatılınca kaybolur.
+- [ ] Ana pencere kapalıyken menü çubuğundan Ayarlar açılır → Dock simgesi görünür.
+- [ ] Menü çubuğu listesi iki kez açılır → ikincisinde arama sıfırlanmış ve arama kutusu odaklı.
