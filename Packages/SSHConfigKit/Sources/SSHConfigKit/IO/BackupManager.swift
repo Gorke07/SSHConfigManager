@@ -4,6 +4,7 @@ public struct Backup: Equatable, Sendable {
     public let url: URL
     public let date: Date
     public let originalName: String
+    let sequence: Int
 }
 
 /// Keeps timestamped copies under `<root>/<kind>/yyyyMMdd-HHmmss[_n]-<name>`.
@@ -50,7 +51,10 @@ public struct BackupManager: Sendable {
         guard FileManager.default.fileExists(atPath: directory.path) else { return [] }
         return try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
             .compactMap(Self.parse)
-            .sorted { $0.url.lastPathComponent > $1.url.lastPathComponent }
+            .sorted { a, b in
+                if a.date != b.date { return a.date > b.date }
+                return a.sequence > b.sequence
+            }
     }
 
     public func prune(kind: String) throws {
@@ -71,15 +75,26 @@ public struct BackupManager: Sendable {
         let name = url.lastPathComponent
         guard name.count > 16, let date = makeFormatter().date(from: String(name.prefix(15))) else { return nil }
         var rest = name.dropFirst(15)
-        if rest.hasPrefix("_") { rest = rest.drop(while: { $0 != "-" }) }
+        var sequence = 1
+        if rest.hasPrefix("_") {
+            let suffix = rest.dropFirst()
+            if let dashIndex = suffix.firstIndex(of: "-") {
+                let counterStr = String(suffix[..<dashIndex])
+                guard let counter = Int(counterStr), counter > 0 else { return nil }
+                sequence = counter
+                rest = suffix[dashIndex...]
+            } else {
+                return nil
+            }
+        }
         guard rest.hasPrefix("-"), rest.count > 1 else { return nil }
-        return Backup(url: url, date: date, originalName: String(rest.dropFirst()))
+        return Backup(url: url, date: date, originalName: String(rest.dropFirst()), sequence: sequence)
     }
 
     static func makeFormatter() -> DateFormatter {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .current
+        formatter.timeZone = TimeZone(identifier: "UTC")!
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         return formatter
     }

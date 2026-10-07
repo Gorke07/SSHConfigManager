@@ -50,8 +50,25 @@ struct BackupManagerTests {
         let second = try manager.backup(fileAt: source, kind: "config")
         #expect(first != second)
         let list = try manager.list(kind: "config")
-        #expect(!list.isEmpty)
-        #expect(list.first?.url.lastPathComponent == second.lastPathComponent)
+        #expect(list.count == 2)
+        #expect(list.first?.url.lastPathComponent.contains("_2-") == true)
+        #expect(list.last?.url.lastPathComponent.contains("_") == false)
+        #expect(FileManager.default.fileExists(atPath: first.path))
+        #expect(FileManager.default.fileExists(atPath: second.path))
+    }
+
+    @Test func manyBackupsInSameSecondHandleHighCounters() throws {
+        let tmp = try TempDir()
+        let source = try tmp.file("config", "x")
+        let fixed = start
+        let manager = BackupManager(rootDirectory: tmp.url.appending(path: "Backups"), keep: 20, now: { fixed })
+        for _ in 0..<11 {
+            try manager.backup(fileAt: source, kind: "config")
+        }
+        let list = try manager.list(kind: "config")
+        #expect(list.count == 11)
+        #expect(list.first?.url.lastPathComponent.contains("_11-") == true)
+        #expect(list.last?.url.lastPathComponent.contains("_") == false)
     }
 
     @Test func pruneKeepsNewestN() throws {
@@ -66,6 +83,24 @@ struct BackupManagerTests {
         let list = try manager.list(kind: "config")
         #expect(list.count == 3)
         #expect(list.first?.date == start.addingTimeInterval(4))
+    }
+
+    @Test func pruneKeepsNewestAcrossHighCounters() throws {
+        let tmp = try TempDir()
+        let source = try tmp.file("config", "x")
+        let fixed = start
+        let manager = BackupManager(rootDirectory: tmp.url.appending(path: "Backups"), keep: 3, now: { fixed })
+        var backupURLs: [URL] = []
+        for _ in 0..<12 {
+            let url = try manager.backup(fileAt: source, kind: "config")
+            backupURLs.append(url)
+        }
+        let list = try manager.list(kind: "config")
+        #expect(list.count == 3)
+        // Verify that the backup files were actually created (at least the last 3)
+        #expect(FileManager.default.fileExists(atPath: backupURLs[9].path))
+        #expect(FileManager.default.fileExists(atPath: backupURLs[10].path))
+        #expect(FileManager.default.fileExists(atPath: backupURLs[11].path))
     }
 
     @Test func symlinkSourceBacksUpTargetContent() throws {
