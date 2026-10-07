@@ -1,5 +1,15 @@
 public enum ConfigEditError: Error, Equatable, Sendable {
     case hostNotFound(Int)
+    case controlCharacter
+}
+
+// MARK: - Helpers
+
+private func containsControlCharacter(_ s: String) -> Bool {
+    s.unicodeScalars.contains { scalar in
+        let value = scalar.value
+        return (value >= 0x00 && value <= 0x1F && value != 0x09) || value == 0x7F
+    }
 }
 
 extension ConfigDocument {
@@ -22,6 +32,17 @@ extension ConfigDocument {
     /// then by order for remaining directives.
     public mutating func updateHost(at header: Int, to draft: HostDraft) throws {
         guard let entry = hostEntry(at: header) else { throw ConfigEditError.hostNotFound(header) }
+
+        // Check for control characters in patterns and directives
+        for pattern in draft.patterns {
+            if containsControlCharacter(pattern) { throw ConfigEditError.controlCharacter }
+        }
+        for directive in draft.directives {
+            if containsControlCharacter(directive.key) || containsControlCharacter(directive.value) {
+                throw ConfigEditError.controlCharacter
+            }
+        }
+
         let end = blockEnd(after: header)
 
         var replacements: [Int: ConfigLine] = [:]
@@ -101,7 +122,17 @@ extension ConfigDocument {
     }
 
     @discardableResult
-    public mutating func addHost(_ draft: HostDraft) -> Int {
+    public mutating func addHost(_ draft: HostDraft) throws -> Int {
+        // Check for control characters in patterns and directives
+        for pattern in draft.patterns {
+            if containsControlCharacter(pattern) { throw ConfigEditError.controlCharacter }
+        }
+        for directive in draft.directives {
+            if containsControlCharacter(directive.key) || containsControlCharacter(directive.value) {
+                throw ConfigEditError.controlCharacter
+            }
+        }
+
         let indent = directiveIndent
         let blank = ConfigLine(raw: lineEndingSuffix)
         var hostLines = [ConfigLine(raw: "Host " + draft.patterns.joined(separator: " ") + lineEndingSuffix)]
@@ -142,6 +173,9 @@ extension ConfigDocument {
         guard hostEntry(at: header) != nil, let parts = lines[header].parts else {
             throw ConfigEditError.hostNotFound(header)
         }
+
+        if containsControlCharacter(newAlias) { throw ConfigEditError.controlCharacter }
+
         var end = ownedEnd(of: header)
         while end - 1 > header && lines[end - 1].kind == .blank { end -= 1 }
 

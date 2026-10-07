@@ -1,4 +1,5 @@
 public enum DraftIssue: Equatable, Sendable {
+    case controlCharacter(String)
     case emptyAlias
     case aliasHasWhitespace
     case duplicateAlias(String)
@@ -15,6 +16,15 @@ public enum DraftIssue: Equatable, Sendable {
     }
 }
 
+// MARK: - Helpers
+
+private func containsControlCharacter(_ s: String) -> Bool {
+    s.unicodeScalars.contains { scalar in
+        let value = scalar.value
+        return (value >= 0x00 && value <= 0x1F && value != 0x09) || value == 0x7F
+    }
+}
+
 public struct HostDraftValidator: Sendable {
     private let fileExists: @Sendable (String) -> Bool
 
@@ -26,6 +36,15 @@ public struct HostDraftValidator: Sendable {
     public func issues(for draft: HostDraft, in document: ConfigDocument, editing header: Int?) -> [DraftIssue] {
         var issues: [DraftIssue] = []
 
+        // Check patterns for control characters FIRST
+        for pattern in draft.patterns {
+            if containsControlCharacter(pattern) {
+                issues.append(.controlCharacter(pattern))
+            }
+        }
+
+        if !issues.isEmpty { return issues }
+
         if draft.patterns.isEmpty || draft.patterns.contains(where: \.isEmpty) {
             issues.append(.emptyAlias)
         } else if draft.patterns.contains(where: { $0.unicodeScalars.contains(where: LineTokenizer.isSpace) }) {
@@ -36,12 +55,28 @@ public struct HostDraftValidator: Sendable {
                 .filter { $0.headerLine != header && !$0.isPattern }
                 .flatMap(\.patterns)
                 .map(\.asciiLowercased))
+
+            // Check for duplicates within the draft itself (case-insensitive)
+            var seenLower = Set<String>()
             for pattern in draft.patterns where !HostEntry(headerLine: 0, patterns: [pattern], directives: []).isPattern {
-                if taken.contains(pattern.asciiLowercased) { issues.append(.duplicateAlias(pattern)) }
+                let lower = pattern.asciiLowercased
+                if seenLower.contains(lower) {
+                    issues.append(.duplicateAlias(pattern))
+                } else if taken.contains(lower) {
+                    issues.append(.duplicateAlias(pattern))
+                } else {
+                    seenLower.insert(lower)
+                }
             }
         }
 
         for directive in draft.directives {
+            // Check directive key for control characters FIRST
+            if containsControlCharacter(directive.key) {
+                issues.append(.controlCharacter(directive.key))
+                continue
+            }
+
             let key = directive.key.asciiLowercased
             let isValidKey = !directive.key.isEmpty && directive.key.unicodeScalars.allSatisfy {
                 (65...90).contains($0.value) || (97...122).contains($0.value) || (48...57).contains($0.value)
@@ -55,8 +90,15 @@ public struct HostDraftValidator: Sendable {
                 continue
             }
             if key == "port" {
-                let isValidPort = Int(directive.value).map { (1...65535).contains($0) } ?? false
+                // Port must be ASCII digits only and in range 1-65535
+                let isValidPort = !directive.value.isEmpty &&
+                    directive.value.unicodeScalars.allSatisfy { (48...57).contains($0.value) } &&
+                    (Int(directive.value).map { (1...65535).contains($0) } ?? false)
                 if !isValidPort { issues.append(.invalidPort(directive.value)) }
+                continue
+            }
+            if containsControlCharacter(directive.value) {
+                issues.append(.controlCharacter(directive.key))
                 continue
             }
             if directive.value.unicodeScalars.allSatisfy(LineTokenizer.isSpace) {

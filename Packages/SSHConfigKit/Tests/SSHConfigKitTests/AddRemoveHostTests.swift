@@ -4,37 +4,37 @@ import Testing
 struct AddRemoveHostTests {
     let draft = HostDraft(patterns: ["new"], directives: [DraftDirective(key: "HostName", value: "n.example")])
 
-    @Test func addInsertsBeforeHostStarWithItsComment() {
+    @Test func addInsertsBeforeHostStarWithItsComment() throws {
         var doc = ConfigDocument(parsing: "Host a\n  User u\n\n# defaults\nHost *\n  User d\n")
-        let header = doc.addHost(draft)
+        let header = try doc.addHost(draft)
         #expect(doc.render() == "Host a\n  User u\n\nHost new\n  HostName n.example\n\n# defaults\nHost *\n  User d\n")
         #expect(doc.hostEntry(at: header)?.alias == "new")
     }
 
-    @Test func addInsertsBeforeMatchAll() {
+    @Test func addInsertsBeforeMatchAll() throws {
         var doc = ConfigDocument(parsing: "Host a\n  User u\nMatch all\n  User d\n")
-        let header = doc.addHost(draft)
+        let header = try doc.addHost(draft)
         #expect(doc.render() == "Host a\n  User u\n\nHost new\n  HostName n.example\n\nMatch all\n  User d\n")
         #expect(header == 3)
         #expect(doc.hostEntry(at: header)?.alias == "new")
     }
 
-    @Test func addAppendsWhenThereIsNoCatchAll() {
+    @Test func addAppendsWhenThereIsNoCatchAll() throws {
         var doc = ConfigDocument(parsing: "Host a\n\tUser u")
-        let header = doc.addHost(draft)
+        let header = try doc.addHost(draft)
         #expect(doc.render() == "Host a\n\tUser u\n\nHost new\n\tHostName n.example\n")
         #expect(header == 3)
     }
 
-    @Test func addToEmptyDocument() {
+    @Test func addToEmptyDocument() throws {
         var doc = ConfigDocument.empty
-        #expect(doc.addHost(draft) == 0)
+        #expect(try doc.addHost(draft) == 0)
         #expect(doc.render() == "Host new\n    HostName n.example\n")
     }
 
-    @Test func addUsesCRLF() {
+    @Test func addUsesCRLF() throws {
         var doc = ConfigDocument(parsing: "Host a\r\n")
-        doc.addHost(draft)
+        try doc.addHost(draft)
         #expect(Array(doc.render().utf8) == Array("Host a\r\n\r\nHost new\r\n    HostName n.example\r\n".utf8))
     }
 
@@ -78,5 +78,17 @@ struct AddRemoveHostTests {
     @Test func removingUnknownHeaderThrows() {
         var doc = ConfigDocument(parsing: "Match all\n")
         #expect(throws: ConfigEditError.hostNotFound(0)) { try doc.removeHost(at: 0) }
+    }
+
+    @Test func addHostThrowsOnControlCharacterInDirectiveValue() {
+        var doc = ConfigDocument.empty
+        let draft = HostDraft(patterns: ["x"], directives: [DraftDirective(key: "User", value: "a\nHost evil")])
+        #expect(throws: ConfigEditError.controlCharacter) { try doc.addHost(draft) }
+        #expect(doc.render() == "")
+    }
+
+    @Test func duplicateHostThrowsOnControlCharacterInAlias() throws {
+        var doc = ConfigDocument(parsing: "Host a\n  User u\n")
+        #expect(throws: ConfigEditError.controlCharacter) { try doc.duplicateHost(at: 0, newAlias: "a\nb") }
     }
 }

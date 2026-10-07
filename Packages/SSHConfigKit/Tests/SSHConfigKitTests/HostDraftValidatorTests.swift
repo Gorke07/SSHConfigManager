@@ -33,10 +33,15 @@ struct HostDraftValidatorTests {
         #expect(issues(HostDraft(patterns: ["*.prod"])).isEmpty)
     }
 
-    @Test(arguments: ["0", "65536", "abc", "22 23", ""])
+    @Test(arguments: ["0", "65536", "abc", "22 23", "", "+22", " 22"])
     func invalidPorts(port: String) {
         let found = issues(HostDraft(patterns: ["n"], directives: [DraftDirective(key: "port", value: port)]))
         #expect(found.contains(.invalidPort(port)))
+    }
+
+    @Test func validPortWithLeadingZeros() {
+        let found = issues(HostDraft(patterns: ["n"], directives: [DraftDirective(key: "port", value: "022")]))
+        #expect(found.isEmpty)
     }
 
     @Test func directiveKeyRules() {
@@ -63,5 +68,25 @@ struct HostDraftValidatorTests {
     @Test func identityFileWithTokensIsNotChecked() {
         let found = issues(HostDraft(patterns: ["n"], directives: [DraftDirective(key: "IdentityFile", value: "~/.ssh/%h")]))
         #expect(found.isEmpty)
+    }
+
+    @Test func controlCharacterInAlias() {
+        let found = issues(HostDraft(patterns: ["a\nb"]))
+        #expect(found == [.controlCharacter("a\nb")])
+    }
+
+    @Test func controlCharacterInDirectiveValue() {
+        let found = issues(HostDraft(patterns: ["n"], directives: [DraftDirective(key: "User", value: "x\nHost evil")]))
+        #expect(found.contains(.controlCharacter("User")))
+    }
+
+    @Test func tabInDirectiveValueIsAllowed() {
+        let found = issues(HostDraft(patterns: ["n"], directives: [DraftDirective(key: "User", value: "x\ty")]))
+        #expect(found.isEmpty)
+    }
+
+    @Test func duplicateAliasesWithinDraft() {
+        let found = issues(HostDraft(patterns: ["a", "A"]))
+        #expect(found == [.duplicateAlias("A")])
     }
 }
