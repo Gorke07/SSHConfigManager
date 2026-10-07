@@ -27,6 +27,7 @@
 - Seçilebilir config dosyası yolu
 - Known Hosts penceresi (görüntüleme, hash'li kayıtlarda arama, silme)
 - Anahtar yönetimi (listeleme, oluşturma, agent'a ekleme, sunucuya yükleme, parola değiştirme, çöp kutusuna taşıma)
+- Çoklu dil desteği: İngilizce (varsayılan, kaynak dil) ve Türkçe (bkz. §6.5)
 
 ### 1.4 Kapsam dışı (v1)
 
@@ -144,7 +145,7 @@ struct ConfigDocument {
 ### 4.2 Parse kuralları
 
 - Anahtar ve değer ayrımı için hem `Key value` hem `Key=value` biçimi kabul edilir; `=` etrafındaki boşluklar da kabul edilir.
-- Anahtar kelimeler büyük/küçük harf duyarsızdır.
+- Anahtar kelimeler büyük/küçük harf duyarsızdır. Karşılaştırma **ASCII büyük/küçük harf dönüşümüyle** ve locale'den bağımsız yapılır. Locale'e duyarlı API'ler (`localizedCaseInsensitiveCompare`, `lowercased(with:)` vb.) kullanılmaz; aksi halde Türkçe locale'de `Include`/`IdentityFile` gibi `I` içeren anahtarlar `ı` ile eşleşip tanınmaz (bkz. §6.5).
 - Çift tırnaklı değerler tanınır. Satır başında `#` varsa satır yorumdur.
 - İlk `Host` veya `Match` satırından önceki direktifler global bölüme aittir.
 - Bir blok, bir sonraki `Host`/`Match` satırına ya da dosya sonuna kadar sürer.
@@ -282,6 +283,19 @@ Yapı olarak `NavigationSplitView` kullanılır. Sol kenar çubuğunda arama ala
 
 - "Tümünü test et" en fazla 4 testi aynı anda çalıştırır. Sonuçlar diske yazılmaz, yalnızca oturum boyunca tutulur.
 
+### 6.5 Dil desteği
+
+- **Diller:** İngilizce kaynak dil ve varsayılan; Türkçe ikinci dil. Bu dokümandaki arayüz metinleri Türkçe çevirilerdir; kodda kaynak metinler İngilizce yazılır.
+- **Altyapı:** Xcode String Catalog (`Localizable.xcstrings`). SwiftUI `Text("…")` / `LocalizedStringKey` ve SwiftUI dışındaki kodda `String(localized:)` kullanılır. Kullanıcıya görünen hiçbir metin kodda sabit (çevrilemez) string olarak bırakılmaz.
+- **`SSHConfigKit` paketi:** Paketin kendi `Localizable.xcstrings` dosyası olur (`defaultLocalization: "en"`), kullanıcıya dönen hata ve sınıflandırma metinleri `String(localized:bundle: .module)` ile çevrilir.
+- **Dil seçimi:** Sistem dili takip edilir. Sistem dili Türkçe değilse uygulama İngilizce açılır. Uygulama içinde ayrı bir dil seçici yoktur. Kullanıcı macOS'un uygulama başına dil ayarını kullanabilir (Sistem Ayarları → Genel → Dil ve Bölge → Uygulamalar); Ayarlar ekranında bu ekrana bir kısayol bulunur.
+- **Çoğul ifadeler:** "4 host", "3 kayıt seçili" gibi metinler String Catalog'un çoğul varyantlarıyla yazılır.
+- **Tarih ve sayılar:** Yedek tarihleri ve sayılar `FormatStyle` ile kullanıcının locale'ine göre biçimlendirilir. Yedek **dosya adlarındaki** zaman damgası locale'den bağımsızdır (`YYYYMMDD-HHMMSS`).
+- **Çevrilmeyenler:** ssh direktif adları (`HostName`, `IdentityFile` …), ssh/ssh-keygen'in ham hata çıktıları ve komut metinleri çevrilmez. Formdaki alan etiketleri direktif adının kendisidir; yanlarında çevrilmiş bir açıklama (tooltip) bulunur.
+- **ssh çıktısının dili:** Bağlantı testi sınıflandırması ssh'in İngilizce stderr metinlerine dayanır. OpenSSH mesajlarını yerelleştirmez; yine de alt süreçler `LC_ALL=C` ile çalıştırılarak bu garanti altına alınır.
+- **Türkçe I/İ tuzağı:** Parser ve `HostMatcher` gibi protokol/dosya formatı kodlarında locale'e duyarlı büyük/küçük harf işlemleri yasaktır (bkz. §4.2). Kullanıcıya yönelik arama (host listesi filtreleme) ise `localizedStandardContains` ile locale'e duyarlı yapılır.
+- **Eksik çeviri kontrolü:** Derlemede String Catalog'daki "needs review"/eksik Türkçe çeviriler uyarı olarak görünür; sürüm öncesi kontrol listesinde sıfır eksik çeviri şartı vardır.
+
 ## 7. Known Hosts penceresi
 
 Ayrı bir `Window` sahnesi olarak açılır. Erişim yerleri: ana pencerenin araç çubuğu, menü çubuğu ve "Pencere" menüsü.
@@ -402,6 +416,8 @@ Testler Swift Testing ile, `SSHConfigKit` paketi üzerinde yazılır.
 - **`SSHCommandBuilder`:** Tırnaklama için özel karakter, boşluk ve `'` içeren alias ve yollar test edilir.
 - **`ConnectionTester`:** Sınıflandırma, gerçek ssh stderr çıktılarından alınmış fixture'larla test edilir.
 - **Entegrasyon testleri (geçici dizinde):** `/usr/bin/ssh -G` ile doğrulama; `KeyManager` ile anahtar oluşturma ve parola değiştirme; `KeyScanner` ile oluşturulan anahtarın tespiti.
+- **Türkçe locale testi:** Parser, `HostMatcher` ve `ConnectionTester` testleri ayrıca `tr_TR` locale'i ile çalıştırılır; `INCLUDE`, `IdentityFile`, `hostname` gibi `I`/`i` içeren anahtar kelimelerin doğru tanındığı kontrol edilir.
+- **Çeviri tamlığı:** String Catalog'ları okuyup her anahtar için `tr` çevirisinin `translated` durumda olduğunu doğrulayan bir test.
 - **Kural:** Hiçbir test gerçek `~/.ssh` dizinine veya kullanıcının agent'ına dokunmaz. Tüm yollar dışarıdan verilir; agent testleri ayrı bir `ssh-agent` örneği ile yapılır.
 - **UI:** Otomatik test yazılmaz. SwiftUI preview'ları ve `docs/design/manual-test-checklist.md` dosyasındaki manuel test listesi kullanılır (planın bir parçası olarak yazılacak).
 
@@ -426,3 +442,5 @@ Uygulama planının ilk adımlarında kısa denemelerle doğrulanacaklar:
 8. Known Hosts
 9. Anahtar yönetimi
 10. İmzalama, notarization, `.dmg`
+
+Dil desteği ayrı bir adım değildir: String Catalog'lar 1. ve 3. adımda kurulur, her adımda eklenen metinlerin İngilizce kaynağı ve Türkçe çevirisi aynı adımda yazılır.
