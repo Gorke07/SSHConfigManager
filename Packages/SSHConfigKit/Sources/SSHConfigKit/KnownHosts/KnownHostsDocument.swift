@@ -66,21 +66,21 @@ public struct KnownHostsDocument: Sendable {
 
     /// A line's text without its terminator.
     public static func content(of raw: String) -> String {
-        var text = Substring(raw)
-        if text.hasSuffix("\n") { text = text.dropLast() }
-        if text.hasSuffix("\r") { text = text.dropLast() }
-        return String(text)
+        var bytes = Array(raw.utf8)
+        if bytes.last == 0x0A { bytes.removeLast() }
+        if bytes.last == 0x0D { bytes.removeLast() }
+        return String(decoding: bytes, as: UTF8.self)
     }
 
     static func classify(_ content: String, lineIndex: Int) -> KnownHostsLineKind {
         if content.unicodeScalars.first == "\u{FEFF}" { return .unparsable }
         let tokens = content.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
         guard let first = tokens.first else { return .blank }
-        if first.hasPrefix("#") { return .comment }
+        if first.unicodeScalars.first == "#" { return .comment }
 
         var rest = tokens[...]
         var marker: KnownHostMarker?
-        if first.hasPrefix("@") {
+        if first.unicodeScalars.first == "@" {
             guard let parsed = KnownHostMarker(rawValue: first) else { return .unparsable }
             marker = parsed
             rest = rest.dropFirst()
@@ -97,7 +97,7 @@ public struct KnownHostsDocument: Sendable {
     }
 
     static func parseNames(_ field: String) -> [KnownHostName]? {
-        if field.hasPrefix("|") {
+        if field.unicodeScalars.first == "|" {
             // Hashed names are always alone on the line: |1|salt|hash
             let parts = field.split(separator: "|", omittingEmptySubsequences: false)
             guard parts.count == 4, parts[0].isEmpty, parts[1] == "1",
@@ -116,13 +116,15 @@ public struct KnownHostsDocument: Sendable {
 
     static func parseAddress(_ text: String) -> KnownHostAddress? {
         guard !text.isEmpty else { return nil }
-        let isPattern = text.hasPrefix("!") || text.contains("*") || text.contains("?")
-        if text.hasPrefix("[") {
+        let isPattern = text.unicodeScalars.first == "!" || text.contains("*") || text.contains("?")
+        if text.unicodeScalars.first == "[" {
             guard let close = text.firstIndex(of: "]") else { return nil }
             let host = String(text[text.index(after: text.startIndex)..<close])
             let after = text[text.index(after: close)...]
-            guard !host.isEmpty, after.hasPrefix(":"),
-                  let port = Int(after.dropFirst()), (1...65535).contains(port) else { return nil }
+            let digits = after.unicodeScalars.dropFirst()
+            guard !host.isEmpty, after.unicodeScalars.first == ":",
+                  !digits.isEmpty, digits.allSatisfy({ ("0"..."9").contains($0) }),
+                  let port = Int(String(after.dropFirst())), (1...65535).contains(port) else { return nil }
             return KnownHostAddress(host: host, port: port, isPattern: isPattern)
         }
         return KnownHostAddress(host: text, port: 22, isPattern: isPattern)

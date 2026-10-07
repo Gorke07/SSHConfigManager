@@ -72,6 +72,7 @@ struct KnownHostsDocumentTests {
         "[host]:notaport ssh-ed25519 \(ed)",
         "[host]:70000 ssh-ed25519 \(ed)",
         "[]:22 ssh-ed25519 \(ed)",
+        "[host]:+22 ssh-ed25519 \(ed)",
     ])
     func malformedLinesAreUnparsable(_ line: String) {
         let doc = KnownHostsDocument(parsing: line + "\n")
@@ -109,5 +110,35 @@ struct KnownHostsDocumentTests {
         var doc = KnownHostsDocument(parsing: "a ssh-ed25519 \(Self.ed)\n")
         doc.remove(lines: [5, -1])
         #expect(doc.render() == "a ssh-ed25519 \(Self.ed)\n")
+    }
+
+    @Test func unparsableTextHasNoCarriageReturnInCRLFDocuments() {
+        let doc = KnownHostsDocument(parsing: "garbage here\r\nmore garbage\r\n")
+        #expect(doc.unparsableLines.map(\.text) == ["garbage here", "more garbage"])
+        #expect(KnownHostsDocument.content(of: "abc\r\n") == "abc")
+        #expect(KnownHostsDocument.content(of: "abc\n") == "abc")
+        #expect(KnownHostsDocument.content(of: "abc") == "abc")
+    }
+
+    @Test func loneCarriageReturnRoundTrips() {
+        let text = "a\rb ssh-ed25519 \(Self.ed)\nx\r\ny\r"
+        #expect(KnownHostsDocument(parsing: text).render().utf8.elementsEqual(text.utf8))
+    }
+
+    @Test func nonASCIICommentIsKept() {
+        let text = "example.com ssh-ed25519 \(Self.ed) tr: g\u{FC}venli \u{11F}\u{FC}\u{15F}\u{131}\u{F6}\u{E7}\n"
+        let doc = KnownHostsDocument(parsing: text)
+        #expect(doc.render() == text)
+        #expect(doc.entries.first?.comment == "tr: g\u{FC}venli \u{11F}\u{FC}\u{15F}\u{131}\u{F6}\u{E7}")
+    }
+
+    @Test func whitespaceOnlyLinesAreBlank() {
+        let doc = KnownHostsDocument(parsing: "   \n\t\t\n \t \r\n")
+        #expect(doc.lines.map(\.kind) == [.blank, .blank, .blank])
+    }
+
+    @Test func commentWithCombiningMarkAfterHashIsAComment() {
+        let doc = KnownHostsDocument(parsing: "#\u{301} x\n")
+        #expect(doc.lines.map(\.kind) == [.comment])
     }
 }
