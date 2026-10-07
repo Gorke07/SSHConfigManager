@@ -6,7 +6,7 @@
 
 **Architecture:** Satır tabanlı kayıpsız bir belge modeli (`ConfigDocument`) her satırın orijinal metnini saklar; düzenlemeler yalnızca dokunulan satırları yeniden üretir. Dosya G/Ç'si (`SafeFileWriter`, `BackupManager`, `FileWatcher`), süreç çalıştırma (`ProcessRunner`) ve ssh entegrasyonları (`ConfigValidator`, `ConnectionTester`, `SSHCommandBuilder`) ayrı, enjekte edilebilir birimlerdir. `ConfigStore` (`@MainActor @Observable`) bunları UI'ın kullanacağı tek bir duruma bağlar.
 
-**Tech Stack:** Swift 6.2+ (Xcode 26.6 / Swift 6.3 kurulu), Swift Package Manager, Swift Testing, Foundation, CryptoKit, CoreServices (FSEvents), Synchronization (`Mutex`), Observation.
+**Tech Stack:** Swift 6.4 (Xcode 26.6 toolchain'i; `xcrun swift` ile çağrılır), Swift Package Manager, Swift Testing, Foundation, CryptoKit, CoreServices (FSEvents), Synchronization (`Mutex`), Observation.
 
 **Spec:** `docs/design/2026-10-07-ssh-config-manager-design.md` — bu plan §4 (parser ve güvenli düzenleme), §5 (dosya seçiminin store tarafı), §6.4 (bağlantı testi), §9.1 (komut), §10 ve §11'in paket kısmını uygular.
 
@@ -22,7 +22,7 @@
 
 ## Global Constraints
 
-- Paket: `Packages/SSHConfigKit`, `swift-tools-version: 6.2`, Swift 6 dil modu, `platforms: [.macOS(.v26)]`.
+- Paket: `Packages/SSHConfigKit`, `swift-tools-version: 6.4`, Swift 6 dil modu, `platforms: [.macOS(.v26)]`.
 - Pakette üçüncü parti bağımlılık yok.
 - Pakette kullanıcıya görünen metin yok; tüm sonuçlar tipli değerlerdir (çeviri Plan 2'de uygulama katmanında).
 - ssh_config anahtar kelimeleri `asciiLowercased` ile karşılaştırılır. `localizedCaseInsensitiveCompare`, `caseInsensitiveCompare`, `lowercased(with:)`, `uppercased(with:)`, `localizedLowercase`, `localizedUppercase` paket kaynaklarında **yasak** (Task 3'te bir test bunu denetler).
@@ -31,7 +31,7 @@
 - Harici araçlar sabit yoldan çağrılır: `/usr/bin/ssh`. Her alt sürece `LC_ALL=C` verilir.
 - Yeni oluşturulan dosyalar `0600`, dizinler `0700` izinli olur.
 - Testler gerçek `~/.ssh` dizinine dokunmaz; tüm yollar ve ev dizini enjekte edilir.
-- Test komutu (paket kökünden): `swift test --package-path Packages/SSHConfigKit`.
+- Test komutu (repo kökünden): `xcrun swift test --package-path Packages/SSHConfigKit`. PATH'teki `swift` farklı (6.3.3) bir sürümü gösterdiği için **her zaman `xcrun swift`** kullanılır.
 
 ## Review Focus
 
@@ -115,7 +115,7 @@ xcuserdata/
 `Packages/SSHConfigKit/Package.swift`:
 
 ```swift
-// swift-tools-version: 6.2
+// swift-tools-version: 6.4
 import PackageDescription
 
 let package = Package(
@@ -270,7 +270,7 @@ struct LineTokenizerTests {
 
 - [ ] **Step 3: Testlerin başarısız olduğunu doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter LineTokenizerTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter LineTokenizerTests`
 Expected: FAIL — derleme hatası, `cannot find 'LineTokenizer' in scope`.
 
 - [ ] **Step 4: Uygulamayı yaz**
@@ -420,7 +420,7 @@ enum LineTokenizer {
 
 - [ ] **Step 5: Testlerin geçtiğini doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter LineTokenizerTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter LineTokenizerTests`
 Expected: PASS (tüm testler).
 
 - [ ] **Step 6: Commit**
@@ -544,7 +544,7 @@ struct ConfigDocumentRoundTripTests {
 
 - [ ] **Step 2: Testlerin başarısız olduğunu doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter ConfigDocumentRoundTripTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter ConfigDocumentRoundTripTests`
 Expected: FAIL — `cannot find 'ConfigDocument' in scope`.
 
 - [ ] **Step 3: Uygulamayı yaz**
@@ -651,7 +651,7 @@ public struct ConfigDocument: Equatable, Sendable {
 
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter ConfigDocumentRoundTripTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter ConfigDocumentRoundTripTests`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -795,7 +795,7 @@ struct LocaleSafetyTests {
 
 - [ ] **Step 2: Testlerin başarısız olduğunu doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter "ConfigDocumentReadTests|LocaleSafetyTests"`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter "ConfigDocumentReadTests|LocaleSafetyTests"`
 Expected: FAIL — `value of type 'ConfigDocument' has no member 'hosts'`.
 
 - [ ] **Step 3: Uygulamayı yaz**
@@ -933,7 +933,7 @@ extension ConfigDocument {
 
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter "ConfigDocumentReadTests|LocaleSafetyTests"`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter "ConfigDocumentReadTests|LocaleSafetyTests"`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -1061,7 +1061,7 @@ struct UpdateHostTests {
 
 - [ ] **Step 2: Testlerin başarısız olduğunu doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter UpdateHostTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter UpdateHostTests`
 Expected: FAIL — `cannot find 'HostDraft' in scope`.
 
 - [ ] **Step 3: Uygulamayı yaz**
@@ -1178,7 +1178,7 @@ extension ConfigDocument {
 
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter UpdateHostTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter UpdateHostTests`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -1286,7 +1286,7 @@ struct AddRemoveHostTests {
 
 - [ ] **Step 2: Testlerin başarısız olduğunu doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter AddRemoveHostTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter AddRemoveHostTests`
 Expected: FAIL — `value of type 'ConfigDocument' has no member 'addHost'`.
 
 - [ ] **Step 3: Uygulamayı yaz** (`ConfigDocument+Edit.swift` sonuna)
@@ -1357,12 +1357,12 @@ extension ConfigDocument {
 
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter AddRemoveHostTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter AddRemoveHostTests`
 Expected: PASS.
 
 - [ ] **Step 5: Tüm paket testlerini çalıştır**
 
-Run: `swift test --package-path Packages/SSHConfigKit`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
@@ -1462,7 +1462,7 @@ struct HostDraftValidatorTests {
 
 - [ ] **Step 2: Testlerin başarısız olduğunu doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter HostDraftValidatorTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter HostDraftValidatorTests`
 Expected: FAIL — `cannot find 'HostDraftValidator' in scope`.
 
 - [ ] **Step 3: Uygulamayı yaz**
@@ -1546,7 +1546,7 @@ public struct HostDraftValidator: Sendable {
 
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter HostDraftValidatorTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter HostDraftValidatorTests`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -1635,7 +1635,7 @@ struct LineDiffTests {
 
 - [ ] **Step 2: Testlerin başarısız olduğunu doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter LineDiffTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter LineDiffTests`
 Expected: FAIL — `cannot find 'LineDiff' in scope`.
 
 - [ ] **Step 3: Uygulamayı yaz**
@@ -1759,7 +1759,7 @@ public enum LineDiff {
 
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter LineDiffTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter LineDiffTests`
 Expected: PASS. (`insertionAtTop` iki geçerli başlık biçimini kabul eder; uygulama `@@ -1,2 +1,3 @@` üretir.)
 
 - [ ] **Step 5: Commit**
@@ -1902,7 +1902,7 @@ struct BackupManagerTests {
 
 - [ ] **Step 3: Testlerin başarısız olduğunu doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter BackupManagerTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter BackupManagerTests`
 Expected: FAIL — `cannot find 'BackupManager' in scope`.
 
 - [ ] **Step 4: Uygulamayı yaz**
@@ -2024,7 +2024,7 @@ public struct BackupManager: Sendable {
 
 - [ ] **Step 5: Testlerin geçtiğini doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter BackupManagerTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter BackupManagerTests`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
@@ -2165,7 +2165,7 @@ struct SafeFileWriterTests {
 
 - [ ] **Step 2: Testlerin başarısız olduğunu doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter SafeFileWriterTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter SafeFileWriterTests`
 Expected: FAIL — `cannot find 'SafeFileWriter' in scope`.
 
 - [ ] **Step 3: Uygulamayı yaz**
@@ -2248,7 +2248,7 @@ public struct SafeFileWriter: Sendable {
 
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter SafeFileWriterTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter SafeFileWriterTests`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -2370,7 +2370,7 @@ struct ProcessRunnerTests {
 
 - [ ] **Step 3: Testlerin başarısız olduğunu doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter ProcessRunnerTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter ProcessRunnerTests`
 Expected: FAIL — `cannot find 'ProcessRunner' in scope`.
 
 - [ ] **Step 4: Uygulamayı yaz**
@@ -2490,7 +2490,7 @@ private final class Unchecked<Value>: @unchecked Sendable {
 
 - [ ] **Step 5: Testlerin geçtiğini doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter ProcessRunnerTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter ProcessRunnerTests`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
@@ -2571,7 +2571,7 @@ struct ConfigValidatorTests {
 
 - [ ] **Step 2: Testlerin başarısız olduğunu doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter ConfigValidatorTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter ConfigValidatorTests`
 Expected: FAIL — `cannot find 'ConfigValidator' in scope`.
 
 - [ ] **Step 3: Uygulamayı yaz**
@@ -2624,7 +2624,7 @@ public struct ConfigValidator: Sendable {
 
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter ConfigValidatorTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter ConfigValidatorTests`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -2705,7 +2705,7 @@ struct SSHCommandBuilderTests {
 
 - [ ] **Step 2: Testlerin başarısız olduğunu doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter SSHCommandBuilderTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter SSHCommandBuilderTests`
 Expected: FAIL — `cannot find 'SSHCommandBuilder' in scope`.
 
 - [ ] **Step 3: Uygulamayı yaz**
@@ -2756,7 +2756,7 @@ public struct SSHCommandBuilder: Equatable, Sendable {
 
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter SSHCommandBuilderTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter SSHCommandBuilderTests`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -2868,7 +2868,7 @@ Bu test dosyasının en üstüne `import Synchronization` ekle.
 
 - [ ] **Step 2: Testlerin başarısız olduğunu doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter ConnectionTesterTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter ConnectionTesterTests`
 Expected: FAIL — `cannot find 'ConnectionClassifier' in scope`.
 
 - [ ] **Step 3: Uygulamayı yaz**
@@ -2981,7 +2981,7 @@ public struct ConnectionTester: Sendable {
 
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter ConnectionTesterTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter ConnectionTesterTests`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -3073,7 +3073,7 @@ struct IncludeResolverTests {
 
 - [ ] **Step 2: Testlerin başarısız olduğunu doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter IncludeResolverTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter IncludeResolverTests`
 Expected: FAIL — `cannot find 'IncludeResolver' in scope`.
 
 - [ ] **Step 3: Uygulamayı yaz**
@@ -3155,7 +3155,7 @@ public struct IncludeResolver: Sendable {
 
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter IncludeResolverTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter IncludeResolverTests`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -3238,7 +3238,7 @@ struct FileWatcherTests {
 
 - [ ] **Step 2: Testlerin başarısız olduğunu doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter FileWatcherTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter FileWatcherTests`
 Expected: FAIL — `cannot find 'FileWatcher' in scope`.
 
 - [ ] **Step 3: Uygulamayı yaz**
@@ -3292,7 +3292,7 @@ public final class FileWatcher: @unchecked Sendable {
 
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter FileWatcherTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter FileWatcherTests`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -3512,7 +3512,7 @@ struct ConfigStoreTests {
 
 - [ ] **Step 2: Testlerin başarısız olduğunu doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter ConfigStoreTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter ConfigStoreTests`
 Expected: FAIL — `cannot find 'ConfigStore' in scope`.
 
 - [ ] **Step 3: Uygulamayı yaz**
@@ -3707,12 +3707,12 @@ private final class WeakStore: @unchecked Sendable {
 
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
-Run: `swift test --package-path Packages/SSHConfigKit --filter ConfigStoreTests`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit --filter ConfigStoreTests`
 Expected: PASS.
 
 - [ ] **Step 5: Tüm paket testlerini çalıştır**
 
-Run: `swift test --package-path Packages/SSHConfigKit`
+Run: `xcrun swift test --package-path Packages/SSHConfigKit`
 Expected: PASS — tüm test dosyaları, uyarısız derleme (Swift 6 strict concurrency).
 
 - [ ] **Step 6: Commit**
@@ -3726,6 +3726,6 @@ git commit -m "feat(kit): ConfigStore — yükleme, düzenleme, doğrulama, güv
 
 ## Plan 1 tamamlandığında
 
-- `swift test --package-path Packages/SSHConfigKit` yeşil.
+- `xcrun swift test --package-path Packages/SSHConfigKit` yeşil.
 - Spec başarı kriteri 1, 2 ve 4 paket düzeyinde testlerle kanıtlanmış olur (bayt bayt gidiş-dönüş, yalnızca düzenlenen satırların değişmesi, `ssh -G` doğrulaması + yedek).
 - Sıradaki adım: Plan 2 (uygulama kabuğu ve arayüz) bu paketin public API'sini kullanarak yazılır.
