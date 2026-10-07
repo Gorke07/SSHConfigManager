@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Observation
 import SSHConfigKit
@@ -5,7 +6,7 @@ import SSHConfigKit
 @MainActor
 @Observable
 final class AppModel {
-    typealias StoreFactory = @MainActor (URL, BackupManager) -> ConfigStore
+    typealias StoreFactory = @MainActor (URL, BackupManager, String) -> ConfigStore
 
     enum SwitchResult: Equatable { case switched, needsConfirmation, unchanged, invalid }
 
@@ -32,11 +33,19 @@ final class AppModel {
         let backups = BackupManager(rootDirectory: backupRoot, keep: settings.backupCount)
         self.backupManager = backups
         self.makeStore = makeStore
-        self.store = makeStore(settings.configURL, backups)
+        self.store = makeStore(settings.configURL, backups, Self.backupKind(for: settings.configURL, home: settings.homeDirectory))
     }
 
-    static func liveStore(url: URL, backups: BackupManager) -> ConfigStore {
-        ConfigStore(fileURL: url, writer: SafeFileWriter(backups: backups))
+    static func liveStore(url: URL, backups: BackupManager, backupKind: String) -> ConfigStore {
+        ConfigStore(fileURL: url, writer: SafeFileWriter(backups: backups), backupKind: backupKind)
+    }
+
+    /// "config" for ~/.ssh/config; otherwise a stable per-path kind so backups of different files never mix.
+    static func backupKind(for url: URL, home: URL) -> String {
+        let path = url.standardizedFileURL.path
+        if path == home.appending(path: ".ssh/config").standardizedFileURL.path { return "config" }
+        let digest = SHA256.hash(data: Data(path.utf8))
+        return "config-" + digest.map { String(format: "%02x", $0) }.joined().prefix(12)
     }
 
     var commandBuilder: SSHCommandBuilder {
@@ -103,7 +112,7 @@ final class AppModel {
         }
         if (store.hasUnsavedChanges || hasPendingFormEdits) && !discardingUnsavedChanges { return .needsConfirmation }
         settings.setConfigPath(path)
-        store = makeStore(url, backupManager)
+        store = makeStore(url, backupManager, Self.backupKind(for: url, home: settings.homeDirectory))
         select(nil)
         return .switched
     }

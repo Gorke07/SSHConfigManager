@@ -39,10 +39,10 @@ struct BannerBuilderTests {
         let tmp = try TempDir()
         try tmp.file(".ssh/config", "Host a\n")
         let app = AppModel(settings: AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url),
-                           backupRoot: tmp.url.appending(path: "Backups")) { url, backups in
+                           backupRoot: tmp.url.appending(path: "Backups")) { url, backups, kind in
             ConfigStore(fileURL: url, writer: SafeFileWriter(backups: backups),
                         validator: ConfigValidator(runner: FixedRunner.valid),
-                        includeResolver: IncludeResolver(homeDirectory: tmp.url), watchForChanges: true)
+                        includeResolver: IncludeResolver(homeDirectory: tmp.url), watchForChanges: true, backupKind: kind)
         }
         #expect(BannerBuilder.banners(for: app.store).isEmpty)
     }

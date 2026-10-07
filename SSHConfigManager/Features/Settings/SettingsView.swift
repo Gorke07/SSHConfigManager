@@ -58,11 +58,11 @@ struct SettingsView: View {
         }
         .confirmationDialog(
             String(localized: "settings.switch.title"),
-            isPresented: Binding(get: { pendingPath != nil }, set: { if !$0 { pendingPath = nil } })
-        ) {
+            isPresented: Binding(get: { pendingPath != nil }, set: { if !$0 { pendingPath = nil } }),
+            presenting: pendingPath
+        ) { path in
             Button(String(localized: "settings.switch.discard"), role: .destructive) {
-                if let path = pendingPath { _ = model.switchConfig(to: path, discardingUnsavedChanges: true) }
-                pendingPath = nil
+                _ = model.switchConfig(to: path, discardingUnsavedChanges: true)
             }
         }
     }

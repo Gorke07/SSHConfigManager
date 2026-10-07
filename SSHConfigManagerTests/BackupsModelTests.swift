@@ -49,6 +49,31 @@ struct BackupsModelTests {
         #expect(try tmp.read(".ssh/config") == "Host a\n    Port 1\n")   // disk untouched until Save
     }
 
+    @Test func backupKindIsStablePerPath() throws {
+        let home = URL(filePath: "/Users/x")
+        let def = home.appending(path: ".ssh/config")
+        #expect(AppModel.backupKind(for: def, home: home) == "config")
+        let other = URL(filePath: "/opt/ssh/config")
+        let kind = AppModel.backupKind(for: other, home: home)
+        #expect(kind == AppModel.backupKind(for: other, home: home))
+        #expect(kind.count == 19)   // "config-" + 12 hex
+        #expect(kind.hasPrefix("config-"))
+        #expect(kind != AppModel.backupKind(for: URL(filePath: "/opt/other/config"), home: home))
+    }
+
+    @Test func backupsAreScopedToTheCurrentFile() async throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\n")
+        try await saveEdit(app, port: "1")
+        try tmp.file("other/config", "Host b\n")
+        #expect(app.switchConfig(to: tmp.url.appending(path: "other/config").path) == .switched)
+        #expect(BackupsModel(model: app).backups.isEmpty)
+        try await saveEdit(app, port: "2")
+        let backups = BackupsModel(model: app)
+        #expect(backups.backups.count == 1)
+        #expect(try app.backupManager.contents(of: backups.backups[0]) == "Host b\n")
+    }
+
     @Test func emptyWhenNoBackups() throws {
         let tmp = try TempDir()
         let app = makeTestModel(tmp, config: "Host a\n")

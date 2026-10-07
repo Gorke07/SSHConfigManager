@@ -757,6 +757,20 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Mevcut dosyadan bu yedeğe değişiklikler" } }
       }
     },
+    "backups.restore.confirm.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Replace your unsaved changes with this backup?" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kaydedilmemiş değişiklikleriniz bu yedekle değiştirilsin mi?" } }
+      }
+    },
+    "backups.restore.confirm.action" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Replace" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Değiştir" } }
+      }
+    },
     "discardForm.title" : {
       "extractionState" : "manual",
       "localizations" : {

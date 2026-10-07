@@ -52,12 +52,13 @@ struct FixedRunner: ProcessRunning {
 func makeTestModel(_ tmp: TempDir, config: String? = nil, runner: FixedRunner = .valid) -> AppModel {
     if let config { _ = try? tmp.file(".ssh/config", config) }
     let settings = AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url)
-    return AppModel(settings: settings, backupRoot: tmp.url.appending(path: "Backups")) { url, backups in
+    return AppModel(settings: settings, backupRoot: tmp.url.appending(path: "Backups")) { url, backups, kind in
         ConfigStore(
             fileURL: url,
             writer: SafeFileWriter(backups: backups),
             validator: ConfigValidator(runner: runner),
             includeResolver: IncludeResolver(homeDirectory: tmp.url),
-            watchForChanges: false)
+            watchForChanges: false,
+            backupKind: kind)
     }
 }

@@ -30,7 +30,7 @@ struct BackupsView: View {
                         Text(String(localized: "backups.restore.note")).font(.footnote).foregroundStyle(.secondary)
                         Spacer()
                         Button(String(localized: "backups.restore")) {
-                            if backups.model.hasPendingFormEdits {
+                            if backups.model.store.hasUnsavedChanges || backups.model.hasPendingFormEdits {
                                 confirmingRestore = backup
                             } else {
                                 restore(backup)
@@ -46,14 +46,14 @@ struct BackupsView: View {
         }
         .frame(minWidth: 760, minHeight: 420)
         .onAppear { backups.refresh() }
+        .onChange(of: ObjectIdentifier(backups.model.store)) { backups.refresh() }
+        .onChange(of: backups.model.store.diskText) { backups.refresh() }
         .confirmationDialog(
-            String(localized: "discardForm.title"),
+            String(localized: "backups.restore.confirm.title"),
             isPresented: Binding(get: { confirmingRestore != nil }, set: { if !$0 { confirmingRestore = nil } }),
             presenting: confirmingRestore
         ) { backup in
-            Button(String(localized: "discardForm.discard"), role: .destructive) { restore(backup) }
-        } message: { _ in
-            Text(String(localized: "discardForm.message"))
+            Button(String(localized: "backups.restore.confirm.action"), role: .destructive) { restore(backup) }
         }
     }
 

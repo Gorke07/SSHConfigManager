@@ -19,7 +19,7 @@ final class BackupsModel {
 
     func refresh() {
         do {
-            backups = try model.backupManager.list(kind: "config")
+            backups = try model.backupManager.list(kind: model.store.backupKind)
             errorMessage = nil
         } catch {
             backups = []
