@@ -1051,6 +1051,55 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yedek kaydedilmemiş değişiklik olarak yüklenir; uygulamak için inceleyip kaydedin." } }
       }
     },
+    "backups.kind.config" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "SSH config" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "SSH config" } }
+      }
+    },
+    "backups.kind.knownHosts" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "known_hosts" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "known_hosts" } }
+      }
+    },
+    "backups.restore.knownHosts.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Replace the known_hosts file with this backup?" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "known_hosts dosyası bu yedekle değiştirilsin mi?" } }
+      }
+    },
+    "backups.restore.knownHosts.message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The file is written now. The current file is backed up first." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dosya hemen yazılır. Mevcut dosyanın önce yedeği alınır." } }
+      }
+    },
+    "settings.knownHostsFile" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "known_hosts file" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "known_hosts dosyası" } }
+      }
+    },
+    "settings.knownHostsFile.useDefault" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Use ~/.ssh/known_hosts" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "~/.ssh/known_hosts kullan" } }
+      }
+    },
+    "settings.knownHostsFile.customNote" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "ssh itself still reads ~/.ssh/known_hosts unless your config sets UserKnownHostsFile." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "ssh, config'inizde UserKnownHostsFile ayarlı değilse yine ~/.ssh/known_hosts okur." } }
+      }
+    },
     "backups.diffCaption" : {
       "extractionState" : "manual",
       "localizations" : {

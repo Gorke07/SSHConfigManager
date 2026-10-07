@@ -2,6 +2,10 @@ import Foundation
 import Observation
 import SSHConfigKit
 
+enum BackupFileKind: CaseIterable {
+    case config, knownHosts
+}
+
 @MainActor
 @Observable
 final class BackupsModel {
@@ -15,11 +19,29 @@ final class BackupsModel {
         refresh()
     }
 
+    var fileKind: BackupFileKind = .config {
+        didSet { if oldValue != fileKind { selectedURL = nil; refresh() } }
+    }
+
+    private var backupKind: String {
+        switch fileKind {
+        case .config: model.store.backupKind
+        case .knownHosts: model.knownHosts.backupKind
+        }
+    }
+
+    private var currentText: String {
+        switch fileKind {
+        case .config: model.store.document.render()
+        case .knownHosts: model.knownHosts.document.render()
+        }
+    }
+
     var selected: Backup? { backups.first { $0.url == selectedURL } }
 
     func refresh() {
         do {
-            backups = try model.backupManager.list(kind: model.store.backupKind)
+            backups = try model.backupManager.list(kind: backupKind)
             errorMessage = nil
         } catch {
             backups = []
@@ -31,13 +53,20 @@ final class BackupsModel {
     /// Current document (old) → backup (new): what restoring would change.
     func hunks(for backup: Backup) -> [DiffHunk] {
         let contents = (try? model.backupManager.contents(of: backup)) ?? ""
-        return LineDiff.hunks(old: model.store.document.render(), new: contents)
+        return LineDiff.hunks(old: currentText, new: contents)
     }
 
-    /// Loads the backup into the editor; the normal Save flow (diff, ssh -G, backup) writes it.
+    /// Config: loads the backup into the editor (the Save flow writes it).
+    /// known_hosts: no drafts, so it is written now (the current file is backed up first).
     func restore(_ backup: Backup) throws {
         let contents = try model.backupManager.contents(of: backup)
-        try model.store.apply { $0 = ConfigDocument(parsing: contents) }
-        model.resetEditor()
+        switch fileKind {
+        case .config:
+            try model.store.apply { $0 = ConfigDocument(parsing: contents) }
+            model.resetEditor()
+        case .knownHosts:
+            try model.knownHosts.restore(text: contents)
+            refresh()
+        }
     }
 }

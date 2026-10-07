@@ -81,4 +81,25 @@ struct BackupsModelTests {
         #expect(backups.backups.isEmpty)
         #expect(backups.errorMessage == nil)
     }
+
+    @Test func knownHostsBackupsAreListedSeparatelyAndRestoredImmediately() throws {
+        let tmp = try TempDir()
+        let ed = KnownHostsModelTests.ed
+        _ = try tmp.file(".ssh/known_hosts", "a.example.com ssh-ed25519 \(ed)\nb.example.com ssh-ed25519 \(ed)\n")
+        let model = makeTestModel(tmp, config: "Host x\n")
+        try model.knownHosts.remove(lines: [0], ifRevision: model.knownHosts.revision)   // makes one backup
+
+        let backups = BackupsModel(model: model)
+        #expect(backups.fileKind == .config)
+        #expect(backups.backups.isEmpty)
+        backups.fileKind = .knownHosts
+        #expect(backups.backups.count == 1)
+
+        let backup = try #require(backups.backups.first)
+        #expect(!backups.hunks(for: backup).isEmpty)
+        try backups.restore(backup)
+        #expect(try tmp.read(".ssh/known_hosts") == "a.example.com ssh-ed25519 \(ed)\nb.example.com ssh-ed25519 \(ed)\n")
+        backups.refresh()
+        #expect(backups.backups.count == 2)   // restoring backed up the current file first
+    }
 }
