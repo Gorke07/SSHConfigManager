@@ -122,6 +122,59 @@ class CheckLocalizationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("yinelenen", result.stderr)
 
+    def test_raw_strings_do_not_start_comments_and_keep_keys(self):
+        swift = "\n".join([
+            'let a = #"http://x // not a comment"#; Text("a")',
+            'let b = ##"quote " and "# inside // still string"##; Text("b")',
+            'let c = String(localized: "k")',
+            'let d = #"""',
+            '  // raw multi-line "',
+            '"""#; Text("d")',
+        ])
+        result = self.run_check(swift, {"k": ("K", "K")})
+        self.assertNotEqual(result.returncode, 0)
+        for line in (1, 2, 6):
+            self.assertIn(f"View.swift:{line}:", result.stderr)
+
+    def test_raw_string_interpolation_with_literal_is_code(self):
+        result = self.run_check('let a = #"x \\#(f("y")) z"#; Text("a")', {})
+        self.assertIn("View.swift:1:", result.stderr)
+
+    def test_nested_block_comments(self):
+        swift = "\n".join(['/* a /* Text("a") */ Text("b") */', 'Text("c")'])
+        result = self.run_check(swift, {})
+        self.assertIn("View.swift:2:", result.stderr)
+        self.assertNotIn("View.swift:1:", result.stderr)
+
+    def test_multiline_initializers_are_reported_at_their_start(self):
+        swift = "\n".join(['Link(', '    "a", destination: u)', 'Text(', '  "b")'])
+        result = self.run_check(swift, {})
+        self.assertIn("View.swift:1:", result.stderr)
+        self.assertIn("View.swift:3:", result.stderr)
+
+    def test_sharelink_and_navigationlink_literals_are_reported(self):
+        swift = "\n".join(['ShareLink("a", item: u)', 'NavigationLink("b") { X() }', 'NavigationLink(destination: X()) { Y() }'])
+        result = self.run_check(swift, {})
+        self.assertIn("View.swift:1:", result.stderr)
+        self.assertIn("View.swift:2:", result.stderr)
+        self.assertNotIn("View.swift:3:", result.stderr)
+
+    def test_nested_duplicate_key_reports_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            sources = Path(tmp) / "src"
+            sources.mkdir()
+            (sources / "View.swift").write_text('let a = String(localized: "k")', encoding="utf-8")
+            unit = '{"stringUnit": {"state": "translated", "value": "V"}}'
+            body = ('{"sourceLanguage": "en", "strings": {"k": {"localizations": {"en": %s, "tr": %s, "tr": %s}}}}'
+                    % (unit, unit, unit))
+            catalog_path = Path(tmp) / "Localizable.xcstrings"
+            catalog_path.write_text(body, encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--sources", str(sources), "--catalog", str(catalog_path)],
+                capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("strings/k/localizations/tr", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

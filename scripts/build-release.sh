@@ -68,9 +68,10 @@ try: print(json.load(sys.stdin).get(sys.argv[1], ""))
 except Exception: print("")' "$1" <<<"$RESULT"; }
   STATUS=$(field status)
   if [[ "$STATUS" != "Accepted" ]]; then
-    echo "Notarization failed (status: ${STATUS:-unknown}). Notary log:" >&2
+    echo "Notarization failed (status: ${STATUS:-unknown})." >&2
     SUBMISSION_ID=$(field id)
     if [[ -n "$SUBMISSION_ID" ]]; then
+      echo "Notary log:" >&2
       xcrun notarytool log "$SUBMISSION_ID" --keychain-profile "$NOTARY_PROFILE" >&2 \
         || echo "Could not fetch the notary log (retry: xcrun notarytool log $SUBMISSION_ID --keychain-profile \"$NOTARY_PROFILE\")." >&2
     fi

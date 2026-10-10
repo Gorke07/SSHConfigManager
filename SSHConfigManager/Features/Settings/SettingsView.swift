@@ -115,6 +115,7 @@ struct SettingsView: View {
             switch result {
             case .success(let picked): url = picked
             case .failure(let error):
+                if AppLog.isUserCancel(error) { return }
                 AppLog.error(.settings, error)
                 switch lastImportTarget {
                 case .config: invalidMessage = String(localized: "settings.configFile.invalid")
