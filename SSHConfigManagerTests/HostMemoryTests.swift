@@ -197,4 +197,28 @@ struct HostMemoryTests {
         #expect(model.switchConfig(to: tmp.url.appending(path: "other/config").path) == .switched)
         #expect(model.favoriteAliases.isEmpty)
     }
+
+    @Test func legacyKeyIsMergedBehindTheNewOneAndRemoved() throws {
+        let tmp = try TempDir()
+        let defaults = tmp.defaults
+        defaults.set(["favorites": ["n1", "shared"], "recents": ["n1", "n2", "n3"]], forKey: "new")
+        defaults.set(["favorites": ["shared", "o1", ""], "recents": ["n2", "o1", "o2", "o3", "o4"]], forKey: "old")
+        AppModel.mergeLegacyMemory(defaults: defaults, key: "new", legacyKey: "old")
+        let memory = HostMemory(defaults: defaults, key: "new")
+        #expect(memory.favorites == ["n1", "shared", "o1"])
+        #expect(memory.recents == ["n1", "n2", "n3", "o1", "o2"])   // capped at 5
+        #expect(defaults.object(forKey: "old") == nil)
+    }
+
+    @Test func legacyKeyAloneIsCopiedAndRemoved() throws {
+        let tmp = try TempDir()
+        let defaults = tmp.defaults
+        defaults.set(["favorites": ["a"], "recents": ["b"]], forKey: "old")
+        AppModel.mergeLegacyMemory(defaults: defaults, key: "new", legacyKey: "old")
+        let memory = HostMemory(defaults: defaults, key: "new")
+        #expect(memory.favorites == ["a"] && memory.recents == ["b"])
+        #expect(defaults.object(forKey: "old") == nil)
+        AppModel.mergeLegacyMemory(defaults: defaults, key: "new", legacyKey: "none")   // no legacy: nothing changes
+        #expect(HostMemory(defaults: defaults, key: "new").favorites == ["a"])
+    }
 }

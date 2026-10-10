@@ -22,6 +22,10 @@ enum LaunchError: Error, Equatable {
     case appleScriptUnavailable
     /// `open` exited with this status.
     case openFailed(Int32)
+    /// The alias is not in the saved file (nothing was launched).
+    case notSaved
+    /// The command would contain a control character (nothing was launched).
+    case invalidCommand
 
     private static func openMessage(_ status: Int32) -> String {
         let code = String(status)
@@ -37,6 +41,8 @@ enum LaunchError: Error, Equatable {
         case .scriptWriteFailed: String(localized: "connect.error.scriptWrite")
         case .appleScriptUnavailable: String(localized: "connect.error.appleScript")
         case .openFailed(let status): Self.openMessage(status)
+        case .notSaved: String(localized: "connect.notSaved")
+        case .invalidCommand: String(localized: "connect.invalidCommand")
         }
     }
 }

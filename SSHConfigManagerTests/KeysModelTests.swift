@@ -147,6 +147,15 @@ struct KeysModelTests {
         #expect(launcher.requests.isEmpty)
     }
 
+    @Test func uploadOfAnUnsavedAliasShowsTheNotSavedMessage() async throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\n", launcher: RecordingLauncher())
+        let row = try await keyRow(model)
+        #expect(await model.keys.upload(row, alias: "other") == .failed(.notSaved))
+        #expect(model.keys.errorMessage == String(localized: "connect.notSaved"))
+        #expect(model.errorMessage == nil)
+    }
+
     @Test func uploadFallbackNoticeShowsInTheKeysWindow() async throws {
         let tmp = try TempDir()
         let launcher = RecordingLauncher()

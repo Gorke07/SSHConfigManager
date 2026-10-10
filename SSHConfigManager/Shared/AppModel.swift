@@ -172,15 +172,36 @@ final class AppModel {
         do { try backupManager.migrate(from: legacy, to: kind) } catch { AppLog.error(.backups, error) }
     }
 
+    /// Moves the memory saved under the old hashed key to `key`. When both exist the new entries come first,
+    /// then the old ones, exact duplicates removed and each list capped; the old key is removed either way.
+    static func mergeLegacyMemory(defaults: UserDefaults, key: String, legacyKey: String) {
+        guard legacyKey != key, let old = defaults.object(forKey: legacyKey) else { return }
+        defer { defaults.removeObject(forKey: legacyKey) }
+        guard let current = defaults.object(forKey: key) else {
+            defaults.set(old, forKey: key)
+            return
+        }
+        let new = current as? [String: Any] ?? [:]
+        let previous = old as? [String: Any] ?? [:]
+        func merged(_ field: String, cap: Int) -> [String] {
+            var seen = Set<String>()
+            var result: [String] = []
+            for value in ((new[field] as? [Any]) ?? []) + ((previous[field] as? [Any]) ?? []) {
+                guard let alias = value as? String, !alias.isEmpty, seen.insert(alias).inserted else { continue }
+                result.append(alias)
+            }
+            return Array(result.prefix(cap))
+        }
+        defaults.set(["favorites": merged("favorites", cap: HostMemory.maxFavorites),
+                      "recents": merged("recents", cap: HostMemory.maxRecents)], forKey: key)
+    }
+
     private static func makeMemory(for url: URL, settings: AppSettings) -> HostMemory {
         let home = settings.homeDirectory
         let key = memoryKey(for: url, home: home)
         let legacyKey = "hostMemory." + hashedKind(for: url, prefix: "config")
-        let defaults = settings.userDefaults
-        if legacyKey != key, defaults.object(forKey: key) == nil, let old = defaults.object(forKey: legacyKey) {
-            defaults.set(old, forKey: key)
-        }
-        return HostMemory(defaults: defaults, key: key)
+        mergeLegacyMemory(defaults: settings.userDefaults, key: key, legacyKey: legacyKey)
+        return HostMemory(defaults: settings.userDefaults, key: key)
     }
 
     /// Opens another known_hosts file. There are no drafts, so nothing needs confirming.
@@ -336,16 +357,16 @@ final class AppModel {
     func connect(alias requested: String) async -> Connector.Outcome? {
         guard !launchInFlight else { return nil }
         guard let alias = savedAlias(requested) else {
-            AppLog.info(.connect, LaunchError.failed("not in the saved file"))
+            AppLog.info(.connect, LaunchError.notSaved)
             errorMessage = String(localized: "connect.notSaved")
-            return .failed(.failed("not in the saved file"))
+            return .failed(.notSaved)
         }
         let builder = commandBuilder
         let request = LaunchRequest(sshArguments: builder.sshArguments(alias: alias), shellCommand: builder.shellCommand(alias: alias))
         guard !request.shellCommand.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7F }) else {
-            AppLog.info(.connect, LaunchError.failed("control character"))
+            AppLog.info(.connect, LaunchError.invalidCommand)
             errorMessage = String(localized: "connect.invalidCommand")
-            return .failed(.failed("control character"))
+            return .failed(.invalidCommand)
         }
         guard let outcome = await runLaunch(request) else { return nil }
         report(outcome)
@@ -431,14 +452,14 @@ final class AppModel {
     func uploadKey(publicKey: URL, alias requested: String) async -> Connector.Outcome? {
         guard !launchInFlight else { return nil }
         guard let alias = savedAlias(requested) else {
-            AppLog.info(.connect, LaunchError.failed("not in the saved file"))
-            return .failed(.failed("not in the saved file"))
+            AppLog.info(.connect, LaunchError.notSaved)
+            return .failed(.notSaved)
         }
         let arguments = ["-i", publicKey.path] + commandBuilder.configArguments + ["--", alias]
         let shellCommand = (["ssh-copy-id"] + arguments.map(SSHCommandBuilder.shellQuote)).joined(separator: " ")
         guard !shellCommand.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7F }) else {
-            AppLog.info(.connect, LaunchError.failed("control character"))
-            return .failed(.failed("control character"))
+            AppLog.info(.connect, LaunchError.invalidCommand)
+            return .failed(.invalidCommand)
         }
         return await runLaunch(LaunchRequest(sshArguments: arguments, shellCommand: shellCommand, program: "/usr/bin/ssh-copy-id"))
     }

@@ -34,14 +34,18 @@ final class QuickConnectModel {
     private let openMainWindow: @MainActor () -> Void
 
     private let copyToPasteboard: @MainActor (String) -> Void
+    /// Feedback for ↩ while a launch is in flight (silent in tests).
+    private let beep: @MainActor () -> Void
     @ObservationIgnored private var previewTask: Task<Void, Never>?
 
     init(app: AppModel, openMainWindow: @escaping @MainActor () -> Void = {},
          copyToPasteboard: @escaping @MainActor (String) -> Void = {
              NSPasteboard.general.clearContents()
              NSPasteboard.general.setString($0, forType: .string)
-         }) {
+         },
+         beep: @escaping @MainActor () -> Void = { NSSound.beep() }) {
         self.app = app
+        self.beep = beep
         self.openMainWindow = openMainWindow
         self.copyToPasteboard = copyToPasteboard
     }
@@ -121,7 +125,8 @@ final class QuickConnectModel {
     /// panel can close at once. A launch that fails opens the main window, where the error shows.
     @discardableResult
     func connectSelected() -> Bool {
-        guard !app.launchInFlight, let entry = selectedEntry else { return false }   // a launch is running: ↩ does nothing
+        guard let entry = selectedEntry else { return false }
+        guard !app.launchInFlight else { beep(); return false }   // a launch is running: ↩ beeps and does nothing
         connectTask = Task { [app, openMainWindow] in
             switch await app.connect(alias: entry.alias) {
             case .launched?, nil: break

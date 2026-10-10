@@ -70,7 +70,8 @@ public enum HostMatcher {
     private static func isNegated(_ lookupName: String, in entry: KnownHostEntry) -> Bool {
         entry.names.contains { name in
             guard case .plain(let address) = name, address.literal.hasPrefix("!") else { return false }
-            return String(address.literal.dropFirst()).asciiLowercased == lookupName.asciiLowercased
+            // Wildcards in the negated pattern count (`host,!h*st` vetoes `host`), case-sensitive like ssh's match_pattern.
+            return ConfigResolver.wildcardMatch(String(address.literal.dropFirst()).asciiLowercased, lookupName.asciiLowercased)
         }
     }
 }

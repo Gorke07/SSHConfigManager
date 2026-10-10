@@ -146,7 +146,7 @@ struct TerminalLaunchingTests {
         let launcher = RecordingLauncher()
         let app = makeTestModel(tmp, config: "Host a\u{1B}x\n", launcher: launcher)
         #expect(app.connectableAliases == ["a\u{1B}x"])
-        #expect(await app.connect(alias: "a\u{1B}x") == .failed(.failed("control character")))
+        #expect(await app.connect(alias: "a\u{1B}x") == .failed(.invalidCommand))
         #expect(launcher.requests.isEmpty)
         #expect(app.errorMessage == String(localized: "connect.invalidCommand"))
     }
@@ -162,7 +162,7 @@ struct TerminalLaunchingTests {
         #expect(app.connectableAliases == ["a"])
         #expect(app.connectableAlias(for: prod) == nil)
         #expect(QuickConnectModel(app: app).entries.map(\.alias) == ["a"])
-        #expect(await app.connect(alias: "prod") == .failed(.failed("not in the saved file")))
+        #expect(await app.connect(alias: "prod") == .failed(.notSaved))
         #expect(launcher.requests.isEmpty)
         #expect(app.errorMessage == String(localized: "connect.notSaved"))
     }
@@ -180,7 +180,7 @@ struct TerminalLaunchingTests {
         #expect(app.store.hasUnsavedChanges)
         #expect(app.connectableAlias(for: .host(alias: "renamed", occurrence: 0)) == nil)
         #expect(app.connectableAliases == ["Web"])
-        #expect(await app.connect(alias: "web") == .failed(.failed("not in the saved file")))   // exact: ssh does not match web to Web
+        #expect(await app.connect(alias: "web") == .failed(.notSaved))   // exact: ssh does not match web to Web
         #expect(launcher.requests.isEmpty)
         #expect(await app.connect(alias: "Web") == .launched(.terminal))
         #expect(launcher.requests.first?.sshArguments == ["--", "Web"])
@@ -263,6 +263,26 @@ struct TerminalLaunchingTests {
         #expect(!app.launchInFlight)
         #expect(launcher.requests.count == 1)
         #expect(await app.connect(alias: "a") == .launched(.terminal))
+    }
+
+    @Test func quickConnectBeepsOnReturnWhileALaunchIsInFlight() async throws {
+        let tmp = try TempDir()
+        let launcher = RecordingLauncher()
+        var release: CheckedContinuation<Void, Never>?
+        launcher.gate = { await withCheckedContinuation { release = $0 } }
+        let app = makeTestModel(tmp, config: "Host a\n", launcher: launcher)
+        var beeps = 0
+        let quick = QuickConnectModel(app: app, beep: { beeps += 1 })
+        #expect(quick.connectSelected())
+        while release == nil { await Task.yield() }
+        #expect(!quick.connectSelected())
+        #expect(beeps == 1)
+        launcher.gate = nil
+        release?.resume()
+        await quick.connectTask?.value
+        #expect(quick.connectSelected())
+        #expect(beeps == 1)
+        await quick.connectTask?.value
     }
 
     @Test func launchErrorsAreLocalizedExceptOsAndSshMessages() {

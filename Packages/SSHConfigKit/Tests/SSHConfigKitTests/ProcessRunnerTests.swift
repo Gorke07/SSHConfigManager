@@ -119,6 +119,25 @@ struct ProcessRunnerTests {
         #expect(gone)
     }
 
+    @Test func cancelAfterLeaderExitStillKillsGroupMembers() async throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "sshcm-pg-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let pidFile = dir.appending(path: "pid")
+        // The leader exits at once; the grandchild keeps stdout open.
+        let script = "sleep 30 & echo $! > '\(pidFile.path)'"
+        let runner = self.runner
+        let task = Task {
+            try await runner.run(URL(filePath: "/bin/sh"), arguments: ["-c", script], environment: [:], timeout: .seconds(60))
+        }
+        let grandchild = try await startTreeAndReadGrandchild(pidFile: pidFile)
+        task.cancel()
+        _ = try await task.value
+        let gone = await isGone(grandchild)
+        if !gone { kill(grandchild, SIGKILL) }   // our own test child only
+        #expect(gone)
+    }
+
     @Test func timeoutKillsGrandchildrenIncludingTermIgnoring() async throws {
         let dir = FileManager.default.temporaryDirectory.appending(path: "sshcm-pg-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

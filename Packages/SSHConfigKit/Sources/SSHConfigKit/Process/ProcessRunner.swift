@@ -72,7 +72,8 @@ public struct ProcessRunner: ProcessRunning {
 
         let seconds = Double(timeout.components.seconds) + Double(timeout.components.attoseconds) / 1e18
         DispatchQueue.global().asyncAfter(deadline: .now() + seconds) {
-            guard !state.hasExited else { return }
+            // Not "has the leader exited": other group members may still hold the pipes.
+            guard !state.isFinished else { return }
             state.markTimedOut()
             escalate()
         }
@@ -84,7 +85,7 @@ public struct ProcessRunner: ProcessRunning {
                 state.install(continuation)
             }
         } onCancel: {
-            if !state.hasExited { escalate() }
+            if !state.isFinished { escalate() }
         }
     }
 
@@ -220,7 +221,7 @@ private final class RunState: Sendable {
 
     func markTimedOut() { inner.withLock { $0.timedOut = true } }
 
-    var hasExited: Bool { inner.withLock { $0.exited } }
+    var isFinished: Bool { inner.withLock { $0.finished } }
 
     /// True for the first caller only: SIGTERM and the SIGKILL escalation are sent once.
     func beginTermination() -> Bool {

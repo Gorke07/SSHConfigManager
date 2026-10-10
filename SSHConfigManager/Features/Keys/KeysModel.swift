@@ -146,9 +146,9 @@ final class KeysModel {
         case .failed(.automationDenied):
             notice = String(localized: "connect.automationDenied.message")
             noticeIsAutomationDenied = true
-        case .failed(.failed("not in the saved file")):
+        case .failed(.notSaved):
             errorMessage = String(localized: "connect.notSaved")
-        case .failed(.failed("control character")):
+        case .failed(.invalidCommand):
             errorMessage = String(localized: "connect.invalidCommand")
         case .failed(let error):
             let detail = error.userMessage ?? ""

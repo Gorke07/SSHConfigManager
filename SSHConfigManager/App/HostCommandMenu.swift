@@ -38,7 +38,7 @@ struct HostCommandMenu: Commands {
                 Task { await model.connect(alias: alias) }
             }
             .keyboardShortcut(.return)
-            .disabled(!model.mainWindowIsKey || selectedAlias == nil)
+            .disabled(!model.mainWindowIsKey || selectedAlias == nil || model.launchInFlight)
 
             Button(String(localized: "menu.host.test")) {
                 guard model.mainWindowIsKey, let alias = selectedAlias else { return }

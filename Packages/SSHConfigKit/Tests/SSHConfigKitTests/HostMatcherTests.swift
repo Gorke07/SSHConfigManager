@@ -124,6 +124,16 @@ struct HostMatcherTests {
         #expect(HostMatcher.entries(in: doc, matchingAny: ["[h2]:2222"]).isEmpty)
     }
 
+    // ssh-keygen -F host (checked by hand): `host,!h*st` is not found, `host,!other*` is.
+    @Test func wildcardNegationVetoesLikeSshKeygen() {
+        let doc = KnownHostsDocument(parsing: """
+        host,!h*st ssh-ed25519 \(Self.ed)
+        host,!other* ssh-ed25519 \(Self.ed)
+
+        """)
+        #expect(HostMatcher.entries(in: doc, matchingAny: ["host"]).map(\.lineIndex) == [1])
+    }
+
     /// Real ssh-keygen on a temp file: `-F` reports `# Host x found: line N`; `-R` leaves the other lines.
     @Test func agreesWithSshKeygenOnLinesAndRemovals() async throws {
         let tmp = try TempDir()
@@ -179,6 +189,18 @@ struct HostMatcherTests {
             let ours = HostMatcher.entries(in: hashedDocument, matchingAny: [query]).map { $0.lineIndex + 1 }
             #expect(reported == ours, "hashed \(query) (was line \(String(describing: expectedLine)))")
         }
+    }
+
+    @Test func wildcardNegationAgreesWithRealSshKeygen() async throws {
+        let tmp = try TempDir()
+        let runner = ProcessRunner()
+        let keygen = URL(filePath: "/usr/bin/ssh-keygen")
+        let file = try tmp.file("kh", "host,!h*st ssh-ed25519 \(Self.ed)\nhost,!other* ssh-ed25519 \(Self.ed)\n")
+        let found = try await runner.run(keygen, arguments: ["-F", "host", "-f", file.path], environment: [:], timeout: .seconds(30))
+        let reported = found.stdout.split(separator: "\n").compactMap { $0.firstMatch(of: /found: line (\d+)/).map { Int($0.1)! } }
+        let document = KnownHostsDocument(parsing: try tmp.read("kh"))
+        #expect(reported == [2])
+        #expect(HostMatcher.entries(in: document, matchingAny: ["host"]).map { $0.lineIndex + 1 } == reported)
     }
 
     @Test func hashedBareAndBracketedPort22AreSeparateLikeSshKeygen() async throws {
