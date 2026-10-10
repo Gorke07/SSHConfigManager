@@ -62,12 +62,13 @@ struct QuickConnectModelTests {
         #expect(quick.selectedEntry?.alias == "web")
     }
 
-    @Test func connectingUsesTheSelectedAlias() throws {
+    @Test func connectingUsesTheSelectedAlias() async throws {
         let tmp = try TempDir()
         let launcher = RecordingLauncher()
         let quick = try model(tmp, launcher: launcher)
         quick.move(by: 2)
         #expect(quick.connectSelected())
+        await quick.connectTask?.value
         #expect(launcher.requests.first?.sshArguments.last == "vpn")
     }
 
@@ -82,31 +83,35 @@ struct QuickConnectModelTests {
         #expect(quick.focusToken != token)
     }
 
-    @Test func failedLaunchOpensTheMainWindow() throws {
+    @Test func failedLaunchOpensTheMainWindow() async throws {
         let tmp = try TempDir()
         let launcher = RecordingLauncher()
         launcher.error = .automationDenied
         var opened = 0
         let quick = try model(tmp, launcher: launcher, openMainWindow: { opened += 1 })
         #expect(quick.connectSelected())
+        await quick.connectTask?.value
         #expect(opened == 1)
         #expect(quick.app.automationDenied)
     }
 
-    @Test func successfulLaunchKeepsTheMainWindowClosed() throws {
+    @Test func successfulLaunchKeepsTheMainWindowClosed() async throws {
         let tmp = try TempDir()
         var opened = 0
         let quick = try model(tmp, openMainWindow: { opened += 1 })
         #expect(quick.connectSelected())
+        await quick.connectTask?.value
+        #expect(quick.connectSelected())
+        await quick.connectTask?.value
         #expect(opened == 0)
     }
 
-    @Test func emptyQueryShowsFavoritesThenRecentsThenTheRest() throws {
+    @Test func emptyQueryShowsFavoritesThenRecentsThenTheRest() async throws {
         let tmp = try TempDir()
         let app = makeTestModel(tmp, config: "Host a\nHost b\nHost c\nHost d\n")
         app.toggleFavorite("c")
-        _ = app.connect(alias: "b")
-        _ = app.connect(alias: "c")
+        _ = await app.connect(alias: "b")
+        _ = await app.connect(alias: "c")
         let model = QuickConnectModel(app: app)
         #expect(model.entries.map(\.alias) == ["c", "b", "a", "d"])
         #expect(model.entries.map(\.section) == [.favorites, .recents, .all, .all])
@@ -184,11 +189,11 @@ struct QuickConnectModelTests {
         #expect(model.entries.map(\.alias).sorted() == ["db", "web"])
     }
 
-    @Test func togglingFavoriteKeepsTheSelectionOnTheSameHost() throws {
+    @Test func togglingFavoriteKeepsTheSelectionOnTheSameHost() async throws {
         let tmp = try TempDir()
         let app = makeTestModel(tmp, config: "Host a\nHost b\nHost c\nHost d\n")
         app.toggleFavorite("c")
-        _ = app.connect(alias: "b")
+        _ = await app.connect(alias: "b")
         let model = QuickConnectModel(app: app)
         model.query = ""
         #expect(model.entries.map(\.alias) == ["c", "b", "a", "d"])

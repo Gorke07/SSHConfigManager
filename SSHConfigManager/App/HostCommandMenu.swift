@@ -35,14 +35,14 @@ struct HostCommandMenu: Commands {
 
             Button(String(localized: "menu.host.connect")) {
                 guard model.mainWindowIsKey, let alias = selectedAlias else { return }
-                model.connect(alias: alias)
+                Task { await model.connect(alias: alias) }
             }
             .keyboardShortcut(.return)
             .disabled(!model.mainWindowIsKey || selectedAlias == nil)
 
             Button(String(localized: "menu.host.test")) {
                 guard model.mainWindowIsKey, let alias = selectedAlias else { return }
-                Task { await model.connectionTests.test(alias, using: model.commandBuilder) }
+                Task { await model.test(alias: alias) }
             }
             .keyboardShortcut("t")
             .disabled(!model.mainWindowIsKey || selectedAlias == nil)

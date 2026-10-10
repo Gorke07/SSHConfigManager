@@ -91,8 +91,11 @@ func makeTestModel(_ tmp: TempDir, config: String? = nil, runner: any ProcessRun
 final class RecordingLauncher: TerminalLaunching {
     private(set) var requests: [LaunchRequest] = []
     var error: LaunchError?
+    /// When set, `launch` suspends on it first (to hold a launch "in flight").
+    var gate: (() async -> Void)?
 
-    func launch(_ request: LaunchRequest) throws {
+    func launch(_ request: LaunchRequest) async throws {
+        await gate?()
         if let error { throw error }
         requests.append(request)
     }

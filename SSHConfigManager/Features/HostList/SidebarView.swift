@@ -95,12 +95,12 @@ struct SidebarView: View {
     @ViewBuilder
     private func connectItems(for item: SidebarItem) -> some View {
         if let alias = model.connectableAlias(for: item) {
-            Button(String(localized: "action.connect")) { model.connect(alias: alias) }
+            Button(String(localized: "action.connect")) { Task { await model.connect(alias: alias) } }
             Button(model.memory.isFavorite(alias) ? String(localized: "favorite.remove") : String(localized: "favorite.add")) {
                 model.toggleFavorite(alias)
             }
             Button(String(localized: "action.test")) {
-                Task { await model.connectionTests.test(alias, using: model.commandBuilder) }
+                Task { await model.test(alias: alias) }
             }
             Button(String(localized: "action.removeKnownHost")) {
                 Task { await model.requestHostKeyRemoval(alias: alias) }

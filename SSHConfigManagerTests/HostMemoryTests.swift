@@ -145,7 +145,7 @@ struct HostMemoryTests {
         #expect(HostMemory(defaults: tmp.defaults, key: "k").recents == ["MixedCase.Host"])
     }
 
-    @Test func caseDifferingAliasesAreSeparateHostsForFavoritesAndRecents() throws {
+    @Test func caseDifferingAliasesAreSeparateHostsForFavoritesAndRecents() async throws {
         let tmp = try TempDir()
         let model = makeTestModel(tmp, config: "Host Web\n  User upper\nHost web\n  User lower\n")
         #expect(model.savedConnectableHosts.map(\.entry.alias) == ["Web", "web"])
@@ -155,37 +155,37 @@ struct HostMemoryTests {
         model.toggleFavorite("web")
         #expect(model.favoriteAliases == ["web"])
         #expect(!model.memory.isFavorite("Web"))
-        model.connect(alias: "Web")
-        model.connect(alias: "web")
+        await model.connect(alias: "Web")
+        await model.connect(alias: "web")
         #expect(model.recentAliases == ["web", "Web"])
     }
 
-    @Test func appModelRecordsSuccessfulConnectsAndHidesUnsavedOrRemovedHosts() throws {
+    @Test func appModelRecordsSuccessfulConnectsAndHidesUnsavedOrRemovedHosts() async throws {
         let tmp = try TempDir()
         let model = makeTestModel(tmp, config: "Host web\nHost db\n")
-        model.connect(alias: "web")
+        await model.connect(alias: "web")
         model.toggleFavorite("db")
         model.memory.recordConnection("gone")           // e.g. removed from the file later
         #expect(model.recentAliases == ["web"])
         #expect(model.favoriteAliases == ["db"])
     }
 
-    @Test func fellBackConnectsAreRecordedAndKeyUploadsAreNot() throws {
+    @Test func fellBackConnectsAreRecordedAndKeyUploadsAreNot() async throws {
         let tmp = try TempDir()
         let model = makeTestModel(tmp, config: "Host web\nHost db\n", isTerminalInstalled: { $0 == .terminal })
         model.settings.setTerminal(.ghostty)
-        #expect(model.connect(alias: "web") == .fellBack(from: .ghostty))
+        #expect(await model.connect(alias: "web") == .fellBack(from: .ghostty))
         #expect(model.recentAliases == ["web"])
-        model.uploadKey(publicKey: tmp.url.appending(path: "k.pub"), alias: "db")
+        await model.uploadKey(publicKey: tmp.url.appending(path: "k.pub"), alias: "db")
         #expect(model.recentAliases == ["web"])
     }
 
-    @Test func failedConnectsAreNotRecorded() throws {
+    @Test func failedConnectsAreNotRecorded() async throws {
         let tmp = try TempDir()
         let launcher = RecordingLauncher()
         launcher.error = .failed("x")
         let model = makeTestModel(tmp, config: "Host web\n", launcher: launcher)
-        model.connect(alias: "web")
+        await model.connect(alias: "web")
         #expect(model.recentAliases.isEmpty)
     }
 

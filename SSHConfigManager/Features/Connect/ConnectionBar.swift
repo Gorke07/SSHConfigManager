@@ -79,11 +79,11 @@ struct ConnectionBar: View {
             }
             Button(String(localized: "action.test")) {
                 guard let alias else { return }
-                Task { await model.connectionTests.test(alias, using: model.commandBuilder) }
+                Task { await model.test(alias: alias) }
             }
             .disabled(alias == nil || model.connectionTests.running.contains(alias ?? ""))
             Button(String(localized: "action.connect")) {
-                if let alias { model.connect(alias: alias) }
+                if let alias { Task { await model.connect(alias: alias) } }
             }
             .buttonStyle(.borderedProminent)
             .help(String(localized: "action.connect.help"))

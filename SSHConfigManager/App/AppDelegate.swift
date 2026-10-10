@@ -7,8 +7,23 @@ import SSHConfigKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let model: AppModel = AppDelegate.makeModel()
     /// Set by every scene (registersMainWindowOpener); reopens it when the Dock icon is clicked or after a failed quit-save.
-    var openMainWindow: (() -> Void)?
+    var windowOpener: (() -> Void)?
+    /// Opening the main window on the user's behalf (menu bar, Dock, panel, quit-save) also disarms the login
+    /// guard, so a window the user asked for within the first seconds is not closed. SwiftUI's own automatic
+    /// window restore does not come through here.
+    var openMainWindow: (() -> Void)? {
+        guard windowOpener != nil else { return nil }
+        return { [weak self] in
+            self?.disarmLoginGuard()
+            self?.windowOpener?()
+        }
+    }
     private(set) lazy var quickConnect = QuickConnectModel(app: model, openMainWindow: { [unowned self] in openMainWindow?() })
+
+    private func disarmLoginGuard() {
+        if let token = loginLaunchGuard { NotificationCenter.default.removeObserver(token) }
+        loginLaunchGuard = nil
+    }
 
     var panelController: QuickConnectPanelController?
     private var observers: [any NSObjectProtocol] = []
@@ -92,6 +107,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// panel nor the menu bar extra's window (both are panels).
     private static func isAppWindow(_ window: NSWindow) -> Bool {
         window.canBecomeMain && !(window is NSPanel)
+            && window.styleMask.contains(.titled) && window.level == .normal
             && !String(describing: type(of: window)).contains("MenuBarExtra")
     }
 
@@ -166,5 +182,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 /// Used by the test host so UI driven during tests can never open a real terminal.
 private struct NoOpLauncher: TerminalLaunching {
-    func launch(_ request: LaunchRequest) throws {}
+    func launch(_ request: LaunchRequest) async throws {}
 }

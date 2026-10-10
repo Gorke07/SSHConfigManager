@@ -71,7 +71,7 @@ final class ProxyChainTest {
             if failed { states[node.id] = .skipped; continue }
             guard let alias = node.alias, !node.isCycle else { continue }
             states[node.id] = .testing
-            await app.connectionTests.test(alias, using: app.commandBuilder)
+            await app.test(alias: alias)
             let status = app.connectionTests.results[alias]?.status ?? .other
             states[node.id] = .done(status)
             if status != .reachable { failed = true }

@@ -328,8 +328,11 @@ final class AppModel {
         savedHosts.hosts.map(\.entry.alias)
     }
 
+    /// Connects in the chosen terminal. Returns nil, doing nothing, while another launch is still in flight
+    /// (a double click or a repeated shortcut must not open two windows).
     @discardableResult
-    func connect(alias requested: String) -> Connector.Outcome {
+    func connect(alias requested: String) async -> Connector.Outcome? {
+        guard !launchInFlight else { return nil }
         guard let alias = savedAlias(requested) else {
             AppLog.info(.connect, LaunchError.failed("not in the saved file"))
             errorMessage = String(localized: "connect.notSaved")
@@ -342,12 +345,21 @@ final class AppModel {
             errorMessage = String(localized: "connect.invalidCommand")
             return .failed(.failed("control character"))
         }
-        let outcome = launch(request)
+        let outcome = await launch(request)
         switch outcome {
         case .launched, .fellBack: memory.recordConnection(alias)
         default: break
         }
         return outcome
+    }
+
+    /// Tests the saved file's host (exact alias, as `connect` does); an unsaved or edited alias is not tested.
+    func test(alias requested: String) async {
+        guard let alias = savedAlias(requested) else {
+            errorMessage = String(localized: "connect.notSaved")
+            return
+        }
+        await connectionTests.test(alias, using: commandBuilder)
     }
 
     /// Favorites that are hosts of the saved file, as written there.
@@ -410,8 +422,10 @@ final class AppModel {
     }
 
     /// "Upload to Server…": `ssh-copy-id -i <pub> [-F <config>] -- <alias>` in the chosen terminal (interactive).
+    /// Returns nil, doing nothing, while another launch is in flight.
     @discardableResult
-    func uploadKey(publicKey: URL, alias requested: String) -> Connector.Outcome {
+    func uploadKey(publicKey: URL, alias requested: String) async -> Connector.Outcome? {
+        guard !launchInFlight else { return nil }
         guard let alias = savedAlias(requested) else {
             AppLog.info(.connect, LaunchError.failed("not in the saved file"))
             errorMessage = String(localized: "connect.notSaved")
@@ -424,11 +438,16 @@ final class AppModel {
             errorMessage = String(localized: "connect.invalidCommand")
             return .failed(.failed("control character"))
         }
-        return launch(LaunchRequest(sshArguments: arguments, shellCommand: shellCommand, program: "/usr/bin/ssh-copy-id"))
+        return await launch(LaunchRequest(sshArguments: arguments, shellCommand: shellCommand, program: "/usr/bin/ssh-copy-id"))
     }
 
-    private func launch(_ request: LaunchRequest) -> Connector.Outcome {
-        let outcome = Connector(choice: settings.terminal, isInstalled: terminalInstalled, makeLauncher: launcherFactory).connect(request)
+    /// True from the moment a launch starts until its outcome is known.
+    private(set) var launchInFlight = false
+
+    private func launch(_ request: LaunchRequest) async -> Connector.Outcome {
+        launchInFlight = true
+        defer { launchInFlight = false }
+        let outcome = await Connector(choice: settings.terminal, isInstalled: terminalInstalled, makeLauncher: launcherFactory).connect(request)
         switch outcome {
         case .launched:
             errorMessage = nil
@@ -440,8 +459,9 @@ final class AppModel {
         case .failed(.automationDenied):
             AppLog.error(.connect, LaunchError.automationDenied)
             automationDenied = true
-        case .failed(.failed(let detail)):
-            AppLog.error(.connect, LaunchError.failed(detail))
+        case .failed(let error):
+            AppLog.error(.connect, error)
+            let detail = error.userMessage ?? ""
             errorMessage = String(localized: "connect.failed \(detail)")
         }
         return outcome

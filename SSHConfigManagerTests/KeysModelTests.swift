@@ -134,13 +134,13 @@ struct KeysModelTests {
         let row = try await keyRow(model)
 
         launcher.error = .automationDenied
-        #expect(model.keys.upload(row, alias: "web") == .failed(.automationDenied))
+        #expect(await model.keys.upload(row, alias: "web") == .failed(.automationDenied))
         #expect(model.keys.notice == String(localized: "connect.automationDenied.message"))
         #expect(model.keys.errorMessage == nil)
         #expect(!model.automationDenied && model.errorMessage == nil && model.fallbackNotice == nil)
 
         launcher.error = .failed("x")
-        #expect(model.keys.upload(row, alias: "web") == .failed(.failed("x")))
+        #expect(await model.keys.upload(row, alias: "web") == .failed(.failed("x")))
         #expect(model.keys.errorMessage == String(localized: "connect.failed \("x")"))
         #expect(!model.automationDenied && model.errorMessage == nil && model.fallbackNotice == nil)
         #expect(launcher.requests.isEmpty)
@@ -152,13 +152,13 @@ struct KeysModelTests {
         let model = makeTestModel(tmp, config: "Host web\n", launcher: launcher, isTerminalInstalled: { $0 == .terminal })
         model.settings.setTerminal(.ghostty)
         let row = try await keyRow(model)
-        #expect(model.keys.upload(row, alias: "web") == .fellBack(from: .ghostty))
+        #expect(await model.keys.upload(row, alias: "web") == .fellBack(from: .ghostty))
         #expect(model.keys.notice == String(localized: "connect.fellBack \(TerminalChoice.ghostty.displayName)"))
         #expect(model.fallbackNotice == nil && model.errorMessage == nil)
         #expect(launcher.requests.count == 1)
 
         model.settings.setTerminal(.terminal)
-        #expect(model.keys.upload(row, alias: "web") == .launched(.terminal))
+        #expect(await model.keys.upload(row, alias: "web") == .launched(.terminal))
         #expect(model.keys.errorMessage == nil)
         #expect(launcher.requests.count == 2)
     }
@@ -221,7 +221,7 @@ struct KeysModelTests {
         _ = await model.keys.generate(type: .ed25519, fileName: "k", comment: "c", passphrase: "", assignTo: nil)
         await model.keys.refresh()
         let row = try #require(model.keys.rows.first)
-        guard case .fellBack = model.keys.upload(row, alias: "web") else { Issue.record("expected fellBack"); return }
+        guard case .fellBack? = await model.keys.upload(row, alias: "web") else { Issue.record("expected fellBack"); return }
         model.keys.errorMessage = nil                             // what the sheet's onDisappear does
         let name = TerminalChoice.ghostty.displayName
         #expect(model.keys.notice == String(localized: "connect.fellBack \(name)"))
@@ -236,7 +236,7 @@ struct KeysModelTests {
         let model = makeTestModel(tmp, config: "Host web\n", launcher: launcher)
         _ = await model.keys.generate(type: .ed25519, fileName: "k", comment: "c", passphrase: "", assignTo: nil)
         await model.keys.refresh()
-        _ = model.keys.upload(try #require(model.keys.rows.first), alias: "web")
+        _ = await model.keys.upload(try #require(model.keys.rows.first), alias: "web")
         #expect(model.keys.notice == String(localized: "connect.automationDenied.message"))
         #expect(model.keys.noticeIsAutomationDenied)
         #expect(model.automationDenied == false)

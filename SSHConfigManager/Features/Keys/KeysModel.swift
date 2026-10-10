@@ -122,12 +122,12 @@ final class KeysModel {
 
     /// "Upload to Server…": the outcome is reported in this window's own state, not the main window's.
     @discardableResult
-    func upload(_ row: KeyRow, alias: String) -> Connector.Outcome {
+    func upload(_ row: KeyRow, alias: String) async -> Connector.Outcome? {
         guard let app, let pub = row.key.publicURL else { return .failed(.failed("no public key")) }
         let savedError = app.errorMessage
         let savedFallback = app.fallbackNotice
         let savedDenied = app.automationDenied
-        let outcome = app.uploadKey(publicKey: pub, alias: alias)
+        guard let outcome = await app.uploadKey(publicKey: pub, alias: alias) else { return nil }   // another launch is running
         switch outcome {
         case .launched:
             errorMessage = nil
@@ -137,7 +137,7 @@ final class KeysModel {
         case .failed(.automationDenied):
             notice = String(localized: "connect.automationDenied.message")
             noticeIsAutomationDenied = true
-        case .failed(.failed):
+        case .failed:
             errorMessage = app.errorMessage
         }
         app.errorMessage = savedError

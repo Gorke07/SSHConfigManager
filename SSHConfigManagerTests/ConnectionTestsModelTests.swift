@@ -107,6 +107,36 @@ struct ConnectionTestsModelTests {
         #expect(!style.symbol.isEmpty)
         #expect(!style.title.isEmpty && !style.title.hasPrefix("status."))
     }
+
+    /// First call for "a" answers fast, later ones slowly; "slow" takes a middle amount.
+    private final class StagedRunner: ProcessRunning, @unchecked Sendable {
+        private let lock = NSLock()
+        private var calls = 0
+        let result: ProcessResult
+        init(result: ProcessResult) { self.result = result }
+
+        func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
+            let isSlow = arguments.contains("slow")
+            let call = lock.withLock { calls += 1; return calls }
+            let delay: Duration = isSlow ? .milliseconds(300) : (call == 1 ? .milliseconds(10) : .milliseconds(900))
+            try await Task.sleep(for: delay)
+            return result
+        }
+    }
+
+    @Test func aSingleTestStartedAfterItsAliasWasRecordedKeepsItsSpinnerWhenTestAllEnds() async {
+        let model = ConnectionTestsModel(runner: StagedRunner(result: refused))
+        model.testAll(["a", "slow"], using: builder)
+        while model.results["a"] == nil { try? await Task.sleep(for: .milliseconds(10)) }
+        let single = Task { await model.test("a", using: builder) }
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(model.running.contains("a"))
+        await model.waitUntilIdle()
+        #expect(!model.isTestingAll)
+        #expect(model.running == ["a"])
+        await single.value
+        #expect(model.running.isEmpty)
+    }
 }
 
 /// Counts how many times ssh would have been started.

@@ -1905,6 +1905,34 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Terminal açılamadı: %@" } }
       }
     },
+    "connect.error.unsafePath" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "the path contains characters that are not safe to run" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "yol çalıştırmak için güvenli olmayan karakterler içeriyor" } }
+      }
+    },
+    "connect.error.scriptWrite" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "the launch script could not be written" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "başlatma betiği yazılamadı" } }
+      }
+    },
+    "connect.error.appleScript" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "the AppleScript could not be prepared" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "AppleScript hazırlanamadı" } }
+      }
+    },
+    "connect.error.open %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "open exited with status %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "open %@ durum koduyla çıktı" } }
+      }
+    },
     "favorite.limit %@" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -114,17 +114,26 @@ final class QuickConnectModel {
         if let index = entries.firstIndex(of: entry) { selectedIndex = index }
     }
 
+    /// The launch of the last `connectSelected` (tests await it).
+    private(set) var connectTask: Task<Void, Never>?
+
+    /// True when there was a selection to connect to; the launch itself runs in `connectTask`, so the
+    /// panel can close at once. A launch that fails opens the main window, where the error shows.
     @discardableResult
     func connectSelected() -> Bool {
         guard let entry = selectedEntry else { return false }
-        if case .launched = app.connect(alias: entry.alias) {} else { openMainWindow() }
+        connectTask = Task { [app, openMainWindow] in
+            switch await app.connect(alias: entry.alias) {
+            case .launched?, nil: break
+            default: openMainWindow()
+            }
+        }
         return true
     }
 
     func testSelected() {
         guard let entry = selectedEntry else { return }
-        let builder = app.commandBuilder
-        Task { await app.connectionTests.test(entry.alias, using: builder) }
+        Task { await app.test(alias: entry.alias) }
     }
 
     @discardableResult

@@ -186,9 +186,11 @@ struct UploadKeySheet: View {
                 Button(String(localized: "action.cancel"), role: .cancel) { close() }.keyboardShortcut(.cancelAction)
                 Button(String(localized: "keys.upload")) {
                     // Launched, fell back or Automation denied: close; the window shows the notice.
-                    switch app.keys.upload(row, alias: alias) {
-                    case .launched, .fellBack, .failed(.automationDenied): close()
-                    case .failed(.failed): break   // the error shows inline
+                    Task {
+                        switch await app.keys.upload(row, alias: alias) {
+                        case .launched?, .fellBack?, .failed(.automationDenied)?: close()
+                        case .failed?, nil: break   // the error shows inline (nil: a launch is already running)
+                        }
                     }
                 }
                 .keyboardShortcut(.defaultAction)

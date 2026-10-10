@@ -12,54 +12,91 @@ struct AppleScriptLauncher: TerminalLaunching {
         let script: URL
         do {
             script = try LaunchScript.write(sshArguments: request.sshArguments, program: request.program, in: scriptDirectory)
+        } catch LaunchScript.Failure.unsafePath {
+            throw LaunchError.unsafePath
         } catch {
-            throw LaunchError.failed(String(describing: error))
+            throw LaunchError.scriptWriteFailed
         }
         guard LaunchScript.isSafePath(script.path) else {
             try? FileManager.default.removeItem(at: script)
-            throw LaunchError.failed("unsafe script path")
+            throw LaunchError.unsafePath
         }
         return (script, makeSource(script.path))
     }
 
-    func launch(_ request: LaunchRequest) throws {
+    func launch(_ request: LaunchRequest) async throws {
+        LaunchScript.sweepStale(in: scriptDirectory)
         let (scriptURL, source) = try prepare(request)
         do {
-            try run(source)
+            try await AppleScriptExecutor.run(source)
         } catch {
             // The script deletes itself when it runs; it never ran.
             try? FileManager.default.removeItem(at: scriptURL)
             throw error
         }
     }
+}
 
-    private func run(_ source: String) throws {
-        guard let script = NSAppleScript(source: source) else {
-            throw LaunchError.failed("AppleScript")
-        }
-        var error: NSDictionary?
-        script.executeAndReturnError(&error)
-        if let error {
-            let number = error[NSAppleScript.errorNumber] as? Int
-            if number == -1743 { throw LaunchError.automationDenied }
-            throw LaunchError.failed(error[NSAppleScript.errorMessage] as? String ?? String(describing: number))
+/// Runs AppleScript off the main thread (the first Apple Event may wait on the Automation permission prompt).
+/// It stays in this process on purpose: macOS ties that permission to the calling app, so the prompt and the
+/// Settings entry keep naming SSH Config Manager (an `osascript` child would be a different, unexplained
+/// requester). `NSAppleScript` is not thread-safe, so every script is created and run on this one serial queue.
+enum AppleScriptExecutor {
+    private static let queue = DispatchQueue(label: "app.sshconfigmanager.applescript", qos: .userInitiated)
+
+    static func run(_ source: String) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+            queue.async {
+                guard let script = NSAppleScript(source: source) else {
+                    continuation.resume(throwing: LaunchError.appleScriptUnavailable)
+                    return
+                }
+                var error: NSDictionary?
+                script.executeAndReturnError(&error)
+                guard let error else {
+                    continuation.resume()
+                    return
+                }
+                let number = error[NSAppleScript.errorNumber] as? Int
+                if number == -1743 {
+                    continuation.resume(throwing: LaunchError.automationDenied)
+                } else {
+                    continuation.resume(throwing: LaunchError.failed(error[NSAppleScript.errorMessage] as? String ?? String(describing: number)))
+                }
+            }
         }
     }
 }
 
 struct GhosttyLauncher: TerminalLaunching {
-    func launch(_ request: LaunchRequest) throws {
-        guard LaunchScript.isSafePath(request.program) else { throw LaunchError.failed("unsafe program path") }
+    func launch(_ request: LaunchRequest) async throws {
+        guard LaunchScript.isSafePath(request.program) else { throw LaunchError.unsafePath }
+        let status = try await OpenCommand.run(GhosttyArguments.openArguments(for: request))
+        guard status == 0 else { throw LaunchError.openFailed(status) }
+    }
+}
+
+/// `/usr/bin/open`, awaited with a termination handler (no thread waits for it).
+enum OpenCommand {
+    private final class Box: @unchecked Sendable {
         let process = Process()
-        process.executableURL = URL(filePath: "/usr/bin/open")
-        process.arguments = GhosttyArguments.openArguments(for: request)
-        do {
-            try process.run()
-        } catch {
-            throw LaunchError.failed(error.localizedDescription)
+    }
+
+    static func run(_ arguments: [String]) async throws -> Int32 {
+        let box = Box()
+        box.process.executableURL = URL(filePath: "/usr/bin/open")
+        box.process.arguments = arguments
+        return try await withCheckedThrowingContinuation { continuation in
+            box.process.terminationHandler = { process in
+                continuation.resume(returning: process.terminationStatus)
+            }
+            do {
+                try box.process.run()
+            } catch {
+                box.process.terminationHandler = nil
+                continuation.resume(throwing: LaunchError.failed(error.localizedDescription))
+            }
         }
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else { throw LaunchError.failed("open \(process.terminationStatus)") }
     }
 }
 

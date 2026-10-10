@@ -75,54 +75,54 @@ struct TerminalLaunchingTests {
         #expect(try FileManager.default.contentsOfDirectory(atPath: unsafe.path).isEmpty)
     }
 
-    @Test func dangerousAliasStaysOneArgument() throws {
+    @Test func dangerousAliasStaysOneArgument() async throws {
         let tmp = try TempDir()
         let launcher = RecordingLauncher()
         let alias = #"$(touch${IFS}/tmp/pwned);`id`!\'"#
         let app = makeTestModel(tmp, config: "Host \(alias)\n", launcher: launcher)
         #expect(app.connectableAliases == [alias])
-        app.connect(alias: alias)
+        await app.connect(alias: alias)
         let request = try #require(launcher.requests.first)
         #expect(request.sshArguments == ["--", alias])
         #expect(LaunchScript.content(sshArguments: request.sshArguments).hasSuffix(
             "exec /usr/bin/ssh '--' " + LaunchScript.singleQuoted(alias) + "\n"))
     }
 
-    @Test func connectorFallsBackToTerminal() {
+    @Test func connectorFallsBackToTerminal() async {
         let ghostty = RecordingLauncher()
         ghostty.error = .failed("boom")
         let terminal = RecordingLauncher()
         let request = LaunchRequest(sshArguments: ["--", "a"], shellCommand: "ssh -- a")
 
         let failing = Connector(choice: .ghostty, isInstalled: { _ in true }, makeLauncher: { $0 == .ghostty ? ghostty : terminal })
-        #expect(failing.connect(request) == .fellBack(from: .ghostty))
+        #expect(await failing.connect(request) == .fellBack(from: .ghostty))
         #expect(terminal.requests == [request])
 
         let missing = Connector(choice: .iterm2, isInstalled: { $0 == .terminal }, makeLauncher: { _ in terminal })
-        #expect(missing.connect(request) == .fellBack(from: .iterm2))
+        #expect(await missing.connect(request) == .fellBack(from: .iterm2))
 
         let fine = Connector(choice: .terminal, isInstalled: { _ in true }, makeLauncher: { _ in terminal })
-        #expect(fine.connect(request) == .launched(.terminal))
+        #expect(await fine.connect(request) == .launched(.terminal))
     }
 
-    @Test func automationDeniedIsReportedNotHidden() {
+    @Test func automationDeniedIsReportedNotHidden() async {
         let iterm = RecordingLauncher()
         iterm.error = .automationDenied
         let terminal = RecordingLauncher()
         let request = LaunchRequest(sshArguments: ["--", "a"], shellCommand: "ssh -- a")
         let connector = Connector(choice: .iterm2, isInstalled: { _ in true }, makeLauncher: { $0 == .iterm2 ? iterm : terminal })
-        #expect(connector.connect(request) == .failed(.automationDenied))
+        #expect(await connector.connect(request) == .failed(.automationDenied))
         #expect(terminal.requests.isEmpty)
     }
 
-    @Test func terminalFailureWithoutFallback() {
+    @Test func terminalFailureWithoutFallback() async {
         let terminal = RecordingLauncher()
         terminal.error = .failed("nope")
         let connector = Connector(choice: .terminal, isInstalled: { _ in true }, makeLauncher: { _ in terminal })
-        #expect(connector.connect(LaunchRequest(sshArguments: [], shellCommand: "ssh")) == .failed(.failed("nope")))
+        #expect(await connector.connect(LaunchRequest(sshArguments: [], shellCommand: "ssh")) == .failed(.failed("nope")))
     }
 
-    @Test func modelConnectsResolvesAliasesAndReportsOutcomes() throws {
+    @Test func modelConnectsResolvesAliasesAndReportsOutcomes() async throws {
         let tmp = try TempDir()
         let launcher = RecordingLauncher()
         let app = makeTestModel(tmp, config: "Host web w2\n  HostName h\nHost *.prod\n", launcher: launcher)
@@ -132,26 +132,26 @@ struct TerminalLaunchingTests {
         #expect(app.connectableAliases == ["web"])
 
         app.errorMessage = "stale fallback message"
-        #expect(app.connect(alias: "web") == .launched(.terminal))
+        #expect(await app.connect(alias: "web") == .launched(.terminal))
         #expect(launcher.requests.first?.shellCommand == "ssh -- web")
         #expect(app.errorMessage == nil)
 
         launcher.error = .automationDenied
-        #expect(app.connect(alias: "web") == .failed(.automationDenied))
+        #expect(await app.connect(alias: "web") == .failed(.automationDenied))
         #expect(app.automationDenied)
     }
 
-    @Test func controlCharactersInAliasAreRejectedBeforeLaunching() throws {
+    @Test func controlCharactersInAliasAreRejectedBeforeLaunching() async throws {
         let tmp = try TempDir()
         let launcher = RecordingLauncher()
         let app = makeTestModel(tmp, config: "Host a\u{1B}x\n", launcher: launcher)
         #expect(app.connectableAliases == ["a\u{1B}x"])
-        #expect(app.connect(alias: "a\u{1B}x") == .failed(.failed("control character")))
+        #expect(await app.connect(alias: "a\u{1B}x") == .failed(.failed("control character")))
         #expect(launcher.requests.isEmpty)
         #expect(app.errorMessage == String(localized: "connect.invalidCommand"))
     }
 
-    @Test func hostAddedButNotSavedCannotBeConnectedOrTested() throws {
+    @Test func hostAddedButNotSavedCannotBeConnectedOrTested() async throws {
         let tmp = try TempDir()
         let launcher = RecordingLauncher()
         let app = makeTestModel(tmp, config: "Host a\n", launcher: launcher)
@@ -162,12 +162,12 @@ struct TerminalLaunchingTests {
         #expect(app.connectableAliases == ["a"])
         #expect(app.connectableAlias(for: prod) == nil)
         #expect(QuickConnectModel(app: app).entries.map(\.alias) == ["a"])
-        #expect(app.connect(alias: "prod") == .failed(.failed("not in the saved file")))
+        #expect(await app.connect(alias: "prod") == .failed(.failed("not in the saved file")))
         #expect(launcher.requests.isEmpty)
         #expect(app.errorMessage == String(localized: "connect.notSaved"))
     }
 
-    @Test func savedHostEditedWithoutSavingConnectsWithTheSavedAlias() throws {
+    @Test func savedHostEditedWithoutSavingConnectsWithTheSavedAlias() async throws {
         let tmp = try TempDir()
         let launcher = RecordingLauncher()
         let app = makeTestModel(tmp, config: "Host Web\n  HostName 10.0.0.1\n", launcher: launcher)
@@ -180,9 +180,9 @@ struct TerminalLaunchingTests {
         #expect(app.store.hasUnsavedChanges)
         #expect(app.connectableAlias(for: .host(alias: "renamed", occurrence: 0)) == nil)
         #expect(app.connectableAliases == ["Web"])
-        #expect(app.connect(alias: "web") == .failed(.failed("not in the saved file")))   // exact: ssh does not match web to Web
+        #expect(await app.connect(alias: "web") == .failed(.failed("not in the saved file")))   // exact: ssh does not match web to Web
         #expect(launcher.requests.isEmpty)
-        #expect(app.connect(alias: "Web") == .launched(.terminal))
+        #expect(await app.connect(alias: "Web") == .launched(.terminal))
         #expect(launcher.requests.first?.sshArguments == ["--", "Web"])
     }
 
@@ -196,26 +196,26 @@ struct TerminalLaunchingTests {
         #expect(app.connectableAlias(for: .host(alias: "b", occurrence: 0)) == "b")
     }
 
-    @Test func fallbackIsAnInformationalNoticeNotAnError() throws {
+    @Test func fallbackIsAnInformationalNoticeNotAnError() async throws {
         let tmp = try TempDir()
         let launcher = RecordingLauncher()
         let app = makeTestModel(tmp, config: "Host a\n", launcher: launcher, isTerminalInstalled: { $0 == .terminal })
         app.settings.setTerminal(.ghostty)
         app.errorMessage = "stale"
-        #expect(app.connect(alias: "a") == .fellBack(from: .ghostty))
+        #expect(await app.connect(alias: "a") == .fellBack(from: .ghostty))
         #expect(app.errorMessage == nil)
         let name = TerminalChoice.ghostty.displayName
         #expect(app.fallbackNotice == String(localized: "connect.fellBack \(name)"))
         #expect(launcher.requests.count == 1)
     }
 
-    @Test func customConfigUsesDashF() throws {
+    @Test func customConfigUsesDashF() async throws {
         let tmp = try TempDir()
         try tmp.file("dot/config", "Host a\n")
         let launcher = RecordingLauncher()
         let app = makeTestModel(tmp, config: "Host z\n", launcher: launcher)
         #expect(app.switchConfig(to: tmp.url.appending(path: "dot/config").path) == .switched)
-        app.connect(alias: "a")
+        await app.connect(alias: "a")
         let request = try #require(launcher.requests.first)
         #expect(request.sshArguments.prefix(2) == ["-F", tmp.url.appending(path: "dot/config").path])
     }
@@ -234,7 +234,7 @@ struct TerminalLaunchingTests {
         let request = LaunchRequest(sshArguments: ["-i", "/k.pub", "--", "a"], shellCommand: "ssh-copy-id -i /k.pub -- a", program: "/usr/bin/ssh-copy-id")
         #expect(LaunchScript.content(sshArguments: request.sshArguments, program: request.program)
                 == "#!/bin/sh\nrm -f -- \"$0\"\nexec /usr/bin/ssh-copy-id '-i' '/k.pub' '--' 'a'\n")
-        #expect(GhosttyArguments.openArguments(for: request) == ["-na", "Ghostty.app", "--args", "--wait-after-command=true", "-e", "/usr/bin/ssh-copy-id", "-i", "/k.pub", "--", "a"])
+        #expect(GhosttyArguments.openArguments(for: request) == ["-n", "-b", "com.mitchellh.ghostty", "--args", "--wait-after-command=true", "-e", "/usr/bin/ssh-copy-id", "-i", "/k.pub", "--", "a"])
         #expect(LaunchRequest(sshArguments: [], shellCommand: "ssh").program == "/usr/bin/ssh")
     }
 
@@ -244,5 +244,75 @@ struct TerminalLaunchingTests {
         #expect(throws: LaunchError.self) {
             try launcher.prepare(LaunchRequest(sshArguments: [], shellCommand: "x", program: "/usr/bin/ssh; rm"))
         }
+    }
+
+    @Test func aSecondConnectWhileOneIsInFlightIsIgnored() async throws {
+        let tmp = try TempDir()
+        let launcher = RecordingLauncher()
+        var release: CheckedContinuation<Void, Never>?
+        launcher.gate = { await withCheckedContinuation { release = $0 } }
+        let app = makeTestModel(tmp, config: "Host a\n", launcher: launcher)
+        let first = Task { await app.connect(alias: "a") }
+        while release == nil { await Task.yield() }
+        #expect(app.launchInFlight)
+        #expect(await app.connect(alias: "a") == nil)
+        #expect(await app.uploadKey(publicKey: tmp.url.appending(path: "k.pub"), alias: "a") == nil)
+        launcher.gate = nil
+        release?.resume()
+        #expect(await first.value == .launched(.terminal))
+        #expect(!app.launchInFlight)
+        #expect(launcher.requests.count == 1)
+        #expect(await app.connect(alias: "a") == .launched(.terminal))
+    }
+
+    @Test func launchErrorsAreLocalizedExceptOsAndSshMessages() {
+        #expect(LaunchError.failed("ssh said no").userMessage == "ssh said no")
+        #expect(LaunchError.unsafePath.userMessage == String(localized: "connect.error.unsafePath"))
+        #expect(LaunchError.scriptWriteFailed.userMessage == String(localized: "connect.error.scriptWrite"))
+        #expect(LaunchError.appleScriptUnavailable.userMessage == String(localized: "connect.error.appleScript"))
+        #expect(LaunchError.openFailed(1).userMessage == String(localized: "connect.error.open \("1")"))
+        #expect(LaunchError.automationDenied.userMessage == nil)
+    }
+
+    @Test func staleScriptSweepRemovesOnlyOldOwnScripts() throws {
+        let tmp = try TempDir()
+        let now = Date()
+        func make(_ name: String, age: TimeInterval) throws -> URL {
+            let url = tmp.url.appending(path: name)
+            try Data("x".utf8).write(to: url)
+            try FileManager.default.setAttributes([.modificationDate: now.addingTimeInterval(-age)], ofItemAtPath: url.path)
+            return url
+        }
+        let old = try make("sshcm-\(UUID().uuidString).sh", age: 3600)
+        let fresh = try make("sshcm-\(UUID().uuidString).sh", age: 30)
+        let foreignOld = try make("other-\(UUID().uuidString).sh", age: 3600)
+        let notUUID = try make("sshcm-notes.sh", age: 3600)
+        let wrongExtension = try make("sshcm-\(UUID().uuidString).txt", age: 3600)
+        // A symlink named like a script is never followed or removed.
+        let target = try make("target.txt", age: 3600)
+        let link = tmp.url.appending(path: "sshcm-\(UUID().uuidString).sh")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+        // A directory with a matching name is left alone.
+        let dir = tmp.url.appending(path: "sshcm-\(UUID().uuidString).sh", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: false)
+
+        #expect(LaunchScript.sweepStale(in: tmp.url, olderThan: 600, now: now) == 1)
+        let fm = FileManager.default
+        #expect(!fm.fileExists(atPath: old.path))
+        for kept in [fresh, foreignOld, notUUID, wrongExtension, target, dir] { #expect(fm.fileExists(atPath: kept.path)) }
+        #expect((try? fm.destinationOfSymbolicLink(atPath: link.path)) != nil)
+        #expect(LaunchScript.sweepStale(in: tmp.url.appending(path: "missing"), now: now) == 0)
+    }
+
+    @Test func testsRunAgainstTheSavedFileOnly() async throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host Web\n  HostName 10.0.0.1\n")
+        await app.test(alias: "web")   // ssh matches exactly: not a saved alias
+        #expect(app.connectionTests.results.isEmpty)
+        #expect(app.errorMessage == String(localized: "connect.notSaved"))
+        app.errorMessage = nil
+        await app.test(alias: "Web")
+        #expect(app.connectionTests.results["Web"] != nil)
+        #expect(app.errorMessage == nil)
     }
 }

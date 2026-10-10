@@ -310,24 +310,24 @@ struct AppModelTests {
         #expect(model.knownHosts.backupKeep == 3)
     }
 
-    @Test func uploadKeyRunsSshCopyIdWithTheConfigAndTheAliasAfterDoubleDash() throws {
+    @Test func uploadKeyRunsSshCopyIdWithTheConfigAndTheAliasAfterDoubleDash() async throws {
         let tmp = try TempDir()
         let launcher = RecordingLauncher()
         try tmp.file("work/config", "Host web\n  HostName 10.0.0.1\n")
         let model = makeTestModel(tmp, launcher: launcher)
         #expect(model.switchConfig(to: tmp.url.appending(path: "work/config").path) == .switched)
         let pub = tmp.url.appending(path: ".ssh/id_ed25519.pub")
-        #expect(model.uploadKey(publicKey: pub, alias: "web") == .launched(.terminal))
+        #expect(await model.uploadKey(publicKey: pub, alias: "web") == .launched(.terminal))
         let request = try #require(launcher.requests.last)
         #expect(request.program == "/usr/bin/ssh-copy-id")
         #expect(request.sshArguments == ["-i", pub.path, "-F", tmp.url.appending(path: "work/config").path, "--", "web"])
     }
 
-    @Test func uploadKeyRefusesUnsavedAliases() throws {
+    @Test func uploadKeyRefusesUnsavedAliases() async throws {
         let tmp = try TempDir()
         let launcher = RecordingLauncher()
         let model = makeTestModel(tmp, config: "Host web\n", launcher: launcher)
-        #expect(model.uploadKey(publicKey: tmp.url.appending(path: "k.pub"), alias: "other") == .failed(.failed("not in the saved file")))
+        #expect(await model.uploadKey(publicKey: tmp.url.appending(path: "k.pub"), alias: "other") == .failed(.failed("not in the saved file")))
         #expect(launcher.requests.isEmpty)
         #expect(model.errorMessage == String(localized: "connect.notSaved"))
     }

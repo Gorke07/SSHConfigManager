@@ -52,7 +52,7 @@ final class QuickConnectPanelController: NSObject, NSWindowDelegate {
     func show() {
         model.prepareForDisplay()
         panel.center()
-        NSApp.activate()
+        // No NSApp.activate(): the panel is non-activating, so the frontmost app stays frontmost.
         panel.makeKeyAndOrderFront(nil)
     }
 
