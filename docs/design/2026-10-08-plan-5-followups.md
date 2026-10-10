@@ -1,18 +1,9 @@
-# Plan 5 (son rötuşlar ve dağıtım): sonraki sürüme devreden konular
+# Plan 5 (son rötuşlar ve dağıtım): kalanlar
+
+Bu listedeki açık maddeler Plan 8'de kapatıldı (`2026-10-10-plan-8-old-followups.md`; madde madde durum: `2026-10-10-plan-8-triage.md`). Yalnızca elle doğrulanması gerekenler kaldı.
 
 ## Sürüm öncesi elle doğrulanmalı
 
-- **Girişte yalnızca menü çubuğu:** Algılama artık `applicationDidFinishLaunching`'de (`kAEOpenApplication` + `keyAELaunchedAsLogInItem`). `SMAppService` ile başlatılan uygulamaların bu Apple Event verisini taşıdığı macOS 26'da gerçek bir oturum açışıyla doğrulanmalı (kontrol listesi "Plan 5" satırları). Ana pencere giriş sırasında anahtar pencere olmadan oluşursa ya da 3 saniyeden geç anahtar olursa açık kalabilir; o durumda pencereleri anahtar olmalarını beklemeden bir sonraki run-loop turunda ve kısa bir gecikmeyle bir kez daha kapatmak gerekir.
-- **İmzalı sürüm:** `SIGN_IDENTITY` / `NOTARY_PROFILE` dalları hiç çalıştırılmadı (bu Mac'te Developer ID yok). İlk gerçek sürüm deneme sayılmalı (`docs/design/release.md`).
-
-## Düşük öncelikli
-
-- Notarize reddedilirse betik `notarytool log` komutunu yalnızca yazdırıyor; `id` varsa doğrudan çalıştırabilir.
-- Girişte açılıştan sonraki 3 saniye içinde kullanıcı ana pencereyi açarsa koruma onu kapatır.
-- Bazı hata yolları hâlâ loglanmıyor (Host ekleme, Ayarlar'da dosya içe aktarma).
-- Keys penceresi: `createdButNotAssigned` yalnızca testlerde okunuyor; test adı eski.
-- `isUnsavedHost` testleri yeniden adlandırma, büyük/küçük harf ve `.included` durumlarını kapsamıyor.
-
-## Kullanıcının elle kontrol etmesi gerekenler
-
-`docs/design/manual-test-checklist.md` — "Plan 5 — Son rötuşlar" bölümü ve `docs/design/release.md` sürüm kontrol listesi.
+- **Girişte yalnızca menü çubuğu (P5-1):** `SMAppService` ile başlatmada `kAEOpenApplication` + `keyAELaunchedAsLogInItem` algılaması macOS 26'da gerçek bir oturum açışıyla doğrulanmalı.
+- **İmzalı sürüm (P5-2):** `SIGN_IDENTITY` / `NOTARY_PROFILE` dalları (reddedilince `notarytool log` dahil) hiç çalıştırılmadı; ilk gerçek sürüm deneme sayılmalı (`release.md`).
+- `manual-test-checklist.md` "Plan 5" bölümü ve `release.md` sürüm kontrol listesi.
