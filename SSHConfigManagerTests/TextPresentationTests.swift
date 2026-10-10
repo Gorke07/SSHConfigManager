@@ -3,6 +3,7 @@ import SSHConfigKit
 import Testing
 @testable import SSH_Config_Manager
 
+@MainActor
 struct TextPresentationTests {
     @Test func highlightsDirective() {
         let spans = CodeHighlighter.spans(for: ConfigLine(raw: "  HostName = 10.0.0.1 # prod\r"))
@@ -30,9 +31,28 @@ struct TextPresentationTests {
         _ = cache.content(for: hunks)
         #expect(cache.buildCount == 1)
         #expect(first.rows == DiffPresenter.rows(for: hunks))
-        #expect(first.maxTextLength == "longer line here".count)
+        #expect(first.minWidth > DiffMetrics.width(of: "longer line here"))
         _ = cache.content(for: LineDiff.hunks(old: "a\n", new: "b\n"))
         #expect(cache.buildCount == 2)
+    }
+
+    @Test func cjkAndEmojiLinesMeasureWiderThanAsciiLinesOfTheSameCount() {
+        let ascii = String(repeating: "a", count: 20)
+        let cjk = String(repeating: "日", count: 20)
+        let emoji = String(repeating: "😀", count: 20)
+        #expect(ascii.count == cjk.count && ascii.count == emoji.count)
+        #expect(DiffMetrics.width(of: cjk) > DiffMetrics.width(of: ascii))
+        #expect(DiffMetrics.width(of: emoji) > DiffMetrics.width(of: ascii))
+        // The cache picks the wide row even though another row has the same character count.
+        let hunks = LineDiff.hunks(old: ascii + "\n", new: cjk + "\n")
+        let rows = DiffPresenter.rows(for: hunks)
+        #expect(DiffMetrics.minWidth(for: rows) >= DiffMetrics.width(of: cjk))
+        #expect(DiffMetrics.width(of: "\tx") > DiffMetrics.width(of: " x"))
+    }
+
+    @Test func fiveDigitLineNumbersWidenTheGutter() {
+        #expect(DiffMetrics.gutterWidth(maxNumber: 99) == DiffMetrics.minGutter)
+        #expect(DiffMetrics.gutterWidth(maxNumber: 12345) > DiffMetrics.minGutter)
     }
 
     @Test func diffRowsStripCarriageReturnsAndMarkMissingNewline() throws {

@@ -48,6 +48,44 @@ struct BackupsModelTests {
         #expect(backups.hunksComputationCount == 2)
     }
 
+    @Test func unreadableBackupIsNotCached() async throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\n")
+        try await saveEdit(app, port: "1")
+        let backups = BackupsModel(model: app)
+        let backup = try #require(backups.backups.first)
+        try FileManager.default.removeItem(at: backup.url)
+        _ = backups.hunks(for: backup)
+        _ = backups.hunks(for: backup)
+        #expect(backups.hunksComputationCount == 2)
+    }
+
+    @Test func refreshClearsTheHunksCache() async throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\n")
+        try await saveEdit(app, port: "1")
+        let backups = BackupsModel(model: app)
+        let backup = try #require(backups.backups.first)
+        _ = backups.hunks(for: backup)
+        backups.refresh()
+        _ = backups.hunks(for: backup)
+        #expect(backups.hunksComputationCount == 2)
+    }
+
+    @Test func anotherBackupMissesTheHunksCache() async throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\n")
+        try await saveEdit(app, port: "1")
+        try await saveEdit(app, port: "2")
+        let backups = BackupsModel(model: app)
+        #expect(backups.backups.count == 2)
+        _ = backups.hunks(for: backups.backups[0])
+        _ = backups.hunks(for: backups.backups[1])
+        #expect(backups.hunksComputationCount == 2)
+        _ = backups.hunks(for: backups.backups[1])
+        #expect(backups.hunksComputationCount == 2)
+    }
+
     @Test func hunksCompareCurrentDocumentToBackup() async throws {
         let tmp = try TempDir()
         let app = makeTestModel(tmp, config: "Host a\n")

@@ -31,34 +31,20 @@ struct DiffTextView: View {
                 // Rows fill the widest row (or the viewport, when wider) so the added/removed
                 // backgrounds end at the same edge.
                 let content = cache.content(for: hunks)
-                let contentWidth = Self.width(forTextLength: content.maxTextLength)
                 GeometryReader { viewport in
                     ScrollView([.vertical, .horizontal]) {
-                        // The lazy stack sizes rows one by one, so the widest row is computed once
-                        // (monospaced advance x longest text) and every row gets that minimum width.
+                        // The lazy stack sizes rows one by one, so the widest row is measured once
+                        // (in the cache) and every row gets that minimum width.
                         LazyVStack(alignment: .leading, spacing: 0) {
                             ForEach(content.rows) { row in
                                 DiffRowView(row: row)
                             }
                         }
-                        .frame(minWidth: max(viewport.size.width, contentWidth), alignment: .leading)
+                        .frame(minWidth: max(viewport.size.width, content.minWidth), alignment: .leading)
                     }
                 }
             }
         }
-    }
-}
-
-extension DiffTextView {
-    /// Gutters (2 x 32), marker, 3 spacings and horizontal padding around the text.
-    private static let chrome: CGFloat = 64 + 8 + 24 + 16
-    private static let characterWidth: CGFloat = {
-        let font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-        return ("0" as NSString).size(withAttributes: [.font: font]).width
-    }()
-
-    static func width(forTextLength length: Int) -> CGFloat {
-        chrome + CGFloat(length) * characterWidth
     }
 }
 
@@ -77,7 +63,7 @@ private struct DiffRowView: View {
                 .textSelection(.enabled)
                 .fixedSize(horizontal: true, vertical: false)
         }
-        .font(.system(.body, design: .monospaced))
+        .font(Font(DiffMetrics.font as CTFont))
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(background)
@@ -107,6 +93,6 @@ private struct DiffRowView: View {
         Text(verbatim: value.map(String.init) ?? "")
             .monospacedDigit()
             .foregroundStyle(.secondary)
-            .frame(minWidth: 32, alignment: .trailing)
+            .frame(minWidth: DiffMetrics.minGutter, alignment: .trailing)
     }
 }

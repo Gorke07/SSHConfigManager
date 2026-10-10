@@ -74,10 +74,11 @@ final class BackupsModel {
     func hunks(for backup: Backup) -> [DiffHunk] {
         let current = currentText
         if let cached = hunksCache, cached.url == backup.url, cached.current == current { return cached.hunks }
-        let contents = (try? model.backupManager.contents(of: backup)) ?? ""
-        let hunks = LineDiff.hunks(old: current, new: contents)
+        let read = try? model.backupManager.contents(of: backup)
+        let hunks = LineDiff.hunks(old: current, new: read ?? "")
         hunksComputationCount += 1
-        hunksCache = (backup.url, current, hunks)
+        // A failed read is not cached: the next pass tries the file again.
+        if read != nil { hunksCache = (backup.url, current, hunks) }
         return hunks
     }
 
