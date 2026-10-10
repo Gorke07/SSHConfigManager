@@ -41,6 +41,12 @@ final class AppModel {
     /// Set when macOS denied Automation access; the main window explains how to allow it.
     var automationDenied = false
     /// Session-only connection test results; cleared when the saved file changes or another one is opened.
+    private(set) var memory: HostMemory
+
+    static func memoryKey(for url: URL, home: URL) -> String {
+        "hostMemory." + backupKind(for: url, home: home)
+    }
+
     let connectionTests: ConnectionTestsModel
     let keys: KeysModel
 
@@ -65,6 +71,7 @@ final class AppModel {
         self.makeKnownHostsStore = makeKnownHostsStore
         self.knownHosts = makeKnownHostsStore(
             settings.knownHostsURL, backups, Self.knownHostsBackupKind(for: settings.knownHostsURL, home: settings.homeDirectory))
+        self.memory = HostMemory(defaults: settings.userDefaults, key: Self.memoryKey(for: settings.configURL, home: settings.homeDirectory))
         keys.app = self
         observeSavedState()
     }
@@ -209,7 +216,22 @@ final class AppModel {
             errorMessage = String(localized: "connect.invalidCommand")
             return .failed(.failed("control character"))
         }
-        return launch(request)
+        let outcome = launch(request)
+        switch outcome {
+        case .launched, .fellBack: memory.recordConnection(alias)
+        default: break
+        }
+        return outcome
+    }
+
+    /// Favorites that are hosts of the saved file, as written there.
+    var favoriteAliases: [String] { memory.favorites.compactMap(savedAlias) }
+
+    /// Recently connected saved hosts, most recent first.
+    var recentAliases: [String] { memory.recents.compactMap(savedAlias) }
+
+    func toggleFavorite(_ alias: String) {
+        memory.toggleFavorite(savedAlias(alias) ?? alias)
     }
 
     /// "Upload to Server…": `ssh-copy-id -i <pub> [-F <config>] -- <alias>` in the chosen terminal (interactive).
@@ -353,6 +375,7 @@ final class AppModel {
         settings.setConfigPath(path)
         store.onDiskStateChange = nil
         store = makeStore(url, backupManager, Self.backupKind(for: url, home: settings.homeDirectory))
+        memory = HostMemory(defaults: settings.userDefaults, key: Self.memoryKey(for: url, home: settings.homeDirectory))
         observeSavedState()
         savedHostsCache = nil
         select(nil)
