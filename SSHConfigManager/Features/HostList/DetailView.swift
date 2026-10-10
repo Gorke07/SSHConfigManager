@@ -51,7 +51,20 @@ struct DetailView: View {
         }
     }
 
+    private var showsOnboarding: Bool {
+        model.store.loadState == .loaded && model.store.document.hosts.allSatisfy(\.isPattern) && model.store.includedHosts.isEmpty
+    }
+
+    @ViewBuilder
     private var empty: some View {
+        if model.selection == nil && showsOnboarding {
+            OnboardingView(model: model)
+        } else {
+            placeholder
+        }
+    }
+
+    private var placeholder: some View {
         ContentUnavailableView(
             String(localized: "detail.empty.title"),
             systemImage: "server.rack",

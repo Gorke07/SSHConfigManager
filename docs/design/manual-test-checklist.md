@@ -117,3 +117,7 @@ Elle denemede gerçek anahtarlarınıza dokunmamak için yeni anahtarları `dene
 - [ ] Grup atanan hostlar kenar çubuğunda grup başlıkları altında; grupsuzlar en altta "Diğer Hostlar". Dosyadaki değişiklik yalnızca `# group:` satırı (Kaydet farkında kontrol).
 - [ ] Favori hostlarda yıldız; sağ tık ve detaydaki yıldızla ekleme/çıkarma.
 - [ ] Var olmayan IdentityFile, yinelenen alias ya da parolasız anahtar kullanan hostta ⚠ ve açıklaması görünüyor; düzeltince hemen kayboluyor.
+- [ ] Menü çubuğunda "Host" menüsü: ⌘N, ⌘D, Sil… (onaylı; ⌫ / ⌘⌫ yalnızca liste odaktayken), ⌘T, ⌘↩, ⌘⇧F, ⌘⇧C çalışıyor; metin alanında ⌘⌫ satır silmeye devam ediyor.
+- [ ] Hızlı Bağlan paneli açıkken ⌘↩ (test), ⌥↩ (kopyala), ⌘S (favori) menüye takılmadan panelde çalışıyor; Anahtarlar penceresinde Host menüsü öğeleri pasif.
+- [ ] "Tümünü test et" sonrası araç çubuğunda ✓/⚠/✕ sayıları; birine tıklayınca liste süzülüyor, "Tümünü Göster" ile kalkıyor.
+- [ ] Boş config ile açılınca üç adımlı karşılama ekranı; "Anahtar oluştur" Anahtarlar penceresini Yeni Anahtar formuyla açıyor.

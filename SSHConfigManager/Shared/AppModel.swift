@@ -22,6 +22,13 @@ final class AppModel {
     private(set) var editorToken = UUID()
     var searchText = ""
     var errorMessage: String?
+    /// Narrows the sidebar to hosts whose last connection test fell in this category.
+    var statusFilter: StatusCategory?
+    /// A host waiting for the user to confirm its deletion (menu, context menu or the delete key).
+    var pendingDelete: SidebarItem?
+    /// True while a main window is the key window. Host menu items are disabled otherwise so their
+    /// shortcuts (⌘↩, ⌘T, ⌘D, ⌘⇧C) stay available to the Quick Connect panel and the other windows.
+    var mainWindowIsKey = false
     /// The "Delete known_hosts entry…" flow for one alias; drives `HostKeyRemovalSheet`.
     var hostKeyRemoval: HostKeyRemoval?
     /// Informational: the chosen terminal was unavailable and the connection opened in Terminal.
@@ -89,6 +96,7 @@ final class AppModel {
         savedHostsCache = nil
         connectionTests.clear()
         effectiveConfig.clear()
+        statusFilter = nil
     }
 
     static func liveStore(url: URL, backups: BackupManager, backupKind: String) -> ConfigStore {
@@ -243,6 +251,41 @@ final class AppModel {
 
     /// Recently connected saved hosts, most recent first.
     var recentAliases: [String] { memory.recents.compactMap(savedAlias) }
+
+    var statusCounts: [StatusCategory: Int] {
+        var counts: [StatusCategory: Int] = [:]
+        for alias in connectableAliases {
+            if let status = connectionTests.results[alias]?.status { counts[StatusCategory.of(status), default: 0] += 1 }
+        }
+        return counts
+    }
+
+    /// Rows without a connectable alias (patterns, includes of patterns, Match) have no status and are hidden by a filter.
+    func passesStatusFilter(_ item: SidebarItem) -> Bool {
+        guard let filter = statusFilter else { return true }
+        guard let alias = connectableAlias(for: item), let status = connectionTests.results[alias]?.status else { return false }
+        return StatusCategory.of(status) == filter
+    }
+
+    func requestDelete(_ item: SidebarItem) {
+        guard SidebarBuilder.hostEntry(for: item, in: store.document) != nil else { return }
+        pendingDelete = item
+    }
+
+    func confirmPendingDelete() {
+        guard let item = pendingDelete else { return }
+        pendingDelete = nil
+        do {
+            try HostCommands.delete(item, in: store)
+            if selection == item { select(nil) }
+        } catch {
+            errorMessage = Messages.text(for: error)
+        }
+    }
+
+    func copySSHCommand(_ item: SidebarItem, copy: (String) -> Void) {
+        if let command = HostCommands.sshCommand(for: item, document: store.document, builder: commandBuilder) { copy(command) }
+    }
 
     func toggleFavorite(_ alias: String) {
         memory.toggleFavorite(savedAlias(alias) ?? alias)
@@ -443,6 +486,8 @@ final class AppModel {
         select(nil)
         connectionTests.clear()
         effectiveConfig.clear()
+        statusFilter = nil
+        pendingDelete = nil
         searchText = ""
         errorMessage = nil
         return .switched

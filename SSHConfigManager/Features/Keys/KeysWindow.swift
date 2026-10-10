@@ -78,6 +78,9 @@ struct KeysWindow: View {
                 .disabled(selectedRow == nil)
             }
         }
+        .onChange(of: keys.pendingNewKey, initial: true) {
+            if keys.pendingNewKey { sheet = .new; keys.pendingNewKey = false }
+        }
         .sheet(item: $sheet) { item in
             switch item {
             case .new: NewKeySheet(keys: keys, assignableAliases: app.assignableAliases) { sheet = nil }

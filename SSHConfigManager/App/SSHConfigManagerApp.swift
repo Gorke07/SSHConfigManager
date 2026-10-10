@@ -11,6 +11,7 @@ struct SSHConfigManagerApp: App {
                 .registersMainWindowOpener(appDelegate)
         }
         .commands {
+            HostCommandMenu(model: appDelegate.model, openMainWindow: { appDelegate.openMainWindow?() })
             CommandGroup(replacing: .appInfo) {
                 Button(String(localized: "about.menu")) { AboutPanel.show() }
             }

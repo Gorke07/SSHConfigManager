@@ -1023,6 +1023,146 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Çoğalt" } }
       }
     },
+    "menu.host" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Host" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Host" } }
+      }
+    },
+    "menu.host.new" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New Host" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yeni Host" } }
+      }
+    },
+    "menu.host.duplicate" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Duplicate" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Çoğalt" } }
+      }
+    },
+    "menu.host.delete" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete…" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Sil…" } }
+      }
+    },
+    "menu.host.test" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Test" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Test Et" } }
+      }
+    },
+    "menu.host.connect" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connect" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bağlan" } }
+      }
+    },
+    "menu.host.favorite" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Toggle Favorite" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Favori Yap / Kaldır" } }
+      }
+    },
+    "menu.host.copyCommand" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Copy ssh Command" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "ssh Komutunu Kopyala" } }
+      }
+    },
+    "status.summary.ok %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ reachable" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "%@ erişilebilir" } }
+      }
+    },
+    "status.summary.attention %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ need attention" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "%@ dikkat istiyor" } }
+      }
+    },
+    "status.summary.failed %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ failed" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "%@ başarısız" } }
+      }
+    },
+    "status.filter %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Showing: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Gösterilen: %@" } }
+      }
+    },
+    "status.filter.clear" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show All" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Tümünü Göster" } }
+      }
+    },
+    "status.category.ok" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reachable" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Erişilebilir" } }
+      }
+    },
+    "status.category.attention" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Needs Attention" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dikkat İstiyor" } }
+      }
+    },
+    "status.category.failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Failed" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Başarısız" } }
+      }
+    },
+    "onboarding.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Let’s add your first server" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "İlk sunucunu ekleyelim" } }
+      }
+    },
+    "onboarding.addHost" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Add your first host" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "İlk host'u ekle" } }
+      }
+    },
+    "onboarding.createKey" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Create a key" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Anahtar oluştur" } }
+      }
+    },
+    "onboarding.uploadKey" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Upload the key to the server" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Anahtarı sunucuya yükle" } }
+      }
+    },
     "action.copySSHCommand" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -26,6 +26,8 @@ final class KeysModel {
     var notice: String?
     var noticeIsAutomationDenied = false
     var selection: String?
+    /// Set by the onboarding screen: the Keys window opens its New Key form and clears it.
+    var pendingNewKey = false
     /// The last Create made the key but could not assign it (the sheet then suggests a fresh file name).
     private(set) var createdButNotAssigned = false
 

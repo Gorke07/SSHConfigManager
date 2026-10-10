@@ -9,6 +9,11 @@ struct MainWindow: View {
     @State private var showExternalDiff = false
     @State private var confirmSaveWithPending = false
 
+    private var deleteTitle: String {
+        guard case .host(let alias, _)? = model.pendingDelete else { return "" }
+        return String(localized: "delete.confirm.title \(alias)")
+    }
+
     var body: some View {
         NavigationSplitView {
             SidebarView(model: model)
@@ -33,6 +38,9 @@ struct MainWindow: View {
                     Label(String(localized: "toolbar.addHost"), systemImage: "plus")
                 }
                 .disabled(model.store.loadState != .loaded)
+            }
+            ToolbarItem(placement: .status) {
+                StatusSummaryView(model: model)
             }
             ToolbarItem(placement: .status) {
                 if model.store.hasUnsavedChanges {
@@ -81,6 +89,14 @@ struct MainWindow: View {
                 .keyboardShortcut("s", modifiers: .command)
                 .disabled(!model.store.hasUnsavedChanges || model.store.isSaving)
             }
+        }
+        .confirmationDialog(
+            deleteTitle,
+            isPresented: Binding(get: { model.pendingDelete != nil }, set: { if !$0 { model.pendingDelete = nil } })
+        ) {
+            Button(String(localized: "action.delete"), role: .destructive) { model.confirmPendingDelete() }
+        } message: {
+            Text(String(localized: "delete.confirm.message"))
         }
         .confirmationDialog(
             String(localized: "saveWithPending.title"), isPresented: $confirmSaveWithPending

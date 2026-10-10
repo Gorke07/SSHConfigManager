@@ -4,7 +4,6 @@ import SwiftUI
 
 struct SidebarView: View {
     @Bindable var model: AppModel
-    @State private var pendingDelete: SidebarItem?
 
     var body: some View {
         let sections = SidebarBuilder.sections(
@@ -12,10 +11,19 @@ struct SidebarView: View {
         // One lint pass per render, not one per row.
         let lint = model.lintIssueMap()
         let onlyUnnamed = sections.hostGroups.allSatisfy { $0.name == nil }
+        let filterName = model.statusFilter?.localizedName
         List(selection: Binding(get: { model.selection }, set: { new in
             guard let new, new != model.selection else { return }
             model.requestSelect(new)
         })) {
+            if let filterName {
+                HStack {
+                    Text(String(localized: "status.filter \(filterName)")).font(.callout)
+                    Spacer()
+                    Button(String(localized: "status.filter.clear")) { model.statusFilter = nil }
+                        .buttonStyle(.link)
+                }
+            }
             ForEach(sections.hostGroups) { group in
                 section(groupTitle(group, onlyUnnamed: onlyUnnamed), rows: group.rows, icon: "server.rack", editable: true, lint: lint)
             }
@@ -23,28 +31,9 @@ struct SidebarView: View {
             section(String(localized: "sidebar.section.included"), rows: sections.included, icon: "lock", editable: false, lint: [:])
             section(String(localized: "sidebar.section.match"), rows: sections.matches, icon: "lock", editable: false, lint: [:])
         }
-        .confirmationDialog(
-            deleteTitle,
-            isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })
-        ) {
-            Button(String(localized: "action.delete"), role: .destructive) {
-                guard let item = pendingDelete else { return }
-                do {
-                    try HostCommands.delete(item, in: model.store)
-                    if model.selection == item { model.select(nil) }
-                } catch {
-                    model.errorMessage = Messages.text(for: error)
-                }
-                pendingDelete = nil
-            }
-        } message: {
-            Text(String(localized: "delete.confirm.message"))
+        .onDeleteCommand {
+            if let item = model.selection { model.requestDelete(item) }
         }
-    }
-
-    private var deleteTitle: String {
-        guard case .host(let alias, _)? = pendingDelete else { return "" }
-        return String(localized: "delete.confirm.title \(alias)")
     }
 
     private func groupTitle(_ group: SidebarGroup, onlyUnnamed: Bool) -> String {
@@ -55,6 +44,7 @@ struct SidebarView: View {
     @ViewBuilder
     private func section(_ title: String, rows: [SidebarRow], icon: String, editable: Bool,
                          lint: [SidebarItem: [HostIssue]]) -> some View {
+        let rows = rows.filter { model.passesStatusFilter($0.item) }
         if !rows.isEmpty {
             // Group names are user text; section titles of fixed sections are already localized strings.
             Section {
@@ -125,13 +115,15 @@ struct SidebarView: View {
                 model.errorMessage = Messages.text(for: error)
             }
         }
-        if let command = HostCommands.sshCommand(for: item, document: model.store.document, builder: model.commandBuilder) {
+        if HostCommands.sshCommand(for: item, document: model.store.document, builder: model.commandBuilder) != nil {
             Button(String(localized: "action.copySSHCommand")) {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(command, forType: .string)
+                model.copySSHCommand(item) { text in
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(text, forType: .string)
+                }
             }
         }
         Divider()
-        Button(String(localized: "action.delete"), role: .destructive) { pendingDelete = item }
+        Button(String(localized: "action.delete"), role: .destructive) { model.requestDelete(item) }
     }
 }

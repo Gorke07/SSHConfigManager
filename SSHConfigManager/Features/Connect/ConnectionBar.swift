@@ -83,8 +83,8 @@ struct ConnectionBar: View {
             Button(String(localized: "action.connect")) {
                 if let alias { model.connect(alias: alias) }
             }
-            .keyboardShortcut(.return, modifiers: .command)
             .buttonStyle(.borderedProminent)
+            .help(String(localized: "action.connect") + " (⌘↩)")
             .disabled(alias == nil)
         }
     }
