@@ -202,10 +202,25 @@ final class AppModel {
     func resolvedConfig(forSavedAlias alias: String) -> ResolvedConfig? {
         guard let saved = savedAlias(alias) else { return nil }
         let document = store.savedDocument
-        let header = document.hosts.first { !$0.isPattern && $0.alias == saved }?.headerLine
         let resolver = store.includeResolver
-        return ConfigResolver.resolve(alias: saved, document: document, targetHeader: header,
-                                      includes: { resolver.includedDocuments(for: $0) })
+        let includes: (IncludeDirective) -> [(file: URL, document: ConfigDocument)] = { resolver.includedDocuments(for: $0) }
+        if let header = document.hosts.first(where: { !$0.isPattern && $0.alias == saved })?.headerLine {
+            return ConfigResolver.resolve(alias: saved, document: document, targetHeader: header, includes: includes)
+        }
+        // The first block of this alias lives in an Include file: that block is "this block".
+        let included = store.savedIncludedHosts.first { !$0.entry.isPattern && $0.entry.alias == saved }
+        return ConfigResolver.resolve(alias: saved, document: document, targetHeader: included?.entry.headerLine,
+                                      targetFile: included?.file, includes: includes)
+    }
+
+    /// Re-reads the Include files (they can change without the root file changing). When the saved
+    /// view's included hosts changed, the effective settings are dropped and reloaded. Connection
+    /// tests stay: they are per alias, and every other host is unaffected.
+    func refreshIncludes() {
+        if store.refreshIncludes() {
+            savedHostsCache = nil
+            effectiveConfig.clear()
+        }
     }
 
     /// The alias to connect to for a sidebar item: nil for patterns, Match blocks, missing hosts

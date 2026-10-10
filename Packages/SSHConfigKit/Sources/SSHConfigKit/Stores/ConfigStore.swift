@@ -148,6 +148,20 @@ public final class ConfigStore {
         }
     }
 
+    /// Re-reads the Include files of the working and the saved document, for edits made to an Include
+    /// file alone (the root file, its text and its dirty state stay untouched). Assigns a property only
+    /// when its value changed, so observers and equality-based caches see real changes only.
+    /// Returns true when the saved view's included hosts changed (what ssh reads).
+    @discardableResult
+    public func refreshIncludes() -> Bool {
+        let working = includeResolver.includedHosts(of: document, rootFile: fileURL)
+        if working != includedHosts { includedHosts = working }
+        let saved = includeResolver.includedHosts(of: savedDocument, rootFile: fileURL)
+        guard saved != savedIncludedHosts else { return false }
+        savedIncludedHosts = saved
+        return true
+    }
+
     /// Reloads from disk (also clears `externalChangePending`).
     public func discardChanges() {
         load()

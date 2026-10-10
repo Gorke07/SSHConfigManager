@@ -67,8 +67,9 @@ final class ProxyChainTest {
         states = [:]
         var failed = false
         for node in nodes {
-            guard let alias = node.alias, !node.isCycle else { continue }
+            // After a failure every later node is skipped, plain hops and cycle markers included.
             if failed { states[node.id] = .skipped; continue }
+            guard let alias = node.alias, !node.isCycle else { continue }
             states[node.id] = .testing
             await app.connectionTests.test(alias, using: app.commandBuilder)
             let status = app.connectionTests.results[alias]?.status ?? .other

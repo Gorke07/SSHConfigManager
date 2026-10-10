@@ -21,6 +21,22 @@ final class PeakRunner: ProcessRunning, @unchecked Sendable {
     }
 }
 
+/// Holds every run open until `open()`, so a test can observe how many are running at once.
+final class GatedRunner: ProcessRunning, @unchecked Sendable {
+    private let state = Mutex((running: 0, peak: 0, runs: 0, open: false, output: "hostname h\n"))
+    var running: Int { state.withLock { $0.running } }
+    var peak: Int { state.withLock { $0.peak } }
+    var runs: Int { state.withLock { $0.runs } }
+    func open() { state.withLock { $0.open = true } }
+    func setOutput(_ text: String) { state.withLock { $0.output = text } }
+    func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
+        state.withLock { $0.running += 1; $0.peak = max($0.peak, $0.running); $0.runs += 1 }
+        while !state.withLock({ $0.open }) { try? await Task.sleep(for: .milliseconds(5)) }
+        let output = state.withLock { $0.running -= 1; return $0.output }
+        return ProcessResult(exitCode: 0, stdout: output, stderr: "", timedOut: false)
+    }
+}
+
 @MainActor
 struct EffectiveConfigCacheTests {
     let builder = SSHCommandBuilder(configFile: URL(filePath: "/h/.ssh/config"), homeDirectory: URL(filePath: "/h"))
@@ -107,5 +123,64 @@ struct EffectiveConfigCacheTests {
         try tmp.file(".ssh/config", "Host web\n  Port 2\n")
         model.store.load()
         #expect(model.effectiveConfig.options(for: "web") == nil)
+    }
+
+    @Test func threeLoadsPeakAtExactlyTwoConcurrentRuns() async {
+        let runner = GatedRunner()
+        let cache = EffectiveConfigCache(runner: runner)
+        let tasks = ["a", "b", "c"].map { alias in Task { await cache.load(alias, using: builder) } }
+        for _ in 0..<400 where runner.running < 2 { try? await Task.sleep(for: .milliseconds(5)) }
+        // Give the third load every chance to (wrongly) start.
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(runner.running == 2)
+        #expect(runner.runs == 2)
+        runner.open()
+        for task in tasks { await task.value }
+        #expect(runner.runs == 3)
+        #expect(runner.peak == 2)
+        #expect(["a", "b", "c"].allSatisfy { cache.options(for: $0) != nil })
+    }
+
+    @Test func clearThenReloadRunsSshAgainAndStoresTheNewResult() async {
+        let runner = GatedRunner()
+        runner.open()
+        let cache = EffectiveConfigCache(runner: runner)
+        await cache.load("a", using: builder)
+        #expect(cache.options(for: "a")?.first("hostname") == "h")
+        cache.clear()
+        runner.setOutput("hostname new\n")
+        await cache.load("a", using: builder)
+        #expect(runner.runs == 2)
+        #expect(cache.options(for: "a")?.first("hostname") == "new")
+    }
+
+    @Test func switchingTheConfigClearsTheCache() async throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\n",
+                                  runner: FixedRunner(result: ProcessResult(exitCode: 0, stdout: "hostname h\n", stderr: "", timedOut: false)))
+        await model.effectiveConfig.load("web", using: model.commandBuilder)
+        let before = model.effectiveConfig.generation
+        let other = try tmp.file("other.conf", "Host db\n")
+        #expect(model.switchConfig(to: other.path) == .switched)
+        #expect(model.effectiveConfig.results.isEmpty)
+        #expect(model.effectiveConfig.failures.isEmpty)
+        #expect(model.effectiveConfig.generation > before)
+    }
+
+    @Test func refreshingIncludesDropsTheCacheOnlyWhenTheyChanged() async throws {
+        let tmp = try TempDir()
+        let extra = try tmp.file(".ssh/extra.conf", "Host inc\n  Port 1\n")
+        let model = makeTestModel(tmp, config: "Include extra.conf\nHost web\n",
+                                  runner: FixedRunner(result: ProcessResult(exitCode: 0, stdout: "hostname h\n", stderr: "", timedOut: false)))
+        await model.effectiveConfig.load("inc", using: model.commandBuilder)
+        let generation = model.effectiveConfig.generation
+        model.refreshIncludes()
+        #expect(model.effectiveConfig.generation == generation)
+        #expect(model.effectiveConfig.options(for: "inc") != nil)
+        try Data("Host inc\n  Port 2\n".utf8).write(to: extra)
+        model.refreshIncludes()
+        #expect(model.effectiveConfig.generation > generation)
+        #expect(model.effectiveConfig.options(for: "inc") == nil)
+        #expect(model.resolvedConfig(forSavedAlias: "inc")?.first("port")?.value == "2")
     }
 }

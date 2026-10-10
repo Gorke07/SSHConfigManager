@@ -27,6 +27,16 @@ struct EffectiveSettingsModelTests {
         #expect(rows.first { $0.key == "user" }?.source == .uncertain)
     }
 
+    @Test func normalizedValuesKeepTheResolversSourceWithoutMatchBlocks() {
+        let doc = ConfigDocument(parsing: "Host web\n  ServerAliveInterval 1m\n  HostName Web.Example.COM\nHost *\n  User %h\n")
+        let resolved = ConfigResolver.resolve(alias: "web", document: doc, targetHeader: 0, includes: { _ in [] })
+        #expect(!resolved.hasMatchBlocks)
+        let options = EffectiveOptions(parsing: "serveraliveinterval 60\nhostname web.example.com\nuser web\n")
+        let rows = EffectiveSettingsBuilder.rows(alias: "web", options: options, resolved: resolved, home: URL(filePath: "/h"), showAll: false)
+        #expect(rows.first { $0.key == "serveraliveinterval" }?.source == .thisBlock)
+        #expect(rows.first { $0.key == "user" }?.source == .otherHost(["*"]))
+    }
+
     @Test func identityFilesCompareAfterTildeExpansion() {
         let doc = ConfigDocument(parsing: "Host web\n  IdentityFile ~/.ssh/k\n")
         let resolved = ConfigResolver.resolve(alias: "web", document: doc, targetHeader: 0, includes: { _ in [] })
@@ -50,5 +60,18 @@ struct EffectiveSettingsModelTests {
         let inc = try #require(app.resolvedConfig(forSavedAlias: "inc"))
         #expect(inc.first("port")?.value == "2201")
         #expect(app.resolvedConfig(forSavedAlias: "missing") == nil)
+    }
+
+    @Test func anIncludedHostsOwnSettingsAreThisBlock() throws {
+        let tmp = try TempDir()
+        _ = try tmp.file(".ssh/extra.conf", "Host inc\n  User bob\n  Port 2201\n")
+        let app = makeTestModel(tmp, config: "Host *\n  Port 22\nInclude extra.conf\nHost web\n")
+        let inc = try #require(app.resolvedConfig(forSavedAlias: "inc"))
+        #expect(inc.first("user")?.source == .thisBlock)
+        // ssh uses the first value: the earlier `Host *` wins over the included host's Port.
+        #expect(inc.first("port")?.source == .otherHost(patterns: ["*"]))
+        let options = EffectiveOptions(parsing: "user bob\nport 22\n")
+        let rows = EffectiveSettingsBuilder.rows(alias: "inc", options: options, resolved: inc, home: tmp.url, showAll: false)
+        #expect(rows.first { $0.key == "user" }?.source == .thisBlock)
     }
 }

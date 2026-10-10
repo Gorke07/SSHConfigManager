@@ -22,6 +22,23 @@ struct ConfigStoreTests {
         }
     }
 
+    @Test func refreshIncludesPicksUpEditsToAnIncludeFileOnly() throws {
+        let tmp = try TempDir()
+        try tmp.file("inc.conf", "Host inc\n  User a\n")
+        try tmp.file("config", "Include \(tmp.url.appending(path: "inc.conf").path)\nHost web\n")
+        let store = makeStore(tmp)
+        #expect(store.savedIncludedHosts.map(\.entry.alias) == ["inc"])
+        #expect(!store.refreshIncludes())
+        try tmp.file("inc.conf", "Host inc\n  User b\nHost more\n")
+        #expect(store.refreshIncludes())
+        #expect(store.savedIncludedHosts.map(\.entry.alias) == ["inc", "more"])
+        #expect(store.includedHosts == store.savedIncludedHosts)
+        #expect(store.savedIncludedHosts.first?.entry.value(for: "User") == "b")
+        #expect(!store.hasUnsavedChanges)
+        #expect(!store.externalChangePending)
+        #expect(!store.refreshIncludes())
+    }
+
     @Test func backupKindSelectsBackupDirectory() async throws {
         let tmp = try TempDir()
         try tmp.file("config", "Host a\n")
