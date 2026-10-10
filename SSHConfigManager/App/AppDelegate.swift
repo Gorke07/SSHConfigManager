@@ -43,6 +43,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 NSApp.setActivationPolicy(.regular)
             }
         })
+        // The Host menu acts only while a main window is key (its shortcuts must not shadow other windows).
+        for (name, isKey) in [(NSWindow.didBecomeKeyNotification, true), (NSWindow.didResignKeyNotification, false)] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                nonisolated(unsafe) let object = note.object
+                MainActor.assumeIsolated {
+                    guard let window = object as? NSWindow, window.identifier?.rawValue.hasPrefix("main") == true else { return }
+                    self?.model.mainWindowIsKey = isKey
+                }
+            })
+        }
+        model.mainWindowIsKey = NSApp.keyWindow?.identifier?.rawValue.hasPrefix("main") == true
         // The launch Apple Event only exists from here on (it is nil in applicationWillFinishLaunching).
         if LaunchContext.currentLaunchIsLoginItem() { startInMenuBar() }
     }

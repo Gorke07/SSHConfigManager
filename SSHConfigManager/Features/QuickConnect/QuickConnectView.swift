@@ -12,7 +12,10 @@ struct QuickConnectView: View {
     @FocusState private var searchFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        // One computation per render, shared by the list, the selection and the preview.
+        let entries = model.entries
+        let selectedEntry = model.selectedEntry(in: entries)
+        return VStack(alignment: .leading, spacing: 0) {
             TextField(String(localized: "quick.search.prompt"), text: $model.query)
                 .textFieldStyle(.plain)
                 .font(.title3)
@@ -24,13 +27,20 @@ struct QuickConnectView: View {
                 .onKeyPress(keys: [.return]) { press in
                     if press.modifiers.contains(.command) {
                         model.testSelected()
+                    } else if press.modifiers.contains(.option) {
+                        if model.copySelectedCommand() { dismiss() }
                     } else if model.connectSelected() {
                         dismiss()
                     }
                     return .handled
                 }
+                .onKeyPress(keys: ["s"]) { press in
+                    guard press.modifiers.contains(.command) else { return .ignored }
+                    model.toggleFavoriteSelected()
+                    return .handled
+                }
             Divider()
-            if model.entries.isEmpty {
+            if entries.isEmpty {
                 Text(String(localized: "quick.empty"))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 60)
@@ -38,19 +48,36 @@ struct QuickConnectView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 0) {
-                            ForEach(model.entries) { entry in
-                                row(entry).id(entry.id)
+                            ForEach(sectionedEntries(entries), id: \.entry.id) { item in
+                                if let header = item.header {
+                                    Text(header)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                        .padding(.horizontal, 12)
+                                        .padding(.top, 6)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .accessibilityAddTraits(.isHeader)
+                                }
+                                row(item.entry, selected: item.entry.id == selectedEntry?.id).id(item.entry.id)
                             }
                         }
                     }
                     .frame(maxHeight: 320)
-                    .onChange(of: model.selectedIndex) {
-                        if let id = model.selectedEntry?.id { proxy.scrollTo(id) }
+                    .onChange(of: selectedEntry?.id) { _, id in
+                        if let id { proxy.scrollTo(id) }
                     }
                 }
             }
             Divider()
-            Text(String(localized: "quick.hint"))
+            if let entry = selectedEntry, let preview = model.previewText(for: entry) {
+                Text(verbatim: preview)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 6)
+            }
+            Text(String(localized: "quick.hint.more"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)
@@ -76,19 +103,41 @@ struct QuickConnectView: View {
             }
         }
         .frame(width: 420)
-        .onAppear { searchFocused = true }
+        .onAppear { searchFocused = true; model.requestPreview() }
         .onChange(of: model.focusToken) { searchFocused = true }
+        .onChange(of: model.selectedIndex) { model.requestPreview() }
+        .onChange(of: model.query) { model.requestPreview() }
+        .onChange(of: model.app.effectiveConfig.generation) { model.requestPreview() }
     }
 
-    private func row(_ entry: QuickConnectEntry) -> some View {
-        let selected = model.selectedEntry == entry
-        return HStack(spacing: 8) {
+    /// Section headers only appear for the empty-query layout (entries carry a section).
+    private func sectionedEntries(_ entries: [QuickConnectEntry]) -> [(entry: QuickConnectEntry, header: String?)] {
+        var previous: QuickConnectSection?
+        return entries.map { entry in
+            defer { previous = entry.section }
+            guard let section = entry.section, section != previous else { return (entry, nil) }
+            return (entry, sectionTitle(section))
+        }
+    }
+
+    private func sectionTitle(_ section: QuickConnectSection) -> String {
+        switch section {
+        case .favorites: String(localized: "quick.section.favorites")
+        case .recents: String(localized: "quick.section.recents")
+        case .all: String(localized: "quick.section.all")
+        }
+    }
+
+    private func row(_ entry: QuickConnectEntry, selected: Bool) -> some View {
+        HStack(spacing: 8) {
             ConnectionStatusBadge(model: model.app.connectionTests, alias: entry.alias, showsTitle: false)
                 .frame(width: 16)
-            Text(verbatim: entry.alias).fontWeight(.medium)
+            Text(FuzzyMatcher.highlighted(entry.alias, offsets: entry.aliasOffsets)).fontWeight(.medium)
+            if entry.isFavorite { Image(systemName: "star.fill").font(.caption).foregroundStyle(.yellow)
+                    .accessibilityLabel(String(localized: "quick.favorite.accessibility")) }
             if entry.isIncluded { Image(systemName: "lock").foregroundStyle(.secondary).accessibilityHidden(true) }
             Spacer()
-            Text(verbatim: entry.subtitle).foregroundStyle(.secondary).lineLimit(1)
+            Text(verbatim: entry.group.map { "\($0) · \(entry.subtitle)" } ?? entry.subtitle).foregroundStyle(.secondary).lineLimit(1)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)

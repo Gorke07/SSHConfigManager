@@ -18,6 +18,7 @@ struct DetailView: View {
         case .host:
             VStack(spacing: 0) {
                 ConnectionBar(model: model, alias: model.connectableAlias(for: item), showsSaveHint: model.isUnsavedHost(item))
+                EffectiveSettingsView(model: model, alias: model.connectableAlias(for: item), isUnsaved: model.isUnsavedHost(item))
                 Divider()
                 HostEditorContainer(model: model)
                     .id(model.editorToken)
@@ -26,6 +27,7 @@ struct DetailView: View {
             if let host = SidebarBuilder.includedHost(for: item, in: model.store.includedHosts) {
                 VStack(spacing: 0) {
                     ConnectionBar(model: model, alias: model.connectableAlias(for: item))
+                    EffectiveSettingsView(model: model, alias: model.connectableAlias(for: item), isUnsaved: false)
                     Divider()
                     IncludedHostView(host: host, displayPath: model.settings.displayPath(for: host.file))
                 }
@@ -47,7 +49,20 @@ struct DetailView: View {
         }
     }
 
+    private var showsOnboarding: Bool {
+        model.store.loadState == .loaded && model.store.document.hosts.allSatisfy(\.isPattern) && model.store.includedHosts.isEmpty
+    }
+
+    @ViewBuilder
     private var empty: some View {
+        if model.selection == nil && showsOnboarding {
+            OnboardingView(model: model)
+        } else {
+            placeholder
+        }
+    }
+
+    private var placeholder: some View {
         ContentUnavailableView(
             String(localized: "detail.empty.title"),
             systemImage: "server.rack",
@@ -63,7 +78,15 @@ private struct HostEditorContainer: View {
     var body: some View {
         Group {
             if let editor {
-                HostEditorView(editor: editor, homeDirectory: model.settings.homeDirectory, keys: model.keys) { model.resetEditor() }
+                VStack(spacing: 0) {
+                    if let entry = SidebarBuilder.hostEntry(for: editor.item, in: model.store.document) {
+                        // Patterns have no group; they get the IdentityFile checks only.
+                        if !entry.isPattern { HostGroupRow(model: model, item: editor.item) }
+                        LintIssuesList(issues: model.lintIssues(for: editor.item))
+                        Divider()
+                    }
+                    HostEditorView(editor: editor, homeDirectory: model.settings.homeDirectory, keys: model.keys) { model.resetEditor() }
+                }
             } else {
                 ContentUnavailableView(String(localized: "edit.hostNotFound"), systemImage: "questionmark")
             }
@@ -72,6 +95,64 @@ private struct HostEditorContainer: View {
             if editor == nil, let item = model.selection {
                 editor = model.editor(for: item)
             }
+        }
+    }
+}
+
+private struct HostGroupRow: View {
+    let model: AppModel
+    let item: SidebarItem
+    @State private var groupText = ""
+
+    var body: some View {
+        HStack {
+            TextField(String(localized: "editor.group"), text: $groupText,
+                      prompt: Text(String(localized: "editor.group.placeholder")))
+                .onSubmit(apply)
+            let groups = model.existingGroups
+            if !groups.isEmpty {
+                Menu(String(localized: "editor.group.suggestions")) {
+                    ForEach(groups, id: \.self) { name in
+                        Button { groupText = name; if name != savedGroup { model.setGroup(item, to: name) } } label: { Text(verbatim: name) }
+                    }
+                }
+                .fixedSize()
+            }
+            Button(String(localized: "editor.group.apply"), action: apply)
+                .disabled(groupText.trimmingCharacters(in: .whitespacesAndNewlines) == savedGroup)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .onAppear { groupText = savedGroup }
+    }
+
+    private var savedGroup: String {
+        guard let entry = SidebarBuilder.hostEntry(for: item, in: model.store.document) else { return "" }
+        return model.store.document.group(ofHostAt: entry.headerLine) ?? ""
+    }
+
+    private func apply() {
+        // Leave the document alone when nothing changed (Return must not rewrite or dirty it).
+        guard groupText.trimmingCharacters(in: .whitespacesAndNewlines) != savedGroup else { return }
+        model.setGroup(item, to: groupText)
+    }
+}
+
+private struct LintIssuesList: View {
+    let issues: [HostIssue]
+
+    var body: some View {
+        if !issues.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(Array(issues.enumerated()), id: \.offset) { _, issue in
+                    Label(Messages.text(for: issue), systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .font(.callout)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
         }
     }
 }

@@ -352,4 +352,68 @@ struct AppModelTests {
         #expect(model.store.externalChangePending)
         #expect(!model.isUnsavedHost(added))
     }
+
+    @Test func settingAGroupIsAnUnsavedEditOfOneLine() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\n  User u\nHost db\n")
+        model.setGroup(.host(alias: "web", occurrence: 0), to: "Prod")
+        #expect(model.store.document.render() == "# group: Prod\nHost web\n  User u\nHost db\n")
+        #expect(model.existingGroups == ["Prod"])
+        #expect(try tmp.read(".ssh/config") == "Host web\n  User u\nHost db\n")
+    }
+
+    @Test func blankGroupNameRemovesTheGroup() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "# group: Prod\nHost web\n")
+        model.setGroup(.host(alias: "web", occurrence: 0), to: "   ")
+        #expect(model.store.document.render() == "Host web\n")
+    }
+
+    @Test func lintIssuesAreReportedForTheDocumentBeingEdited() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\n  IdentityFile ~/.ssh/missing\nHost web\n")
+        #expect(model.lintIssues(for: .host(alias: "web", occurrence: 0)).contains(.missingIdentityFile("~/.ssh/missing")))
+        #expect(model.lintIssues(for: .host(alias: "web", occurrence: 1)) == [.duplicateAlias(alias: "web", isFirst: false)])
+        #expect(model.lintIssueMap().count == 2)
+    }
+
+    @Test func patternsGetTheIdentityFileCheckOnly() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host *\n  IdentityFile ~/.ssh/missing\nHost *\nHost a *\n")
+        #expect(model.lintIssues(for: .host(alias: "*", occurrence: 0)) == [.missingIdentityFile("~/.ssh/missing")])
+        #expect(model.lintIssues(for: .host(alias: "*", occurrence: 1)).isEmpty)
+        #expect(model.lintIssues(for: .host(alias: "a", occurrence: 0)).isEmpty)
+        #expect(model.lintIssues(for: .match(index: 0)).isEmpty)
+    }
+
+    @Test func anIncludeBeforeTheRootBlockMakesItALaterDuplicate() throws {
+        let tmp = try TempDir()
+        _ = try tmp.file(".ssh/extra.conf", "Host Web\n  User x\n")
+        let model = makeTestModel(tmp, config: "Include extra.conf\nHost web\n  User me\n")
+        #expect(model.lintIssues(for: .host(alias: "web", occurrence: 0)) == [.duplicateAlias(alias: "web", isFirst: false)])
+    }
+
+    @Test func anIncludeAfterTheRootBlockKeepsItFirst() throws {
+        let tmp = try TempDir()
+        _ = try tmp.file(".ssh/extra.conf", "Host web\n  User x\n")
+        let model = makeTestModel(tmp, config: "Host web\n  User me\nInclude extra.conf\n")
+        // Include after a Host block belongs to that block's scope; the root block is still first.
+        #expect(model.lintIssues(for: .host(alias: "web", occurrence: 0)) == [.duplicateAlias(alias: "web", isFirst: true)])
+    }
+
+    @Test func groupNamesDifferingOnlyInCaseHaveAStableOrder() throws {
+        let tmp = try TempDir()
+        let a = makeTestModel(tmp, config: "# group: prod\nHost a\n# group: Prod\nHost b\n")
+        let b = makeTestModel(tmp, config: "# group: Prod\nHost a\n# group: prod\nHost b\n")
+        #expect(a.existingGroups == b.existingGroups)
+    }
+
+    @Test func effectiveSettingsStateIsSessionState() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n")
+        #expect(!model.effectiveSettingsExpanded && !model.effectiveSettingsShowAll)
+        model.effectiveSettingsExpanded = true
+        model.select(.host(alias: "a", occurrence: 0))
+        #expect(model.effectiveSettingsExpanded)
+    }
 }

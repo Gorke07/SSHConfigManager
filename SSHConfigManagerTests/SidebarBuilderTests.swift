@@ -75,4 +75,18 @@ struct SidebarBuilderTests {
         #expect(SidebarBuilder.matchEntry(for: .match(index: 5), in: doc) == nil)
         #expect(SidebarBuilder.hostEntry(for: .match(index: 0), in: doc) == nil)
     }
+
+    @Test func hostsAreGroupedAlphabeticallyWithUngroupedLast() {
+        let doc = ConfigDocument(parsing: "# group: Staging\nHost s1\n# group: Prod\nHost p1\nHost loose\n# group: Prod\nHost p2\nHost *\n")
+        let sections = SidebarBuilder.sections(document: doc, included: [], search: "")
+        #expect(sections.hostGroups.map(\.name) == ["Prod", "Staging", nil])
+        #expect(sections.hostGroups.map { $0.rows.map(\.title) } == [["p1", "p2"], ["s1"], ["loose"]])
+        #expect(sections.hosts.count == 4)
+        #expect(sections.patterns.map(\.title) == ["*"])
+    }
+
+    @Test func noGroupsMeansOneUnnamedGroup() {
+        let sections = SidebarBuilder.sections(document: ConfigDocument(parsing: "Host a\nHost b\n"), included: [], search: "")
+        #expect(sections.hostGroups.map(\.name) == [nil])
+    }
 }

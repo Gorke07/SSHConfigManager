@@ -14,7 +14,7 @@ Günlük kullanımı hızlandırmak (son bağlanılanlar, favoriler, akıllı ar
 
 ## 2. Son bağlanılanlar ve favoriler
 
-- **Saklama:** `UserDefaults`, anahtar `hostMemory.<configKey>`; `configKey`, yedek türüyle aynı kuraldan türetilir (`config` ya da `config-<sha256 ilk 12>`). Değer: `{ "favorites": [alias], "recents": [alias] }`. Alias'lar dosyada yazıldığı biçimde saklanır; karşılaştırma ssh gibi ASCII büyük/küçük harf duyarsızdır.
+- **Saklama:** `UserDefaults`, anahtar `hostMemory.<configKey>`; `configKey`, yedek türüyle aynı kuraldan türetilir (`config` ya da `config-<sha256 ilk 12>`). Değer: `{ "favorites": [alias], "recents": [alias] }`. Alias'lar dosyada yazıldığı biçimde saklanır; karşılaştırma ASCII büyük/küçük harf duyarsızdır. Not: ssh `Host` eşleştirmesi büyük/küçük harf duyarlıdır (§5); burada duyarsızlık bilinçli bir "aynı host sayılır" sezgisidir (`Web` ve `web` tek kayıt), ssh anlamı iddia etmez.
 - **Son bağlanılanlar:** `connect` sonucu `.launched` ya da `.fellBack` olunca alias listenin başına alınır (tekrarı silinir), en fazla 5 tutulur. Test, ssh-copy-id ve başarısız bağlantı eklemez.
 - **Favoriler:** Kenar çubuğu sağ tık menüsü ("Favorilere ekle/çıkar"), detay başlığındaki yıldız düğmesi ve panelde ⌘S kısayolu ile değiştirilir. Sıra eklenme sırasıdır.
 - **Gösterim:** Menü çubuğu ve ⌥⌘S panelinde arama boşken bölümler: **Favoriler**, **Son**, **Tüm hostlar** (bir host yalnızca ilk uygun bölümde görünür). Arama varken bölüm yoktur, yalnızca sıralı sonuçlar. Kenar çubuğunda favori hostların yanında küçük bir yıldız gösterilir.
@@ -37,7 +37,7 @@ Günlük kullanımı hızlandırmak (son bağlanılanlar, favoriler, akıllı ar
 ## 5. Etkin ayarlar ve kaynakları
 
 - **Değerler:** `ssh -G [-F] -- <alias>` çıktısı (5 sn sınır). Gösterilen anahtarlar: `hostname`, `user`, `port`, `identityfile`, `proxyjump`, `proxycommand`, `forwardagent`, `identitiesonly`, `localforward`, `remoteforward`, `dynamicforward`, `serveraliveinterval`, `stricthostkeychecking`, `userknownhostsfile`, `controlmaster`, `controlpath`; diğerleri "Tümünü göster" ile.
-- **Kaynak:** Paket içinde `ConfigResolver`, kaydedilmiş belge + Include'larla ssh'in kuralını uygular: bloklar dosya sırasıyla taranır, `Host` desenleri (`*`, `?`, `!` olumsuzlama, virgüllü/boşluklu listeler) alias'a göre eşleştirilir, **her anahtar için ilk elde edilen değer kazanır** (çok değerli `IdentityFile`, `LocalForward` vb. birikir). Sonuç `[anahtar: (değer, kaynak)]`; kaynak `.thisBlock`, `.otherHost(desenler)`, `.include(dosya, desenler)`, `.unresolved`.
+- **Kaynak:** Paket içinde `ConfigResolver`, kaydedilmiş belge + Include'larla ssh'in kuralını uygular: bloklar dosya sırasıyla taranır, `Host` desenleri (`*`, `?`, `!` olumsuzlama; boşlukla ayrılmış liste — `Host` satırında virgül ayırıcı değildir) alias'a **büyük/küçük harf duyarlı** eşleştirilir (OpenSSH 10.3 ile doğrulandı: `Host WEB` `ssh -G web`'e uygulanmaz), **her anahtar için ilk elde edilen değer kazanır** (çok değerli `IdentityFile`, `CertificateFile`, `LocalForward`, `RemoteForward`, `DynamicForward`, `SendEnv` birikir — yinelenen IdentityFile bir kez, `SendEnv -DESEN` öncekileri siler; `SetEnv` için ilk satır kazanır). Sonuç `[anahtar: (değer, kaynak)]`; kaynak `.thisBlock`, `.otherHost(desenler)`, `.include(dosya, desenler)`, `.unresolved`.
 - **Match blokları** değerlendirilmez. ssh -G değeri, çözümleyicinin değeriyle uyuşmazsa (ya da çözümleyicide yoksa ve ssh'in varsayılanı değilse) kaynak "Match / belirsiz" gösterilir. Çözümleyicide yok ve ssh -G değeri yalnızca varsayılan ise "varsayılan".
 - **Önbellek:** Alias başına ssh -G sonucu; kaydedilmiş dosya değişince (`onDiskStateChange`) ya da config değişince temizlenir. Aynı anda en fazla 2 ssh -G.
 - **Kaydedilmemiş host:** Bölüm "Kaydedildikten sonra gösterilir" notu verir (ssh kaydedilmiş dosyayı okur).
@@ -57,9 +57,9 @@ Günlük kullanımı hızlandırmak (son bağlanılanlar, favoriler, akıllı ar
 
 Paket içinde `HostLint` (dosya varlığı ve anahtar başı okuma enjekte edilir). Kontroller (kaydedilmemiş belge değil, **düzenlenen belge** üzerinde, böylece kullanıcı düzeltirken anında görür):
 - **IdentityFile bulunamadı:** `KeyUsage.resolve` ile çözülen yol yoksa. Çözülemeyen (`%h` vb.) değerler uyarı vermez.
-- **Yinelenen alias:** Düzenlenebilir hostlar ve Include edilenler arasında ASCII büyük/küçük harf duyarsız aynı alias birden fazla blokta (ilk olan geçerli; sonrakiler için "ssh bu bloğa hiç ulaşmaz").
+- **Yinelenen alias:** Düzenlenebilir hostlar ve Include edilenler arasında aynı alias birden fazla blokta. Karşılaştırma ASCII büyük/küçük harf duyarsızdır; ssh eşleştirmesi duyarlı olduğundan (§5) bu, `Web`/`web` gibi olası yazım hataları için bilinçli bir uyarıdır, ssh davranışının iddiası değildir. İleti ilk blok için "sonraki bloklarda da var; onlar yalnızca bu blokta olmayan ayarları ekler", sonrakiler için "daha önceki bir blokta tanımlı; oradaki değerler önceliklidir" der (ssh her anahtarda ilk değeri alır, bloklara erişilmez değil). Kök dosyada bir `Include` satırı host bloğundan önceyse ve dahil edilen dosyalar aynı alias'ı tanımlıyorsa kök blok ilk sayılmaz ("sonraki" iletisi).
 - **Parolasız anahtar:** IdentityFile'ın başı `KeyFileInspector` ile parolasız özel anahtar ise.
-Kenar çubuğunda ⚠ (ipucunda sorunlar), detayda sorun listesi. Desen bloklarında yalnızca IdentityFile kontrolü.
+Kenar çubuğunda ⚠ (ipucunda sorunlar), detayda sorun listesi. Desen bloklarında (kenar çubuğu "Desenler" bölümü dahil) yalnızca IdentityFile kontrolü; yinelenen alias uyarısı yoktur ve grup satırı gösterilmez.
 
 ## 9. Gruplama
 

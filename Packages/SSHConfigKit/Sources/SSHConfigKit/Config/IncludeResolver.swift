@@ -32,6 +32,14 @@ public struct IncludeResolver: Sendable {
         return result
     }
 
+    /// The files one Include directive names, parsed, in ssh's (sorted glob) order.
+    public func includedDocuments(for include: IncludeDirective) -> [(file: URL, document: ConfigDocument)] {
+        include.paths.flatMap(expand).compactMap { file in
+            guard let data = try? Data(contentsOf: file), let text = String(validating: data, as: UTF8.self) else { return nil }
+            return (file, ConfigDocument(parsing: text))
+        }
+    }
+
     private func collect(_ document: ConfigDocument, depth: Int, visited: inout Set<String>, into result: inout [IncludedHost]) {
         guard depth < maxDepth else { return }
         for include in document.includes {

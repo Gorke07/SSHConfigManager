@@ -105,3 +105,19 @@ Elle denemede gerçek anahtarlarınıza dokunmamak için yeni anahtarları `dene
 - [ ] Yeni bir host ekleyip kaydetmeden seçince Bağlan/Test pasif ve "Bu host'a bağlanmak ya da test etmek için dosyayı kaydedin" notu var.
 - [ ] Kaydedilmemiş düzenleme varken config'ten bir host'u terminalden silin: o host artık menü çubuğu listesinde ve ⌥⌘S panelinde yok; "Dosya dışarıdan değişti" bandı görünüyor.
 - [ ] Girişte açılışta ana pencere bir an görünüp kaybolmuyor ve birkaç saniye sonra geri gelmiyor; menü çubuğundan 'Ana pencereyi aç' ile normal açılıyor ve Dock ikonu görünüyor.
+
+## v1.1 — Arayüz geliştirmeleri
+
+- [ ] ⌥⌘S → arama yazmadan ↩: en son bağlanılan host'a bağlanıyor; boş aramada Favoriler / Son / Tüm Hostlar bölümleri.
+- [ ] `prd web` gibi kısaltmalar doğru host'u ilk sırada buluyor; eşleşen harfler kalın.
+- [ ] ⌥↩ komutu panoya kopyalıyor; ⌘S favoriye ekleyip çıkarıyor; satırda yıldız görünüyor.
+- [ ] Seçili host'un altında `kullanıcı@adres:port · … üzerinden` önizlemesi kısa sürede beliriyor.
+- [ ] Bir host'un detayında "Etkin Ayarlar" ssh -G değerlerini ve her birinin kaynağını (Bu host / Host * / Dosyanın başı / Dahil edilen / Varsayılan) gösteriyor; "Tümünü Göster" kalan ayarları açıyor.
+- [ ] ProxyJump kullanan host'ta `Bu Mac → bastion → host` zinciri görünüyor; "Zinciri Test Et" sırayla test ediyor, başarısız halkadan sonrakiler "Atlandı".
+- [ ] Grup atanan hostlar kenar çubuğunda grup başlıkları altında; grupsuzlar en altta "Diğer Hostlar". Dosyadaki değişiklik yalnızca `# group:` satırı (Kaydet farkında kontrol).
+- [ ] Favori hostlarda yıldız; sağ tık ve detaydaki yıldızla ekleme/çıkarma.
+- [ ] Var olmayan IdentityFile, yinelenen alias ya da parolasız anahtar kullanan hostta ⚠ ve açıklaması görünüyor; düzeltince hemen kayboluyor.
+- [ ] Menü çubuğunda "Host" menüsü: ⌘N, ⌘D, Sil… (onaylı; ⌫ / ⌘⌫ yalnızca liste odaktayken), ⌘T, ⌘↩, ⌘⇧F, ⌘⇧C çalışıyor; metin alanında ⌘⌫ satır silmeye devam ediyor.
+- [ ] Hızlı Bağlan paneli açıkken ⌘↩ (test), ⌥↩ (kopyala), ⌘S (favori) menüye takılmadan panelde çalışıyor; Anahtarlar penceresinde Host menüsü öğeleri pasif.
+- [ ] "Tümünü test et" sonrası araç çubuğunda ✓/⚠/✕ sayıları; birine tıklayınca liste süzülüyor, "Tümünü Göster" ile kalkıyor.
+- [ ] Boş config ile açılınca üç adımlı karşılama ekranı; "Anahtar oluştur" Anahtarlar penceresini Yeni Anahtar formuyla açıyor.

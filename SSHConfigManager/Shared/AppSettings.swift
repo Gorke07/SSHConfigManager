@@ -17,6 +17,7 @@ final class AppSettings {
     }
 
     @ObservationIgnored private let defaults: UserDefaults
+    var userDefaults: UserDefaults { defaults }
     let homeDirectory: URL
     private(set) var configPath: String
     private(set) var knownHostsPath: String

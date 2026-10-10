@@ -22,6 +22,13 @@ final class AppModel {
     private(set) var editorToken = UUID()
     var searchText = ""
     var errorMessage: String?
+    /// Narrows the sidebar to hosts whose last connection test fell in this category.
+    var statusFilter: StatusCategory?
+    /// A host waiting for the user to confirm its deletion (menu, context menu or the delete key).
+    var pendingDelete: SidebarItem?
+    /// True while a main window is the key window. Host menu items are disabled otherwise so their
+    /// shortcuts (⌘↩, ⌘T, ⌘D, ⌘⇧C) stay available to the Quick Connect panel and the other windows.
+    var mainWindowIsKey = false
     /// The "Delete known_hosts entry…" flow for one alias; drives `HostKeyRemovalSheet`.
     var hostKeyRemoval: HostKeyRemoval?
     /// Informational: the chosen terminal was unavailable and the connection opened in Terminal.
@@ -32,6 +39,9 @@ final class AppModel {
     @ObservationIgnored private var activeEditorToken: UUID?
     /// A selection waiting for the user to confirm discarding blocked form edits.
     var pendingSelection: SidebarItem?
+    /// Effective Settings disclosure state; lives for the session, across host switches and editor rebuilds.
+    var effectiveSettingsExpanded = false
+    var effectiveSettingsShowAll = false
 
     @ObservationIgnored private let makeStore: StoreFactory
     @ObservationIgnored private let makeKnownHostsStore: KnownHostsStoreFactory
@@ -41,7 +51,15 @@ final class AppModel {
     /// Set when macOS denied Automation access; the main window explains how to allow it.
     var automationDenied = false
     /// Session-only connection test results; cleared when the saved file changes or another one is opened.
+    private(set) var memory: HostMemory
+
+    static func memoryKey(for url: URL, home: URL) -> String {
+        "hostMemory." + backupKind(for: url, home: home)
+    }
+
     let connectionTests: ConnectionTestsModel
+    /// `ssh -G` results per alias; cleared with the connection tests.
+    let effectiveConfig: EffectiveConfigCache
     let keys: KeysModel
 
     init(settings: AppSettings,
@@ -55,6 +73,7 @@ final class AppModel {
         self.settings = settings
         self.processRunner = processRunner
         self.connectionTests = ConnectionTestsModel(runner: processRunner)
+        self.effectiveConfig = EffectiveConfigCache(runner: processRunner)
         self.launcherFactory = launcherFactory
         self.terminalInstalled = isTerminalInstalled
         self.keys = KeysModel(tools: keyTools)
@@ -65,6 +84,7 @@ final class AppModel {
         self.makeKnownHostsStore = makeKnownHostsStore
         self.knownHosts = makeKnownHostsStore(
             settings.knownHostsURL, backups, Self.knownHostsBackupKind(for: settings.knownHostsURL, home: settings.homeDirectory))
+        self.memory = HostMemory(defaults: settings.userDefaults, key: Self.memoryKey(for: settings.configURL, home: settings.homeDirectory))
         keys.app = self
         observeSavedState()
     }
@@ -78,6 +98,9 @@ final class AppModel {
     private func savedStateDidChange() {
         savedHostsCache = nil
         connectionTests.clear()
+        effectiveConfig.clear()
+        statusFilter = nil
+        pendingDelete = nil
     }
 
     static func liveStore(url: URL, backups: BackupManager, backupKind: String) -> ConfigStore {
@@ -175,6 +198,16 @@ final class AppModel {
         savedHosts.aliases[alias.lowercased()]
     }
 
+    /// Resolver result for a host of the saved file (Includes followed in place, with the store's own resolver).
+    func resolvedConfig(forSavedAlias alias: String) -> ResolvedConfig? {
+        guard let saved = savedAlias(alias) else { return nil }
+        let document = store.savedDocument
+        let header = document.hosts.first { !$0.isPattern && $0.alias == saved }?.headerLine
+        let resolver = store.includeResolver
+        return ConfigResolver.resolve(alias: saved, document: document, targetHeader: header,
+                                      includes: { resolver.includedDocuments(for: $0) })
+    }
+
     /// The alias to connect to for a sidebar item: nil for patterns, Match blocks, missing hosts
     /// and hosts that are not in the saved file yet.
     func connectableAlias(for item: SidebarItem) -> String? {
@@ -209,7 +242,57 @@ final class AppModel {
             errorMessage = String(localized: "connect.invalidCommand")
             return .failed(.failed("control character"))
         }
-        return launch(request)
+        let outcome = launch(request)
+        switch outcome {
+        case .launched, .fellBack: memory.recordConnection(alias)
+        default: break
+        }
+        return outcome
+    }
+
+    /// Favorites that are hosts of the saved file, as written there.
+    var favoriteAliases: [String] { memory.favorites.compactMap(savedAlias) }
+
+    /// Recently connected saved hosts, most recent first.
+    var recentAliases: [String] { memory.recents.compactMap(savedAlias) }
+
+    var statusCounts: [StatusCategory: Int] {
+        var counts: [StatusCategory: Int] = [:]
+        for alias in connectableAliases {
+            if let status = connectionTests.results[alias]?.status { counts[StatusCategory.of(status), default: 0] += 1 }
+        }
+        return counts
+    }
+
+    /// Rows without a connectable alias (patterns, includes of patterns, Match) have no status and are hidden by a filter.
+    func passesStatusFilter(_ item: SidebarItem) -> Bool {
+        guard let filter = statusFilter else { return true }
+        guard let alias = connectableAlias(for: item), let status = connectionTests.results[alias]?.status else { return false }
+        return StatusCategory.of(status) == filter
+    }
+
+    func requestDelete(_ item: SidebarItem) {
+        guard SidebarBuilder.hostEntry(for: item, in: store.document) != nil else { return }
+        pendingDelete = item
+    }
+
+    func confirmPendingDelete() {
+        guard let item = pendingDelete else { return }
+        pendingDelete = nil
+        do {
+            try HostCommands.delete(item, in: store)
+            if selection == item { select(nil) }
+        } catch {
+            errorMessage = Messages.text(for: error)
+        }
+    }
+
+    func copySSHCommand(_ item: SidebarItem, copy: (String) -> Void) {
+        if let command = HostCommands.sshCommand(for: item, document: store.document, builder: commandBuilder) { copy(command) }
+    }
+
+    func toggleFavorite(_ alias: String) {
+        memory.toggleFavorite(savedAlias(alias) ?? alias)
     }
 
     /// "Upload to Server…": `ssh-copy-id -i <pub> [-F <config>] -- <alias>` in the chosen terminal (interactive).
@@ -267,6 +350,66 @@ final class AppModel {
         activeEditor = created
         activeEditorToken = created == nil ? nil : editorToken
         return created
+    }
+
+    /// Sets or (nil/blank) removes the host's `# group:` line as an unsaved edit. The open editor
+    /// keeps its fields: it finds its block by alias and occurrence and compares only directives.
+    func setGroup(_ item: SidebarItem, to name: String?) {
+        guard let entry = SidebarBuilder.hostEntry(for: item, in: store.document) else { return }
+        let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            try store.apply { try $0.setGroup(ofHostAt: entry.headerLine, to: trimmed?.isEmpty == false ? trimmed : nil) }
+        } catch {
+            errorMessage = Messages.text(for: error)
+        }
+    }
+
+    /// Group names used in the document, for suggestions.
+    var existingGroups: [String] {
+        let document = store.document
+        let names = Set(document.hosts.compactMap { document.group(ofHostAt: $0.headerLine) })
+        return names.sorted(by: SidebarBuilder.groupNameOrder)
+    }
+
+    /// Lint of every root-file Host block in the document being edited (so fixes show at once),
+    /// keyed by sidebar item. One pass: duplicates and first blocks are computed once, and each
+    /// key file is read at most once. Pattern blocks get the IdentityFile checks only.
+    func lintIssueMap() -> [SidebarItem: [HostIssue]] {
+        let document = store.document
+        let reads = KeyReadMemo()
+        let lint = HostLint(
+            home: settings.homeDirectory,
+            fileExists: { FileManager.default.fileExists(atPath: $0.path) },
+            encryption: { reads.encryption(of: $0) })
+        let duplicates = HostLint.duplicateCounts(document: document, included: store.includedHosts)
+        var firstBlocks = HostLint.firstBlocks(document: document)
+        // ssh reads an Include where it stands: a root block after one is not the first for aliases
+        // the included files define too.
+        if let firstInclude = document.includes.map(\.line).min() {
+            for host in store.includedHosts {
+                let plain = host.entry.patterns.filter { !$0.hasPrefix("!") && !$0.contains("*") && !$0.contains("?") }
+                for name in plain.map(EffectiveConfigCache.key) {
+                    if let header = firstBlocks[name], header > firstInclude { firstBlocks[name] = -1 }
+                }
+            }
+        }
+        var seen: [String: Int] = [:]
+        var map: [SidebarItem: [HostIssue]] = [:]
+        for entry in document.hosts {
+            let occurrence = seen[entry.alias, default: 0]
+            seen[entry.alias] = occurrence + 1
+            var issues = lint.issues(for: entry, duplicates: duplicates, firstBlocks: firstBlocks)
+            if entry.isPattern {
+                issues.removeAll { if case .duplicateAlias = $0 { true } else { false } }
+            }
+            if !issues.isEmpty { map[.host(alias: entry.alias, occurrence: occurrence)] = issues }
+        }
+        return map
+    }
+
+    func lintIssues(for item: SidebarItem) -> [HostIssue] {
+        guard case .host = item else { return [] }
+        return lintIssueMap()[item] ?? []
     }
 
     var hasPendingFormEdits: Bool { activeEditor?.hasPendingChanges ?? false }
@@ -353,10 +496,14 @@ final class AppModel {
         settings.setConfigPath(path)
         store.onDiskStateChange = nil
         store = makeStore(url, backupManager, Self.backupKind(for: url, home: settings.homeDirectory))
+        memory = HostMemory(defaults: settings.userDefaults, key: Self.memoryKey(for: url, home: settings.homeDirectory))
         observeSavedState()
         savedHostsCache = nil
         select(nil)
         connectionTests.clear()
+        effectiveConfig.clear()
+        statusFilter = nil
+        pendingDelete = nil
         searchText = ""
         errorMessage = nil
         return .switched
@@ -373,4 +520,19 @@ final class AppModel {
 enum KeyAssignmentError: Error, Equatable {
     case hostNotFound(String)
     case pendingFormEdits
+}
+
+/// Reads each private key's head at most once per lint pass.
+private final class KeyReadMemo: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cache: [URL: KeyEncryption] = [:]
+
+    func encryption(of url: URL) -> KeyEncryption {
+        lock.lock()
+        defer { lock.unlock() }
+        if let known = cache[url] { return known }
+        let value = (try? KeyFileInspector.readHead(of: url)).map(KeyFileInspector.encryption(ofPrivateKeyHead:)) ?? .unknown
+        cache[url] = value
+        return value
+    }
 }

@@ -92,4 +92,114 @@ struct QuickConnectModelTests {
         #expect(quick.connectSelected())
         #expect(opened == 0)
     }
+
+    @Test func emptyQueryShowsFavoritesThenRecentsThenTheRest() throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\nHost b\nHost c\nHost d\n")
+        app.toggleFavorite("c")
+        _ = app.connect(alias: "b")
+        _ = app.connect(alias: "c")
+        let model = QuickConnectModel(app: app)
+        #expect(model.entries.map(\.alias) == ["c", "b", "a", "d"])
+        #expect(model.entries.map(\.section) == [.favorites, .recents, .all, .all])
+        #expect(model.entries.first?.isFavorite == true)
+    }
+
+    @Test func searchRanksAndHighlights() throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host db-prod\n  HostName 10.0.0.9\nHost prod-web-01\nHost prod\n")
+        let model = QuickConnectModel(app: app)
+        model.query = "prod"
+        #expect(model.entries.map(\.alias) == ["prod", "prod-web-01", "db-prod"])
+        #expect(model.entries.allSatisfy { $0.section == nil })
+        model.query = "prd web"
+        #expect(model.entries.map(\.alias) == ["prod-web-01"])
+        #expect(model.entries.first?.aliasOffsets == [0, 1, 3, 5, 6, 7])
+        model.query = "10.0.0"
+        #expect(model.entries.map(\.alias) == ["db-prod"])
+    }
+
+    @Test func groupsAppearOnEntries() throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "# group: Prod\nHost web\n")
+        #expect(QuickConnectModel(app: app).entries.first?.group == "Prod")
+    }
+
+    @Test func copyAndFavoriteActOnTheSelection() throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host web\n")
+        var copied: [String] = []
+        let model = QuickConnectModel(app: app, copyToPasteboard: { copied.append($0) })
+        #expect(model.copySelectedCommand())
+        #expect(copied == ["ssh -- web"])
+        model.toggleFavoriteSelected()
+        #expect(app.favoriteAliases == ["web"])
+    }
+
+    @Test func previewUsesSshGOutput() async throws {
+        let tmp = try TempDir()
+        let runner = FixedRunner(result: ProcessResult(exitCode: 0, stdout: "user ubuntu\nhostname 10.0.1.12\nport 2222\nproxyjump bastion\n", stderr: "", timedOut: false))
+        let app = makeTestModel(tmp, config: "Host web\n", runner: runner)
+        let model = QuickConnectModel(app: app)
+        let entry = try #require(model.selectedEntry)
+        #expect(model.previewText(for: entry) == "…")
+        await app.effectiveConfig.load("web", using: app.commandBuilder)
+        #expect(model.previewText(for: entry) == "ubuntu@10.0.1.12:2222 · " + String(localized: "quick.preview.via \("bastion")"))
+    }
+
+    @Test func aFailedPreviewIsNotShownAsLoading() async throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host web\n", runner: FixedRunner.invalid("Bad configuration option: x"))
+        let model = QuickConnectModel(app: app)
+        let entry = try #require(model.selectedEntry)
+        await app.effectiveConfig.load("web", using: app.commandBuilder)
+        #expect(model.previewText(for: entry) == nil)
+    }
+
+    @Test func whileLoadingThePreviewShowsTheSavedHostName() throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host web\n  HostName 10.0.0.5\nHost bare\n")
+        let model = QuickConnectModel(app: app)
+        let web = try #require(model.entries.first { $0.alias == "web" })
+        let bare = try #require(model.entries.first { $0.alias == "bare" })
+        #expect(model.previewText(for: web) == "10.0.0.5")
+        #expect(model.previewText(for: bare) == "…")
+    }
+
+    @Test func duplicateAliasesAppearOnceWhileSearching() throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host web\n  User a\nHost web\n  User b\nHost db\n")
+        let model = QuickConnectModel(app: app)
+        model.query = "web"
+        #expect(model.entries.map(\.alias) == ["web"])
+        model.query = ""
+        #expect(model.entries.map(\.alias).sorted() == ["db", "web"])
+    }
+
+    @Test func togglingFavoriteKeepsTheSelectionOnTheSameHost() throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\nHost b\nHost c\nHost d\n")
+        app.toggleFavorite("c")
+        _ = app.connect(alias: "b")
+        let model = QuickConnectModel(app: app)
+        model.query = ""
+        #expect(model.entries.map(\.alias) == ["c", "b", "a", "d"])
+        model.selectedIndex = 3
+        model.toggleFavoriteSelected()
+        #expect(model.selectedEntry?.alias == "d")
+        #expect(app.favoriteAliases.contains("d"))
+        model.toggleFavoriteSelected()
+        #expect(model.selectedEntry?.alias == "d")
+        #expect(!app.favoriteAliases.contains("d"))
+    }
+
+    @Test func copyWithNoMatchingEntryReportsFalse() throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host web\n")
+        var copied: [String] = []
+        let model = QuickConnectModel(app: app, copyToPasteboard: { copied.append($0) })
+        model.query = "zzz"
+        #expect(!model.copySelectedCommand())
+        #expect(copied.isEmpty)
+    }
 }
