@@ -46,10 +46,13 @@ enum FuzzyMatcher {
         guard !words.isEmpty else { return FuzzyMatch(score: 0, aliasOffsets: []) }
         let folded = fold(alias)
         let foldedOthers = others.map(foldWhole)
+        // Multi-word queries sum the per-word scores. Every word must match, so all candidates of
+        // one query have the same word count and the sums compare like-for-like.
         var score = 0
         var offsets = Set<Int>()
+        var steps = 0
         for word in words {
-            if let hit = aliasMatch(Array(word), in: folded) {
+            if let hit = aliasMatch(Array(word), in: folded, steps: &steps) {
                 score += hit.score
                 offsets.formUnion(hit.offsets)
             } else if foldedOthers.contains(where: { $0.contains(word) }) {
@@ -69,7 +72,15 @@ enum FuzzyMatcher {
         return previousIsDigit != currentIsDigit
     }
 
-    private static func aliasMatch(_ word: [Character], in folded: [String]) -> (score: Int, offsets: [Int])? {
+    /// Test hook: the number of memoized-search steps spent matching one word against an alias.
+    static func searchSteps(word: String, alias: String) -> Int {
+        var steps = 0
+        _ = aliasMatch(Array(foldWhole(word)), in: fold(alias), steps: &steps)
+        return steps
+    }
+
+    /// Tiers: 1000 exact, 800 prefix, 600 word-start, 101...300 scattered; other-fields hits score 100.
+    private static func aliasMatch(_ word: [Character], in folded: [String], steps: inout Int) -> (score: Int, offsets: [Int])? {
         let target = folded.joined()
         let characters = folded.map { $0.first ?? " " }
         if target == String(word) { return (1000, Array(folded.indices)) }
@@ -83,6 +94,7 @@ enum FuzzyMatcher {
             guard position < characters.count else { return nil }
             let key = n * (characters.count + 1) + position
             if failed.contains(key) { return nil }
+            steps += 1  // one per expanded (word index, position) state, so at most word.count x alias.count
             for index in position..<characters.count where characters[index] == word[n] {
                 guard (n > 0 && index == position) || isWordStart(index, in: folded) else { continue }
                 if let rest = search(n + 1, index + 1) { return [index] + rest }
@@ -99,7 +111,7 @@ enum FuzzyMatcher {
             offsets.append(index); position = index + 1
         }
         let gaps = zip(offsets, offsets.dropFirst()).reduce(0) { $0 + ($1.1 - $1.0 - 1) }
-        return (300 - min(gaps, 200), offsets)
+        return (300 - min(gaps, 199), offsets)
     }
 
     static func highlighted(_ alias: String, offsets: [Int]) -> AttributedString {
