@@ -59,7 +59,18 @@ public enum HostMatcher {
     /// matching any of `lookupNames`.
     public static func entries(in document: KnownHostsDocument, matchingAny lookupNames: [String]) -> [KnownHostEntry] {
         document.entries.filter { entry in
-            entry.marker == nil && entry.names.contains { name in lookupNames.contains { matches(name, lookupName: $0) } }
+            entry.marker == nil && lookupNames.contains { lookup in
+                entry.names.contains { matches($0, lookupName: lookup) } && !isNegated(lookup, in: entry)
+            }
+        }
+    }
+
+    /// ssh's match_hostname: a `!name` on the line that matches the lookup name makes the whole line a
+    /// non-match (`!host,host` is never found by `ssh-keygen -F host`).
+    private static func isNegated(_ lookupName: String, in entry: KnownHostEntry) -> Bool {
+        entry.names.contains { name in
+            guard case .plain(let address) = name, address.literal.hasPrefix("!") else { return false }
+            return String(address.literal.dropFirst()).asciiLowercased == lookupName.asciiLowercased
         }
     }
 }

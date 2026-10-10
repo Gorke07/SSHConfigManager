@@ -29,7 +29,8 @@ struct HostResolverTests {
         let host = HostResolver.parse(Self.output)
         #expect(host == ResolvedHost(hostname: "example.com", port: 2222, hostKeyAlias: "myalias",
                                      userKnownHostsFiles: ["/h/.ssh/known_hosts", "/h/.ssh/known_hosts2"]))
-        #expect(host?.lookupNames == ["myalias", "[example.com]:2222"])
+        #expect(host?.lookupNames == ["[myalias]:2222"])   // alias replaces the host name; port bracketed as ssh does
+        #expect(HostResolver.parse("hostname example.com\nport 22\nhostkeyalias MyAlias\n")?.lookupNames == ["myalias"])
     }
 
     @Test func withoutAliasOnlyTheHostName() {

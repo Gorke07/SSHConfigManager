@@ -34,12 +34,13 @@ struct HostKeyRemovalTests {
         // The hashed line is for "example.com", not "web.example.com"; the pattern never matches.
     }
 
-    @Test func hostKeyAliasIsAlsoLookedUp() async throws {
+    @Test func hostKeyAliasReplacesTheHostName() async throws {
         let tmp = try TempDir()
         let model = make(tmp, sshG: "hostname web.example.com\nport 22\nhostkeyalias example.com\n")
         await model.requestHostKeyRemoval(alias: "web")
         guard case .confirm(let entries) = model.hostKeyRemoval?.phase else { Issue.record("expected confirm"); return }
-        #expect(entries.map(\.lineIndex) == [0, 1])
+        // Only the alias is looked up (ssh never reads the host name's own entry then).
+        #expect(entries.map(\.lineIndex) == [1])
     }
 
     @Test func confirmingDeletesOnlyThoseLinesAndForgetsTheTestResult() async throws {
@@ -183,17 +184,33 @@ struct HostKeyRemovalTests {
         #expect(model.hostKeyRemoval?.otherKnownHostsFile == nil)
     }
 
-    @Test func cancellingTheFlowCancelsTheRunningSsh() async throws {
+    @Test(.timeLimit(.minutes(1))) func cancellingTheFlowCancelsTheRunningSsh() async throws {
         let tmp = try TempDir()
         _ = try tmp.file(".ssh/known_hosts", Self.knownHosts)
         let runner = CancellableRunner()
         let model = makeTestModel(tmp, config: Self.config, runner: runner)
         model.startHostKeyRemoval(alias: "web")
-        for await _ in runner.entries { break }   // ssh -G is running (validation runs go through the same runner only on save)
+        for await _ in runner.entries { break }   // wait until the fake ssh -G has started
         model.cancelHostKeyRemoval()
         for await _ in runner.cancellations { break }
         #expect(runner.cancelledCount == 1)
         #expect(model.hostKeyRemoval == nil)
+    }
+
+    /// The real runner does not throw when it kills ssh: it returns the signal number as exit code.
+    @Test(.timeLimit(.minutes(1))) func aKilledSshEndsTheFlowWithoutAStaleResult() async throws {
+        let tmp = try TempDir()
+        _ = try tmp.file(".ssh/known_hosts", Self.knownHosts)
+        let runner = CancellableRunner(killedBySignal: true)
+        let model = makeTestModel(tmp, config: Self.config, runner: runner)
+        model.startHostKeyRemoval(alias: "web")
+        for await _ in runner.entries { break }
+        let task = model.hostKeyRemovalTask
+        model.cancelHostKeyRemoval()
+        await task?.value   // the flow has fully ended: a late failed/answer would show up now
+        for await _ in runner.cancellations { break }
+        #expect(model.hostKeyRemoval == nil)
+        #expect(model.errorMessage == nil)
     }
 }
 
@@ -204,8 +221,11 @@ final class CancellableRunner: ProcessRunning, @unchecked Sendable {
     let cancellations: AsyncStream<Void>
     private let cancelled: AsyncStream<Void>.Continuation
     private let count = Mutex(0)
+    /// Return a SIGTERM-killed result (exit code 15, no output) instead of throwing, like ProcessRunner.
+    private let killedBySignal: Bool
     var cancelledCount: Int { count.withLock { $0 } }
-    init() {
+    init(killedBySignal: Bool = false) {
+        self.killedBySignal = killedBySignal
         (entries, entered) = AsyncStream.makeStream()
         (cancellations, cancelled) = AsyncStream.makeStream()
     }
@@ -216,6 +236,7 @@ final class CancellableRunner: ProcessRunning, @unchecked Sendable {
         } catch {
             count.withLock { $0 += 1 }
             cancelled.yield()
+            if killedBySignal { return ProcessResult(exitCode: 15, stdout: "", stderr: "", timedOut: false) }
             throw CancellationError()
         }
         return ProcessResult(exitCode: 0, stdout: "hostname web.example.com\nport 22\n", stderr: "", timedOut: false)

@@ -33,13 +33,10 @@ public struct ResolvedHost: Equatable, Sendable {
         self.userKnownHostsFiles = userKnownHostsFiles
     }
 
-    /// Names to look up in known_hosts: the HostKeyAlias as written (ssh uses it instead of the
-    /// host name, without a port) and the host name in ssh's `host` / `[host]:port` form.
+    /// The name ssh looks up in known_hosts, in its `host` / `[host]:port` form. With a HostKeyAlias ssh
+    /// uses the alias INSTEAD of the host name (same port bracketing), never both.
     public var lookupNames: [String] {
-        var names: [String] = []
-        if let hostKeyAlias { names.append(hostKeyAlias) }
-        names.append(HostMatcher.lookupName(host: hostname, port: port))
-        return names
+        [HostMatcher.lookupName(host: hostKeyAlias ?? hostname, port: port)]
     }
 }
 
@@ -72,6 +69,8 @@ public struct HostResolver: Sendable {
         } catch {
             throw HostResolverError.failed(error.localizedDescription)
         }
+        // Cancelled: a signalled ssh reports a failure that nobody wants to see.
+        try Task.checkCancellation()
         if result.timedOut { throw HostResolverError.timedOut }
         guard result.exitCode == 0 else { throw HostResolverError.failed(ConnectionClassifier.firstLine(result.stderr)) }
         guard let host = Self.parse(result.stdout) else { throw HostResolverError.unparsable }
