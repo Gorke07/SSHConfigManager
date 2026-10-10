@@ -6,7 +6,7 @@ extension KeyboardShortcuts.Name {
     static let quickConnect = Self("quickConnect", default: .init(.s, modifiers: [.option, .command]))
 }
 
-/// A borderless panel that can take keyboard focus.
+/// A titled panel (title bar hidden) that can take keyboard focus.
 final class QuickConnectPanel: NSPanel {
     override var canBecomeKey: Bool { true }
 }

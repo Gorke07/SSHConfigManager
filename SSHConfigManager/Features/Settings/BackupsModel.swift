@@ -55,6 +55,7 @@ final class BackupsModel {
     @ObservationIgnored private var listedKind: String?
 
     func refresh() {
+        hunksCache = nil
         listedKind = backupKind
         do {
             backups = try model.backupManager.list(kind: backupKind)
@@ -69,10 +70,20 @@ final class BackupsModel {
     }
 
     /// Current document (old) → backup (new): what restoring would change.
+    /// Cached per backup and current text, so a body pass does not re-read the file and re-diff.
     func hunks(for backup: Backup) -> [DiffHunk] {
+        let current = currentText
+        if let cached = hunksCache, cached.url == backup.url, cached.current == current { return cached.hunks }
         let contents = (try? model.backupManager.contents(of: backup)) ?? ""
-        return LineDiff.hunks(old: currentText, new: contents)
+        let hunks = LineDiff.hunks(old: current, new: contents)
+        hunksComputationCount += 1
+        hunksCache = (backup.url, current, hunks)
+        return hunks
     }
+
+    @ObservationIgnored private var hunksCache: (url: URL, current: String, hunks: [DiffHunk])?
+    /// How many times a diff was actually computed (tests).
+    @ObservationIgnored private(set) var hunksComputationCount = 0
 
     /// The known_hosts file as the user saw it when a restore confirmation opened.
     struct KnownHostsSnapshot {

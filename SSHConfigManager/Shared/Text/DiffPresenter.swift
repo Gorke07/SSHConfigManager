@@ -62,3 +62,25 @@ enum DiffPresenter {
         text.unicodeScalars.last == "\r" ? String(text.unicodeScalars.dropLast()) : text
     }
 }
+
+/// Rows for a diff plus the length of its longest text, so every row can share one minimum width.
+struct DiffContent: Equatable, Sendable {
+    let rows: [DiffRow]
+    let maxTextLength: Int
+}
+
+/// Builds `DiffContent` once per distinct `hunks` value instead of on every draw.
+final class DiffRowsCache {
+    private var hunks: [DiffHunk]?
+    private var cached = DiffContent(rows: [], maxTextLength: 0)
+    private(set) var buildCount = 0
+
+    func content(for hunks: [DiffHunk]) -> DiffContent {
+        if self.hunks == hunks { return cached }
+        let rows = DiffPresenter.rows(for: hunks)
+        cached = DiffContent(rows: rows, maxTextLength: rows.map(\.text.count).max() ?? 0)
+        self.hunks = hunks
+        buildCount += 1
+        return cached
+    }
+}

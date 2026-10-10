@@ -121,3 +121,12 @@ Elle denemede gerçek anahtarlarınıza dokunmamak için yeni anahtarları `dene
 - [ ] Hızlı Bağlan paneli açıkken ⌘↩ (test), ⌥↩ (kopyala), ⌘S (favori) menüye takılmadan panelde çalışıyor; Anahtarlar penceresinde Host menüsü öğeleri pasif.
 - [ ] "Tümünü test et" sonrası araç çubuğunda ✓/⚠/✕ sayıları; birine tıklayınca liste süzülüyor, "Tümünü Göster" ile kalkıyor.
 - [ ] Boş config ile açılınca üç adımlı karşılama ekranı; "Anahtar oluştur" Anahtarlar penceresini Yeni Anahtar formuyla açıyor.
+
+## Plan 8 — Fark ve arayüz rötuşları
+
+- [ ] Çok uzun satırlı (200+ karakter) bir diff kaydırılırken tüm satırların eklenen/silinen arka planı aynı sağ kenarda bitiyor, satır genişlikleri aşağı kaydırınca zıplamıyor.
+- [ ] Yedekler penceresinde bir yedek seçiliyken pencere yeniden boyutlandırılınca / başka yedek seçilip dönülünce diff takılmadan görünüyor.
+- [ ] VoiceOver: bant (banner) simgeleri ayrıca okunmuyor, yalnızca mesaj ve düğmeler okunuyor.
+- [ ] Kenar çubuğunda desen / Match gibi bağlanamayan bir satıra sağ tık: menü ayırıcıyla başlamıyor.
+- [ ] Bağlantı çubuğundaki rozetin üstüne gelince çıkan ipucu yalnızca durumu gösteriyor (ayrıntı yanındaki metinde, tekrar yok); kenar çubuğundaki rozetin ipucu ayrıntıyı içermeye devam ediyor.
+- [ ] Ayarlar → Bağlantı: kısayol kaydedici, "Girişte aç" anahtarının onay/hata metinlerinin altında.

@@ -23,6 +23,18 @@ struct TextPresentationTests {
         #expect(CodeHighlighter.spans(for: ConfigLine(raw: "")) == [])
     }
 
+    @Test func rowsCacheReusesRowsForEqualHunksAndReportsWidestText() {
+        let cache = DiffRowsCache()
+        let hunks = LineDiff.hunks(old: "a\n", new: "a\nlonger line here\n")
+        let first = cache.content(for: hunks)
+        _ = cache.content(for: hunks)
+        #expect(cache.buildCount == 1)
+        #expect(first.rows == DiffPresenter.rows(for: hunks))
+        #expect(first.maxTextLength == "longer line here".count)
+        _ = cache.content(for: LineDiff.hunks(old: "a\n", new: "b\n"))
+        #expect(cache.buildCount == 2)
+    }
+
     @Test func diffRowsStripCarriageReturnsAndMarkMissingNewline() throws {
         let hunks = LineDiff.hunks(old: "Host a\r\n  User u", new: "Host a\r\n  User v\n")
         let rows = DiffPresenter.rows(for: hunks)

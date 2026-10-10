@@ -77,9 +77,11 @@ struct SidebarView: View {
                     }
                     .tag(row.item)
                     .contextMenu {
-                        connectItems(for: row.item)
+                        if model.connectableAlias(for: row.item) != nil {
+                            connectItems(for: row.item)
+                            if editable { Divider() }
+                        }
                         if editable {
-                            Divider()
                             menu(for: row.item)
                         }
                     }

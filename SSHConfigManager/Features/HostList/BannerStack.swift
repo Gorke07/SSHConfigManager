@@ -83,7 +83,7 @@ private struct BannerRow<Actions: View>: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: icon).foregroundStyle(tint)
+            Image(systemName: icon).foregroundStyle(tint).accessibilityHidden(true)
             Text(message).frame(maxWidth: .infinity, alignment: .leading)
             actions()
         }

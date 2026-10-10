@@ -69,7 +69,6 @@ struct SettingsView: View {
                     }
                 }
                 Toggle(String(localized: "settings.launchAtLogin"), isOn: Binding(get: { loginItem.isOn }, set: { loginItem.set($0) }))
-                KeyboardShortcuts.Recorder(String(localized: "settings.shortcut"), name: .quickConnect)
                 if loginItem.needsApproval {
                     Text(String(localized: "settings.launchAtLogin.needsApproval")).font(.footnote).foregroundStyle(.secondary)
                     Button(String(localized: "settings.launchAtLogin.openSettings")) {
@@ -79,6 +78,7 @@ struct SettingsView: View {
                 if let message = loginItem.errorMessage {
                     Text(message).font(.footnote).foregroundStyle(.red)
                 }
+                KeyboardShortcuts.Recorder(String(localized: "settings.shortcut"), name: .quickConnect)
             }
 
             Section(String(localized: "settings.backups")) {

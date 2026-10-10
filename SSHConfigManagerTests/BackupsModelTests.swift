@@ -28,6 +28,26 @@ struct BackupsModelTests {
         #expect(backups.selected?.url == backups.backups[1].url)
     }
 
+    @Test func hunksAreCachedPerBackupAndInvalidatedWhenTheDocumentChanges() async throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\n")
+        try await saveEdit(app, port: "1")
+        let backups = BackupsModel(model: app)
+        let backup = try #require(backups.backups.first)
+        let first = backups.hunks(for: backup)
+        _ = backups.hunks(for: backup)
+        #expect(backups.hunksComputationCount == 1)
+        #expect(backups.hunks(for: backup) == first)
+        // A draft edit changes the current text: the diff is recomputed.
+        try app.store.apply { doc in
+            var draft = HostDraft(doc.hosts[0])
+            draft.directives = [DraftDirective(key: "Port", value: "9")]
+            try doc.updateHost(at: doc.hosts[0].headerLine, to: draft)
+        }
+        _ = backups.hunks(for: backup)
+        #expect(backups.hunksComputationCount == 2)
+    }
+
     @Test func hunksCompareCurrentDocumentToBackup() async throws {
         let tmp = try TempDir()
         let app = makeTestModel(tmp, config: "Host a\n")

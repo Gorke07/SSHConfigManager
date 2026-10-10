@@ -5,6 +5,7 @@ import SwiftUI
 /// Read-only unified diff with old/new line numbers and added/removed backgrounds.
 struct DiffTextView: View {
     let hunks: [DiffHunk]
+    @State private var cache = DiffRowsCache()
 
     init(hunks: [DiffHunk]) {
         self.hunks = hunks
@@ -29,18 +30,35 @@ struct DiffTextView: View {
             } else {
                 // Rows fill the widest row (or the viewport, when wider) so the added/removed
                 // backgrounds end at the same edge.
+                let content = cache.content(for: hunks)
+                let contentWidth = Self.width(forTextLength: content.maxTextLength)
                 GeometryReader { viewport in
                     ScrollView([.vertical, .horizontal]) {
+                        // The lazy stack sizes rows one by one, so the widest row is computed once
+                        // (monospaced advance x longest text) and every row gets that minimum width.
                         LazyVStack(alignment: .leading, spacing: 0) {
-                            ForEach(DiffPresenter.rows(for: hunks)) { row in
+                            ForEach(content.rows) { row in
                                 DiffRowView(row: row)
                             }
                         }
-                        .frame(minWidth: viewport.size.width, alignment: .leading)
+                        .frame(minWidth: max(viewport.size.width, contentWidth), alignment: .leading)
                     }
                 }
             }
         }
+    }
+}
+
+extension DiffTextView {
+    /// Gutters (2 x 32), marker, 3 spacings and horizontal padding around the text.
+    private static let chrome: CGFloat = 64 + 8 + 24 + 16
+    private static let characterWidth: CGFloat = {
+        let font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        return ("0" as NSString).size(withAttributes: [.font: font]).width
+    }()
+
+    static func width(forTextLength length: Int) -> CGFloat {
+        chrome + CGFloat(length) * characterWidth
     }
 }
 
