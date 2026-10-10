@@ -28,23 +28,31 @@ public struct PublicKeyInfo: Equatable, Sendable {
 
 /// Looks only at the first bytes of a private key file (header and first base64 line); the key
 /// material is never parsed or kept (spec §8.1).
+public enum KeyFileError: Error, Equatable, LocalizedError {
+    case notARegularFile(String)
+    public var errorDescription: String? {
+        switch self { case .notARegularFile(let path): "Not a regular file: \(path)" }
+    }
+}
+
 public enum KeyFileInspector {
     public static let headLimit = 512
 
     public static func readHead(of url: URL) throws -> Data {
-        // Opening a FIFO or device for reading can block forever; only regular files (symlinks followed).
-        var info = stat()   // stat follows symlinks
-        guard stat(url.path, &info) == 0 else {
-            throw CocoaError(.fileReadNoSuchFile, userInfo: [NSFilePathErrorKey: url.path])
+        // O_NONBLOCK: opening a FIFO or device can never block; fstat on the descriptor (no check/use race).
+        let fd = open(url.path, O_RDONLY | O_NONBLOCK)
+        guard fd >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        var info = stat()
+        guard fstat(fd, &info) == 0 else {
+            let code = POSIXErrorCode(rawValue: errno) ?? .EIO
+            close(fd)
+            throw POSIXError(code)
         }
         guard info.st_mode & S_IFMT == S_IFREG else {
-            throw CocoaError(.fileReadUnsupportedScheme, userInfo: [
-                NSFilePathErrorKey: url.path,
-                NSLocalizedDescriptionKey: "Not a regular file: \(url.path)",
-            ])
+            close(fd)
+            throw KeyFileError.notARegularFile(url.path)
         }
-        let handle = try FileHandle(forReadingFrom: url)
-        defer { try? handle.close() }
+        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
         return try handle.read(upToCount: headLimit) ?? Data()
     }
 

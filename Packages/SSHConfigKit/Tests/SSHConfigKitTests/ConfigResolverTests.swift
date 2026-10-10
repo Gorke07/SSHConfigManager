@@ -145,6 +145,25 @@ struct ConfigResolverTests {
         #expect(rootTarget.first("user")?.source == .include(file: file, patterns: ["web"]))
     }
 
+    @Test func sendEnvDropsEmptyAndEqualsTokens() {
+        #expect(sendEnv("Host web\n  SendEnv A=B \"\" C\n") == ["C"])
+    }
+
+    @Test func targetFileComparesSymlinkResolvedPaths() throws {
+        let tmp = try TempDir()
+        let real = tmp.url.appending(path: "real"); let link = tmp.url.appending(path: "link")
+        try FileManager.default.createDirectory(at: real, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: real)
+        try Data().write(to: real.appending(path: "a.conf"))   // symlink resolution needs an existing file
+        let included = ConfigDocument(parsing: "Host web\n  User u\n")
+        let root = ConfigDocument(parsing: "Include x\n")
+        let config = ConfigResolver.resolve(alias: "web", document: root, targetHeader: 0,
+                                            targetFile: link.appending(path: "a.conf")) { _ in
+            [(real.appending(path: "a.conf"), included)]
+        }
+        #expect(config.first("user")?.source == .thisBlock)
+    }
+
     @Test func matchInsideASkippedIncludeIsIgnored() {
         let file = URL(filePath: "/tmp/inc/a.conf")
         let included = ConfigDocument(parsing: "Match host web\n  User m\nHost *\n  Port 9\n")

@@ -83,13 +83,16 @@ public enum ConfigResolver {
     ) -> ResolvedConfig {
         var result = ResolvedConfig()
         walk(document, file: nil, depth: 0, alias: alias, targetHeader: targetHeader,
-             targetFile: targetFile?.standardizedFileURL,
+             targetFile: targetFile.map(Self.normalized),
              active: true, blockSource: .global, parentPatterns: [], stack: [], includes: includes, into: &result)
         return result
     }
 
+    /// Same normalization as the include-cycle key, so `/tmp` and `/private/tmp` compare equal.
+    private static func normalized(_ url: URL) -> String { url.standardizedFileURL.resolvingSymlinksInPath().path }
+
     private static func walk(
-        _ document: ConfigDocument, file: URL?, depth: Int, alias: String, targetHeader: Int?, targetFile: URL?,
+        _ document: ConfigDocument, file: URL?, depth: Int, alias: String, targetHeader: Int?, targetFile: String?,
         active startActive: Bool, blockSource startSource: OptionSource,
         parentPatterns: [String], stack: Set<String>,
         includes: (IncludeDirective) -> [(file: URL, document: ConfigDocument)],
@@ -105,7 +108,7 @@ public enum ConfigResolver {
                 active = hostLineMatches(patterns, alias: alias)
                 blockPatterns = patterns
                 // `targetFile == nil` means the target block is in the root document.
-                let isTarget = index == targetHeader && file?.standardizedFileURL == targetFile
+                let isTarget = index == targetHeader && file.map(Self.normalized) == targetFile
                 if isTarget {
                     source = .thisBlock
                 } else if let file {
@@ -139,7 +142,9 @@ public enum ConfigResolver {
                 if lower == "sendenv" {
                     // One value per whitespace-separated token; `-PATTERN` removes earlier entries that match
                     // it as a wildcard (verified with OpenSSH `ssh -G`), later tokens/lines may add them again.
+                    // ssh rejects empty names and names containing `=`; backslash escapes are left as written.
                     for token in LineTokenizer.arguments(of: rawValue) {
+                        if token.isEmpty || token.contains("=") { continue }
                         if token.hasPrefix("-") {
                             let pattern = String(token.dropFirst())
                             result.options[lower]?.removeAll { wildcardMatch(pattern, $0.value) }

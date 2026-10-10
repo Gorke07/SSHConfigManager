@@ -37,12 +37,23 @@ public struct JumpHop: Equatable, Sendable {
         return trimmed.split(separator: ",").compactMap { parse(String($0).trimmingCharacters(in: .whitespaces)) }
     }
 
-    /// 1-5 ASCII digits, value 1...65535 (no sign, spaces or non-ASCII digits).
+    /// As OpenSSH's a2port: an optional `+` then ASCII digits (leading zeros allowed) with value 1...65535,
+    /// otherwise a service name known to getservbyname(3) (tcp). Everything else is rejected.
     private static func parsePort(_ text: Substring) -> Int? {
         let bytes = Array(text.utf8)
-        guard (1...5).contains(bytes.count), bytes.allSatisfy({ (0x30...0x39).contains($0) }),
-              let value = Int(text), (1...65535).contains(value) else { return nil }
-        return value
+        guard !bytes.isEmpty, bytes.allSatisfy({ $0 > 0x20 && $0 < 0x7F }) else { return nil }
+        let digits = bytes.first == 0x2B ? Array(bytes.dropFirst()) : bytes
+        if !digits.isEmpty, digits.allSatisfy({ (0x30...0x39).contains($0) }) {
+            var value = 0
+            for d in digits {
+                value = value * 10 + Int(d - 0x30)
+                if value > 65535 { return nil }
+            }
+            return value >= 1 ? value : nil
+        }
+        guard bytes.first != 0x2B, let entry = getservbyname(String(text), "tcp") else { return nil }
+        let port = Int(UInt16(bigEndian: UInt16(truncatingIfNeeded: entry.pointee.s_port)))
+        return port >= 1 ? port : nil
     }
 
     static func parse(_ text: String) -> JumpHop? {
