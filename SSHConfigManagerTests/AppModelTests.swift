@@ -488,7 +488,7 @@ struct AppModelTests {
         #expect(model.activeEditor === editor)
 
         // An earlier occurrence than the selection is unaffected by a later delete; other aliases too.
-        model.requestDelete(w(1) == model.selection ? SidebarItem.host(alias: "other", occurrence: 0) : w(0))
+        model.requestDelete(SidebarItem.host(alias: "other", occurrence: 0))
         model.confirmPendingDelete()
         #expect(model.selection == w(1))
 
@@ -528,6 +528,87 @@ struct AppModelTests {
         let matching = makeTestModel(tmp, config: "Host w*\n  Include two.conf\nHost web\n")
         #expect(matching.lintIssues(for: .host(alias: "web", occurrence: 0)) == [.duplicateAlias(alias: "web", isFirst: false)])
     }
+    @Test func deletingAnEarlierPatternOrGroupedBlockMovesTheSelection() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host *\n  User a\n# group: g\nHost *\n  User b\nHost *\n  User c\n")
+        let star = { SidebarItem.host(alias: "*", occurrence: $0) }
+        model.select(star(2))
+        model.requestDelete(star(1))   // block with a "# group:" line above it
+        model.confirmPendingDelete()
+        #expect(model.selection == star(1))
+        model.requestDelete(star(0))
+        model.confirmPendingDelete()
+        #expect(model.selection == star(0))
+        #expect(model.store.document.hosts.count == 1)
+    }
+
+    @Test func invalidateLintForcesAFreshRead() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n  IdentityFile ~/.ssh/id_a\n")
+        let reads = ReadCounter()
+        model.keyEncryptionReader = { _ in reads.hit(); return .unencrypted }
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        #expect(model.lintIssues(for: a) == [.missingIdentityFile("~/.ssh/id_a")])
+        _ = try tmp.file(".ssh/id_a", "x")
+        #expect(model.lintIssues(for: a) == [.missingIdentityFile("~/.ssh/id_a")])   // memoized
+        let revision = model.lintRevision
+        model.invalidateLint()
+        #expect(model.lintRevision != revision)
+        #expect(model.lintIssues(for: a) == [.unencryptedKey("~/.ssh/id_a")])
+        #expect(reads.count == 1)
+        model.refreshIncludes()
+        #expect(model.lintRevision == revision + 2)
+    }
+
+    @Test func includesNamingEachOtherTerminateWithTheRightWording() throws {
+        let tmp = try TempDir()
+        _ = try tmp.file(".ssh/a.conf", "Include ~/.ssh/*.conf\nHost web\n")
+        _ = try tmp.file(".ssh/b.conf", "Include ~/.ssh/*.conf\n")
+        _ = try tmp.file(".ssh/c.conf", "Include ~/.ssh/*.conf\n")
+        let model = makeTestModel(tmp, config: "Include a.conf b.conf c.conf\nHost web\n")
+        let start = Date()
+        #expect(model.lintIssues(for: .host(alias: "web", occurrence: 0)) == [.duplicateAlias(alias: "web", isFirst: false)])
+        #expect(Date().timeIntervalSince(start) < 5)
+    }
+
+    @Test func anIncludeInMatchAllCountsButOtherMatchCriteriaAreIgnored() throws {
+        let tmp = try TempDir()
+        _ = try tmp.file(".ssh/two.conf", "Host web\n")
+        let all = makeTestModel(tmp, config: "Match all\n  Include two.conf\nHost web\n")
+        #expect(all.lintIssues(for: .host(alias: "web", occurrence: 0)) == [.duplicateAlias(alias: "web", isFirst: false)])
+        let other = makeTestModel(tmp, config: "Match host nomatch\n  Include two.conf\nHost web\n")
+        #expect(other.lintIssues(for: .host(alias: "web", occurrence: 0)) == [.duplicateAlias(alias: "web", isFirst: true)])
+    }
+
+    @Test func aGroupDraftIsAppliedBeforeSavingAndIsNotABlockedFormEdit() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n")
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        model.select(a)
+        model.groupDraft = "prod"
+        #expect(model.hasPendingFormEdits)
+        #expect(model.hasPendingGroupDraft)
+        #expect(!model.hasBlockedFormEdits)
+        model.applyPendingGroupDraft()
+        #expect(model.savedGroup(for: a) == "prod")
+        #expect(model.store.hasUnsavedChanges)
+        #expect(model.groupDraft == nil)
+        #expect(!model.hasPendingFormEdits)
+    }
+
+    @Test func aGroupDraftSurvivesSaveNoticesButNotAReload() async throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\nHost b\n")
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        model.select(a)
+        model.setGroup(.host(alias: "b", occurrence: 0), to: "x")
+        model.groupDraft = "draft"
+        try await model.store.save()   // a save notice, not a reload
+        #expect(model.groupDraft == "draft")
+        model.store.load()
+        #expect(model.groupDraft == nil)
+    }
+
 }
 
 private final class ReadCounter: @unchecked Sendable {

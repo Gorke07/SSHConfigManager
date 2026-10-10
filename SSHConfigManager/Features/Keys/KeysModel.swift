@@ -61,6 +61,8 @@ final class KeysModel {
 
     func refresh() async {
         guard let app else { return }
+        // Called after every key operation, successful or not: the lint reads key files.
+        app.invalidateLint()
         refreshGeneration += 1
         let generation = refreshGeneration
         isRefreshing = true

@@ -100,6 +100,7 @@ final class AppModel {
     /// The saved file changed (save, reload, external change): results measured against the old
     /// file are stale and the connectable hosts must be rebuilt.
     private func observeSavedState() {
+        lastLoadRevision = store.loadRevision
         store.onDiskStateChange = { [weak self] in self?.savedStateDidChange() }
     }
 
@@ -109,8 +110,22 @@ final class AppModel {
         effectiveConfig.clear()
         statusFilter = nil
         pendingDelete = nil
-        groupDraft = nil
+        // Only an actual reload from disk resets the draft; a save applied it already and change notices keep it.
+        if store.loadRevision != lastLoadRevision {
+            lastLoadRevision = store.loadRevision
+            groupDraft = nil
+        }
+        invalidateLint()
+    }
+
+    @ObservationIgnored private var lastLoadRevision = 0
+    /// Bumped by `invalidateLint()`; read by `lintIssueMap()` so views re-render after key files changed.
+    private(set) var lintRevision = 0
+
+    /// Drops the memoized lint (key files can change without the document changing).
+    func invalidateLint() {
         lintCache = nil
+        lintRevision += 1
     }
 
     static func liveStore(url: URL, backups: BackupManager, backupKind: String) -> ConfigStore {
@@ -229,8 +244,9 @@ final class AppModel {
     /// view's included hosts changed, the effective settings are dropped and reloaded. Connection
     /// tests stay: they are per alias, and every other host is unaffected.
     func refreshIncludes() {
+        // Key files can change while the app is in the background, so the lint is always refreshed.
+        invalidateLint()
         if store.refreshIncludes() {
-            lintCache = nil
             savedHostsCache = nil
             effectiveConfig.clear()
         }
@@ -428,11 +444,13 @@ final class AppModel {
     /// blocks are computed once, and each key file is read at most once. Pattern blocks get the
     /// IdentityFile checks only.
     func lintIssueMap() -> [SidebarItem: [HostIssue]] {
+        _ = lintRevision
         let document = store.document
         let included = store.includedHosts
         let id = ObjectIdentifier(store)
         if let cache = lintCache, cache.store == id, cache.document == document, cache.included == included { return cache.map }
         let map = computeLintIssueMap(document: document, included: included)
+        // Writing the revision here would re-trigger observers; the cache is plain state.
         lintCache = LintCache(store: id, document: document, included: included, map: map)
         return map
     }
@@ -469,11 +487,17 @@ final class AppModel {
         let resolver = store.includeResolver
         let hostHeaders = Dictionary(uniqueKeysWithValues: document.hosts.map { ($0.headerLine, $0) })
         let matchHeaders = Set(document.matches.map(\.headerLine))
+        // `Match all` always applies (verified with ssh -G), so an Include in it counts as top-level.
+        // Other criteria are conditional and unknown here: those Includes are ignored.
+        let matchAll = Set(document.matches.filter {
+            $0.criteria.trimmingCharacters(in: .whitespaces).asciiLowercased == "all"
+        }.map(\.headerLine))
         // The block an Include line sits in: the nearest header above it.
         func scope(of line: Int) -> HostEntry?? {
             let nearest = (Array(hostHeaders.keys) + Array(matchHeaders)).filter { $0 < line }.max()
             guard let nearest else { return .some(nil) }       // top level
             if let host = hostHeaders[nearest] { return .some(host) }
+            if matchAll.contains(nearest) { return .some(nil) }
             return nil                                          // inside a Match block: condition unknown, ignored
         }
         var originals: [String: String] = [:]
@@ -485,7 +509,8 @@ final class AppModel {
         for directive in directives where directive.line < lastHeader {
             guard let blockScope = scope(of: directive.line) else { continue }
             var defined: Set<String> = []
-            collectNames(of: directive, resolver: resolver, depth: 0, into: &defined)
+            var visited: Set<String> = []
+            collectNames(of: directive, resolver: resolver, depth: 0, visited: &visited, into: &defined)
             for key in defined {
                 guard let header = firstBlocks[key], header > directive.line, header != -1 else { continue }
                 if let host = blockScope {
@@ -496,15 +521,18 @@ final class AppModel {
         }
     }
 
-    private func collectNames(of directive: IncludeDirective, resolver: IncludeResolver, depth: Int, into names: inout Set<String>) {
+    private func collectNames(of directive: IncludeDirective, resolver: IncludeResolver, depth: Int,
+                              visited: inout Set<String>, into names: inout Set<String>) {
         guard depth < 16 else { return }
-        for (_, included) in resolver.includedDocuments(for: directive) {
+        for (file, included) in resolver.includedDocuments(for: directive) {
+            // Each file once, like IncludeResolver: includes that name each other must not multiply reads.
+            guard visited.insert(file.resolvingSymlinksInPath().path).inserted else { continue }
             for entry in included.hosts {
                 for name in entry.patterns where !name.hasPrefix("!") && !name.contains("*") && !name.contains("?") {
                     names.insert(name.asciiLowercased)
                 }
             }
-            for nested in included.includes { collectNames(of: nested, resolver: resolver, depth: depth + 1, into: &names) }
+            for nested in included.includes { collectNames(of: nested, resolver: resolver, depth: depth + 1, visited: &visited, into: &names) }
         }
     }
 
@@ -519,12 +547,21 @@ final class AppModel {
         return store.document.group(ofHostAt: entry.headerLine) ?? ""
     }
 
-    private var hasPendingGroupDraft: Bool {
+    /// Writes a pending group draft into the document (an unsaved edit), like pending form edits survive a save.
+    func applyPendingGroupDraft() {
+        guard hasPendingGroupDraft, let item = selection else { return }
+        setGroup(item, to: groupDraft)
+    }
+
+    /// Edits the form could not apply (validation or write failure); an unapplied group draft is not one.
+    var hasBlockedFormEdits: Bool { activeEditor?.hasPendingChanges ?? false }
+
+    var hasPendingGroupDraft: Bool {
         guard let draft = groupDraft, let item = selection else { return false }
         return draft.trimmingCharacters(in: .whitespacesAndNewlines) != savedGroup(for: item)
     }
 
-    var hasPendingFormEdits: Bool { (activeEditor?.hasPendingChanges ?? false) || hasPendingGroupDraft }
+    var hasPendingFormEdits: Bool { hasBlockedFormEdits || hasPendingGroupDraft }
 
     /// Selects `item`, unless the form holds edits that were never applied; then asks first.
     func requestSelect(_ item: SidebarItem?) {

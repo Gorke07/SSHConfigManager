@@ -100,7 +100,7 @@ private struct HostEditorContainer: View {
 }
 
 private struct HostGroupRow: View {
-    @Bindable var model: AppModel
+    let model: AppModel
     let item: SidebarItem
 
     var body: some View {

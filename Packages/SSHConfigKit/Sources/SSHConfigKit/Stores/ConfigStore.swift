@@ -61,6 +61,8 @@ public final class ConfigStore {
     @ObservationIgnored public let includeResolver: IncludeResolver
     @ObservationIgnored private var watcher: FileWatcher?
     @ObservationIgnored private var loadGeneration = 0
+    /// Counts loads from disk (initial, reload, discard, external change without unsaved edits); saves and change notices do not count.
+    public var loadRevision: Int { loadGeneration }
     /// Called after the file was (re)loaded from disk or saved, i.e. whenever the saved state may have changed.
     @ObservationIgnored public var onDiskStateChange: (@MainActor () -> Void)?
 

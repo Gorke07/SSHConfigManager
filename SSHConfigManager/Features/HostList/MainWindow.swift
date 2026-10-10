@@ -39,10 +39,8 @@ struct MainWindow: View {
                 }
                 .disabled(model.store.loadState != .loaded)
             }
-            if !model.statusCounts.isEmpty {
-                ToolbarItem(placement: .status) {
-                    StatusSummaryView(model: model)
-                }
+            ToolbarItem(placement: .status) {
+                StatusSummaryView(model: model)
             }
             ToolbarItem(placement: .status) {
                 if model.store.hasUnsavedChanges {
@@ -80,7 +78,9 @@ struct MainWindow: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    if model.hasPendingFormEdits {
+                    // An unapplied group draft is applied first; only blocked form edits need the warning.
+                    model.applyPendingGroupDraft()
+                    if model.hasBlockedFormEdits {
                         confirmSaveWithPending = true
                     } else {
                         saveFlow = SaveFlowModel(store: model.store)
@@ -89,7 +89,7 @@ struct MainWindow: View {
                     Label(String(localized: "action.save"), systemImage: "square.and.arrow.down")
                 }
                 .keyboardShortcut("s", modifiers: .command)
-                .disabled(!model.store.hasUnsavedChanges || model.store.isSaving)
+                .disabled(!(model.store.hasUnsavedChanges || model.hasPendingGroupDraft) || model.store.isSaving)
             }
         }
         .confirmationDialog(

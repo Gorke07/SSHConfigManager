@@ -117,7 +117,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate()
         switch alert.runModal() {
         case .alertFirstButtonReturn:
-            if model.hasPendingFormEdits {
+            model.applyPendingGroupDraft()
+            if model.hasBlockedFormEdits {
                 // Saving would silently drop the fields that have problems.
                 openMainWindow?()
                 NSApp.activate()
