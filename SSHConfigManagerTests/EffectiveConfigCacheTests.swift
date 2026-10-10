@@ -55,6 +55,26 @@ struct EffectiveConfigCacheTests {
         #expect(cache.options(for: "a") == nil)
     }
 
+    @Test func aWaiterQueuedBeforeClearDoesNotRunSsh() async {
+        let runner = PeakRunner(delay: .milliseconds(200), output: "hostname h\n")
+        let cache = EffectiveConfigCache(runner: runner)
+        let tasks = ["a", "b", "c"].map { alias in Task { await cache.load(alias, using: builder) } }
+        try? await Task.sleep(for: .milliseconds(50))
+        cache.clear()
+        for task in tasks { await task.value }
+        #expect(runner.runs == 2)
+        #expect(cache.options(for: "c") == nil)
+        await cache.load("d", using: builder)
+        #expect(runner.runs == 3)
+    }
+
+    @Test func aNonZeroExitWithoutStderrIsReportedByItsCode() async {
+        let runner = FixedRunner(result: ProcessResult(exitCode: 255, stdout: "", stderr: "", timedOut: false))
+        let cache = EffectiveConfigCache(runner: runner)
+        await cache.load("a", using: builder)
+        #expect(cache.failure(for: "a") == "exit 255")
+    }
+
     @Test func failuresAreKept() async {
         let cache = EffectiveConfigCache(runner: FixedRunner.invalid("Bad configuration option: x"))
         await cache.load("a", using: builder)

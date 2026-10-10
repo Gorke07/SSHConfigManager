@@ -1009,11 +1009,46 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Eşleşen host yok." } }
       }
     },
-    "quick.hint" : {
+    "quick.hint.more" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "↩ connect · ⌘↩ test · esc close" } },
-        "tr" : { "stringUnit" : { "state" : "translated", "value" : "↩ bağlan · ⌘↩ test et · esc kapat" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "↩ Connect · ⌘↩ Test · ⌥↩ Copy command · ⌘S Favorite" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "↩ Bağlan · ⌘↩ Test · ⌥↩ Komutu kopyala · ⌘S Favori" } }
+      }
+    },
+    "quick.preview.loading" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reading the configuration…" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yapılandırma okunuyor…" } }
+      }
+    },
+    "quick.preview.via %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "via %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "%@ üzerinden" } }
+      }
+    },
+    "quick.section.all" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "All Hosts" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Tüm Hostlar" } }
+      }
+    },
+    "quick.section.favorites" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Favorites" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Favoriler" } }
+      }
+    },
+    "quick.section.recents" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Recent" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Son" } }
       }
     },
     "quick.openMainWindow" : {

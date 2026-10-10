@@ -11,11 +11,12 @@ final class EffectiveConfigCache {
 
     private(set) var results: [String: EffectiveOptions] = [:]
     private(set) var failures: [String: String] = [:]
+    /// Bumped by `clear()`, so views can reload what an external change dropped.
+    private(set) var generation = 0
     @ObservationIgnored private let runner: any ProcessRunning
     @ObservationIgnored private var inFlight: [String: Task<Void, Never>] = [:]
     @ObservationIgnored private var running = 0
     @ObservationIgnored private var waiters: [CheckedContinuation<Void, Never>] = []
-    @ObservationIgnored private var generation = 0
 
     init(runner: any ProcessRunning) {
         self.runner = runner
@@ -36,6 +37,7 @@ final class EffectiveConfigCache {
         let task = Task { [runner] in
             await self.acquire()
             defer { self.release() }
+            guard currentGeneration == self.generation else { return }
             let outcome: Result<ProcessResult, any Error>
             do {
                 outcome = .success(try await runner.run(URL(filePath: "/usr/bin/ssh"),
@@ -49,7 +51,8 @@ final class EffectiveConfigCache {
             case .success(let result) where result.exitCode == 0 && !result.timedOut:
                 self.results[key] = EffectiveOptions(parsing: result.stdout)
             case .success(let result):
-                self.failures[key] = result.timedOut ? "timed out" : ConnectionClassifier.firstLine(result.stderr)
+                let line = ConnectionClassifier.firstLine(result.stderr)
+                self.failures[key] = result.timedOut ? "timed out" : (line.isEmpty ? "exit \(result.exitCode)" : line)
             case .failure(let error):
                 self.failures[key] = error.localizedDescription
             }

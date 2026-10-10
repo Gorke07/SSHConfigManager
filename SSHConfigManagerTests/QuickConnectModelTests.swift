@@ -92,4 +92,70 @@ struct QuickConnectModelTests {
         #expect(quick.connectSelected())
         #expect(opened == 0)
     }
+
+    @Test func emptyQueryShowsFavoritesThenRecentsThenTheRest() throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\nHost b\nHost c\nHost d\n")
+        app.toggleFavorite("c")
+        _ = app.connect(alias: "b")
+        _ = app.connect(alias: "c")
+        let model = QuickConnectModel(app: app)
+        #expect(model.entries.map(\.alias) == ["c", "b", "a", "d"])
+        #expect(model.entries.map(\.section) == [.favorites, .recents, .all, .all])
+        #expect(model.entries.first?.isFavorite == true)
+    }
+
+    @Test func searchRanksAndHighlights() throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host db-prod\n  HostName 10.0.0.9\nHost prod-web-01\nHost prod\n")
+        let model = QuickConnectModel(app: app)
+        model.query = "prod"
+        #expect(model.entries.map(\.alias) == ["prod", "prod-web-01", "db-prod"])
+        #expect(model.entries.allSatisfy { $0.section == nil })
+        model.query = "prd web"
+        #expect(model.entries.map(\.alias) == ["prod-web-01"])
+        #expect(model.entries.first?.aliasOffsets == [0, 1, 3, 5, 6, 7])
+        model.query = "10.0.0"
+        #expect(model.entries.map(\.alias) == ["db-prod"])
+    }
+
+    @Test func groupsAppearOnEntries() throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "# group: Prod\nHost web\n")
+        #expect(QuickConnectModel(app: app).entries.first?.group == "Prod")
+    }
+
+    @Test func copyAndFavoriteActOnTheSelection() throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host web\n")
+        var copied: [String] = []
+        let model = QuickConnectModel(app: app, copyToPasteboard: { copied.append($0) })
+        model.copySelectedCommand()
+        #expect(copied == ["ssh -- web"])
+        model.toggleFavoriteSelected()
+        #expect(app.favoriteAliases == ["web"])
+    }
+
+    @Test func previewUsesSshGOutput() async throws {
+        let tmp = try TempDir()
+        let runner = FixedRunner(result: ProcessResult(exitCode: 0, stdout: "user ubuntu\nhostname 10.0.1.12\nport 2222\nproxyjump bastion\n", stderr: "", timedOut: false))
+        let app = makeTestModel(tmp, config: "Host web\n", runner: runner)
+        let model = QuickConnectModel(app: app)
+        let entry = try #require(model.selectedEntry)
+        #expect(model.previewText(for: entry) == nil)
+        #expect(model.isPreviewLoading(for: entry))
+        await app.effectiveConfig.load("web", using: app.commandBuilder)
+        #expect(!model.isPreviewLoading(for: entry))
+        #expect(model.previewText(for: entry) == "ubuntu@10.0.1.12:2222 · " + String(localized: "quick.preview.via \("bastion")"))
+    }
+
+    @Test func aFailedPreviewIsNotShownAsLoading() async throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host web\n", runner: FixedRunner.invalid("Bad configuration option: x"))
+        let model = QuickConnectModel(app: app)
+        let entry = try #require(model.selectedEntry)
+        await app.effectiveConfig.load("web", using: app.commandBuilder)
+        #expect(model.previewText(for: entry) == nil)
+        #expect(!model.isPreviewLoading(for: entry))
+    }
 }

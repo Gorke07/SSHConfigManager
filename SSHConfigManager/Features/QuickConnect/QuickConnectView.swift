@@ -24,9 +24,17 @@ struct QuickConnectView: View {
                 .onKeyPress(keys: [.return]) { press in
                     if press.modifiers.contains(.command) {
                         model.testSelected()
+                    } else if press.modifiers.contains(.option) {
+                        model.copySelectedCommand()
+                        dismiss()
                     } else if model.connectSelected() {
                         dismiss()
                     }
+                    return .handled
+                }
+                .onKeyPress(keys: ["s"]) { press in
+                    guard press.modifiers.contains(.command) else { return .ignored }
+                    model.toggleFavoriteSelected()
                     return .handled
                 }
             Divider()
@@ -38,8 +46,17 @@ struct QuickConnectView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 0) {
-                            ForEach(model.entries) { entry in
-                                row(entry).id(entry.id)
+                            ForEach(sectionedEntries(), id: \.entry.id) { item in
+                                if let header = item.header {
+                                    Text(header)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                        .padding(.horizontal, 12)
+                                        .padding(.top, 6)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .accessibilityAddTraits(.isHeader)
+                                }
+                                row(item.entry).id(item.entry.id)
                             }
                         }
                     }
@@ -50,7 +67,23 @@ struct QuickConnectView: View {
                 }
             }
             Divider()
-            Text(String(localized: "quick.hint"))
+            if let entry = model.selectedEntry {
+                if let preview = model.previewText(for: entry) {
+                    Text(verbatim: preview)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .padding(.horizontal, 12)
+                        .padding(.top, 6)
+                } else if model.isPreviewLoading(for: entry) {
+                    Text(String(localized: "quick.preview.loading"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.top, 6)
+                }
+            }
+            Text(String(localized: "quick.hint.more"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)
@@ -76,8 +109,29 @@ struct QuickConnectView: View {
             }
         }
         .frame(width: 420)
-        .onAppear { searchFocused = true }
+        .onAppear { searchFocused = true; model.requestPreview() }
         .onChange(of: model.focusToken) { searchFocused = true }
+        .onChange(of: model.selectedIndex) { model.requestPreview() }
+        .onChange(of: model.query) { model.requestPreview() }
+        .onChange(of: model.app.effectiveConfig.generation) { model.requestPreview() }
+    }
+
+    /// Section headers only appear for the empty-query layout (entries carry a section).
+    private func sectionedEntries() -> [(entry: QuickConnectEntry, header: String?)] {
+        var previous: QuickConnectSection?
+        return model.entries.map { entry in
+            defer { previous = entry.section }
+            guard let section = entry.section, section != previous else { return (entry, nil) }
+            return (entry, sectionTitle(section))
+        }
+    }
+
+    private func sectionTitle(_ section: QuickConnectSection) -> String {
+        switch section {
+        case .favorites: String(localized: "quick.section.favorites")
+        case .recents: String(localized: "quick.section.recents")
+        case .all: String(localized: "quick.section.all")
+        }
     }
 
     private func row(_ entry: QuickConnectEntry) -> some View {
@@ -85,10 +139,11 @@ struct QuickConnectView: View {
         return HStack(spacing: 8) {
             ConnectionStatusBadge(model: model.app.connectionTests, alias: entry.alias, showsTitle: false)
                 .frame(width: 16)
-            Text(verbatim: entry.alias).fontWeight(.medium)
+            Text(FuzzyMatcher.highlighted(entry.alias, offsets: entry.aliasOffsets)).fontWeight(.medium)
+            if entry.isFavorite { Image(systemName: "star.fill").font(.caption).foregroundStyle(.yellow).accessibilityHidden(true) }
             if entry.isIncluded { Image(systemName: "lock").foregroundStyle(.secondary).accessibilityHidden(true) }
             Spacer()
-            Text(verbatim: entry.subtitle).foregroundStyle(.secondary).lineLimit(1)
+            Text(verbatim: entry.group.map { "\($0) · \(entry.subtitle)" } ?? entry.subtitle).foregroundStyle(.secondary).lineLimit(1)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
