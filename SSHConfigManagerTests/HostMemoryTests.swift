@@ -50,7 +50,7 @@ struct HostMemoryTests {
         #expect(!memory.favorites.contains("h3"))
     }
 
-    @Test func appModelShowsTheLimitMessageAndKeepsUnsavedEditableHosts() throws {
+    @Test func appModelShowsTheLimitMessageWhenFavoritesAreFull() throws {
         let tmp = try TempDir()
         let aliases = (0..<HostMemory.maxFavorites).map { "h\($0)" }
         let model = makeTestModel(tmp, config: aliases.map { "Host \($0)\n" }.joined() + "Host extra\n")
@@ -63,6 +63,33 @@ struct HostMemoryTests {
         #expect(model.errorMessage?.contains("\(HostMemory.maxFavorites)") == true)
     }
 
+    @Test func unsavedEditableHostFavoriteSurvivesPruningAtTheCap() throws {
+        let tmp = try TempDir()
+        let saved = (0..<HostMemory.maxFavorites).map { "s\($0)" }
+        let model = makeTestModel(tmp, config: saved.map { "Host \($0)\n" }.joined())
+        let added = try HostCommands.addHost(to: model.store)
+        let unsaved = try #require(SidebarBuilder.hostEntry(for: added, in: model.store.document)).alias
+        #expect(model.isUnsavedHost(added))
+        model.toggleFavorite("stale0")
+        model.toggleFavorite("stale1")
+        model.toggleFavorite(unsaved)
+        for alias in saved.prefix(HostMemory.maxFavorites - 3) { model.toggleFavorite(alias) }
+        #expect(model.memory.favorites.count == HostMemory.maxFavorites)
+        // Full: the next favorite prunes the two stale ones and succeeds.
+        model.toggleFavorite(saved[HostMemory.maxFavorites - 3])
+        #expect(model.errorMessage == nil)
+        #expect(!model.memory.isFavorite("stale0") && !model.memory.isFavorite("stale1"))
+        #expect(model.memory.isFavorite(unsaved))
+        // Full again with nothing stale: refused, and the unsaved host's favorite is still there.
+        model.toggleFavorite(saved[HostMemory.maxFavorites - 2])
+        #expect(model.memory.favorites.count == HostMemory.maxFavorites)
+        model.toggleFavorite(saved[HostMemory.maxFavorites - 1])
+        #expect(model.errorMessage != nil)
+        #expect(!model.memory.isFavorite(saved[HostMemory.maxFavorites - 1]))
+        #expect(model.memory.isFavorite(unsaved))
+        #expect(model.isUnsavedHost(added))
+    }
+
     @Test func corruptStoredDataIsIgnored() throws {
         let tmp = try TempDir()
         tmp.defaults.set("nonsense", forKey: "a")
@@ -70,6 +97,8 @@ struct HostMemoryTests {
         tmp.defaults.set(["favorites": [1, "", "ok", ["n"], "ok"], "recents": [true, "r", "r", ""]], forKey: "c")
         let a = HostMemory(defaults: tmp.defaults, key: "a")
         #expect(a.favorites.isEmpty && a.recents.isEmpty)
+        #expect(tmp.defaults.dictionary(forKey: "a")?["favorites"] as? [String] == [])
+        #expect(tmp.defaults.dictionary(forKey: "a")?["recents"] as? [String] == [])
         let b = HostMemory(defaults: tmp.defaults, key: "b")
         #expect(b.favorites.isEmpty && b.recents.isEmpty)
         let c = HostMemory(defaults: tmp.defaults, key: "c")
@@ -78,6 +107,17 @@ struct HostMemoryTests {
         let stored = tmp.defaults.dictionary(forKey: "c")
         #expect(stored?["favorites"] as? [String] == ["ok"])
         #expect(stored?["recents"] as? [String] == ["r"])
+    }
+
+    @Test func cleanOrMissingStoredDataIsNotRewritten() throws {
+        let tmp = try TempDir()
+        _ = HostMemory(defaults: tmp.defaults, key: "fresh")
+        #expect(tmp.defaults.object(forKey: "fresh") == nil)
+        tmp.defaults.set(["favorites": ["a", "b"]], forKey: "partial")
+        let partial = HostMemory(defaults: tmp.defaults, key: "partial")
+        #expect(partial.favorites == ["a", "b"] && partial.recents.isEmpty)
+        let stored = tmp.defaults.dictionary(forKey: "partial")
+        #expect(stored?["recents"] == nil)
     }
 
     @Test func oversizedStoredListsAreCappedKeepingTheFirst() throws {

@@ -18,27 +18,33 @@ final class HostMemory {
         self.defaults = defaults
         self.key = key
         let stored = defaults.dictionary(forKey: key)
-        let rawFavorites = stored?["favorites"]
-        let rawRecents = stored?["recents"]
-        favorites = Self.normalized(rawFavorites, cap: Self.maxFavorites)
-        recents = Self.normalized(rawRecents, cap: Self.maxRecents)
-        // Rewrite only when something was dropped from what was stored.
-        if stored != nil, (rawFavorites as? [String]) != favorites || (rawRecents as? [String]) != recents {
+        let favoritesResult = Self.normalized(stored?["favorites"], cap: Self.maxFavorites)
+        let recentsResult = Self.normalized(stored?["recents"], cap: Self.maxRecents)
+        favorites = favoritesResult.values
+        recents = recentsResult.values
+        // Rewrite only when stored junk was dropped; a missing key or a fresh install writes nothing.
+        let notADictionary = stored == nil && defaults.object(forKey: key) != nil
+        if notADictionary || favoritesResult.dropped || recentsResult.dropped {
             save()
         }
     }
 
     /// Strings only, non-empty, exact duplicates removed (first wins), capped; anything else is dropped.
-    private static func normalized(_ raw: Any?, cap: Int) -> [String] {
-        guard let array = raw as? [Any] else { return [] }
+    /// `dropped` is true when a stored value was present but something in it was discarded. A missing value is not a drop.
+    private static func normalized(_ raw: Any?, cap: Int) -> (values: [String], dropped: Bool) {
+        guard let raw else { return ([], false) }
+        guard let array = raw as? [Any] else { return ([], true) }
         var seen = Set<String>()
         var result: [String] = []
+        var dropped = false
         for element in array {
-            guard let alias = element as? String, !alias.isEmpty, seen.insert(alias).inserted else { continue }
+            guard result.count < cap, let alias = element as? String, !alias.isEmpty, seen.insert(alias).inserted else {
+                dropped = true
+                continue
+            }
             result.append(alias)
-            if result.count == cap { break }
         }
-        return result
+        return (result, dropped)
     }
 
     func isFavorite(_ alias: String) -> Bool {
