@@ -138,7 +138,8 @@ struct BackupManagerTests {
         clock.advance(5)
         try manager.backup(fileAt: source, kind: "config-old")
 
-        try manager.migrate(from: "config-old", to: "config")
+        let pruning = BackupManager(rootDirectory: tmp.url.appending(path: "Backups"), keep: 1, now: { clock.now })
+        try pruning.migrate(from: "config-old", to: "config")   // keep is 1, yet nothing is deleted
 
         #expect(try manager.list(kind: "config").count == 3)
         #expect(try manager.list(kind: "config-old").isEmpty)

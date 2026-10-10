@@ -17,10 +17,13 @@ final class BackupsModel {
     /// Why the last restore failed (shown in the Backups window, not the main window).
     var restoreFailure: String?
 
-    /// What the Backups window's alert shows; dismissing clears both.
+    /// A list error the user already dismissed; the same error is not shown again on every refresh.
+    @ObservationIgnored private var dismissedListError: String?
+
+    /// What the Backups window's alert shows (a restore failure, else a list error not yet dismissed).
     var alertMessage: String? {
-        get { restoreFailure ?? errorMessage }
-        set { if newValue == nil { restoreFailure = nil; errorMessage = nil } }
+        get { restoreFailure ?? (errorMessage == dismissedListError ? nil : errorMessage) }
+        set { if newValue == nil { restoreFailure = nil; dismissedListError = errorMessage } }
     }
 
     init(model: AppModel) {
@@ -56,6 +59,7 @@ final class BackupsModel {
         do {
             backups = try model.backupManager.list(kind: backupKind)
             errorMessage = nil
+            dismissedListError = nil
         } catch {
             backups = []
             AppLog.error(.backups, error)
@@ -80,7 +84,15 @@ final class BackupsModel {
         KnownHostsSnapshot(revision: model.knownHosts.revision, store: model.knownHosts)
     }
 
-    /// Config: loads the backup into the editor (the Save flow writes it).
+    /// Restores and records a failure for the Backups window's alert.
+    func performRestore(_ backup: Backup, seen: KnownHostsSnapshot? = nil) {
+        do { try restore(backup, seen: seen) } catch {
+            AppLog.error(.backups, error)
+            restoreFailure = Messages.text(for: error)
+        }
+    }
+
+    /// Config: loads the backup into the editor (the Save flow writes it). When the config file is missing it is created first (empty), then the backup is loaded.
     /// known_hosts: no drafts, so it is written now (the current file is backed up first). `seen` is
     /// the file the confirmation was shown for: a reload or a switched file since then refuses.
     func restore(_ backup: Backup, seen: KnownHostsSnapshot? = nil) throws {

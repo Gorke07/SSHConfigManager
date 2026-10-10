@@ -105,9 +105,6 @@ struct BackupsView: View {
     }
 
     private func restore(_ backup: Backup, seen: BackupsModel.KnownHostsSnapshot? = nil) {
-        do { try backups.restore(backup, seen: seen) } catch {
-            AppLog.error(.backups, error)
-            backups.restoreFailure = Messages.text(for: error)
-        }
+        backups.performRestore(backup, seen: seen)
     }
 }

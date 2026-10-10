@@ -240,6 +240,21 @@ struct HostEditorModelTests {
         #expect(app.store.document.render() == "Host web\n  User c\n  HostName h\n  Port 2222\n")
     }
 
+    /// Swapping the field value and the "Other options" value does NOT reorder the file: updateHost pairs equal
+    /// values first, so both lines stay where they are and ssh still uses the first one in the file. That is why
+    /// the warning says "the first one in the file", not "the value in the field".
+    @Test func swappingRepeatedValuesLeavesFileOrderUnchanged() throws {
+        let tmp = try TempDir()
+        let original = "Host web\n  User a\n  User b\n"
+        let app = model(tmp, original)
+        let editor = try #require(HostEditorModel(item: .host(alias: "web", occurrence: 0), store: app.store, homeDirectory: tmp.url))
+        editor.fields["User"] = "b"
+        editor.otherOptions = [DraftDirective(key: "User", value: "a")]
+        #expect(editor.commit())
+        #expect(app.store.document.render() == original)
+        #expect(editor.issues.contains(.duplicateFieldKey("User")))
+    }
+
     @Test func repeatedLowercasedKeyKeepsItsSpelling() throws {
         let tmp = try TempDir()
         let original = "Host web\n  port 22\n  Port 23\n  Port 24\n"

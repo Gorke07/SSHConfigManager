@@ -648,8 +648,8 @@
     "issue.duplicateFieldKey %@" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ appears more than once. ssh uses the first value and ignores the others." } },
-        "tr" : { "stringUnit" : { "state" : "translated", "value" : "%@ birden fazla kez geçiyor. ssh ilk değeri kullanır, diğerlerini yok sayar." } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ appears more than once. ssh uses the first one in the file, which may not be the value in the field above." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "%@ birden fazla kez geçiyor. ssh dosyadaki ilk değeri kullanır; bu, yukarıdaki alandaki değer olmayabilir." } }
       }
     },
     "edit.hostNotFound" : {

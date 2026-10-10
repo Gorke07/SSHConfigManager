@@ -749,6 +749,35 @@ struct AppModelTests {
         #expect(model.store.fileURL.path.hasSuffix("other/config"))
     }
 
+    @Test func saveThenSwitchRefusesWhileFormEditsAreBlocked() async throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n")
+        try tmp.file("other/config", "Host b\n")
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        try blockedEditor(model, a)
+        #expect(!model.store.hasUnsavedChanges)   // only blocked form edits are pending
+        let result = await model.saveThenSwitchConfig(to: tmp.url.appending(path: "other/config").path)
+        #expect(result == .failed(String(localized: "discardForm.message")))
+        #expect(!model.store.fileURL.path.hasSuffix("other/config"))
+        #expect(model.hasBlockedFormEdits)
+    }
+
+    @Test func switchingConfigClearsPendingConfirmations() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\nHost b\n")
+        try tmp.file("other/config", "Host c\n")
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        try blockedEditor(model, a)
+        model.requestSelect(.host(alias: "b", occurrence: 0))
+        #expect(model.pendingSelection != nil)
+        model.addHost()
+        #expect(model.pendingCreation == .new)
+        #expect(model.switchConfig(to: tmp.url.appending(path: "other/config").path, discardingUnsavedChanges: true) == .switched)
+        #expect(model.pendingSelection == nil)
+        #expect(model.pendingCreation == nil)
+        #expect(!model.hasPendingDiscardConfirmation)
+    }
+
     @Test func saveThenSwitchStaysWhenTheSaveFails() async throws {
         let tmp = try TempDir()
         let model = makeTestModel(tmp, config: "Host a\n", runner: FixedRunner.invalid("line 2: Bad configuration option: bogus"))

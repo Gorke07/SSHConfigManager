@@ -212,15 +212,37 @@ struct BackupsModelTests {
         #expect(app.store.hasUnsavedChanges)
     }
 
-    @Test func failedRestoreIsShownInTheBackupsWindowModel() async throws {
+    @Test func failedRestoreShowsOnceAndClearsOnDismiss() async throws {
         let tmp = try TempDir()
         let app = makeTestModel(tmp, config: "Host a\n")
         try await saveEdit(app, port: "1")
         let backups = BackupsModel(model: app)
+        let backup = try #require(backups.backups.first)
+        try FileManager.default.removeItem(at: backup.url)   // the real restore path now fails reading it
         #expect(backups.alertMessage == nil)
-        backups.restoreFailure = "boom"
-        #expect(backups.alertMessage == "boom")
+        backups.performRestore(backup)
+        #expect(backups.restoreFailure != nil)
+        #expect(backups.alertMessage == backups.restoreFailure)
         backups.alertMessage = nil
-        #expect(backups.restoreFailure == nil)
+        #expect(backups.alertMessage == nil)
+        #expect(!app.store.hasUnsavedChanges)
+    }
+
+    @Test func aPersistentListErrorIsNotShownAgainOnRefresh() async throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\n")
+        try await saveEdit(app, port: "1")
+        // A file where the kind's folder should be makes listing throw.
+        let root = tmp.url.appending(path: "Backups")
+        let kindDir = root.appending(path: app.store.backupKind)
+        try FileManager.default.removeItem(at: kindDir)
+        try FileManager.default.createDirectory(at: kindDir, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: kindDir.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: kindDir.path) }
+        let backups = BackupsModel(model: app)
+        #expect(backups.alertMessage != nil)
+        backups.alertMessage = nil
+        backups.refresh()
+        #expect(backups.alertMessage == nil)
     }
 }

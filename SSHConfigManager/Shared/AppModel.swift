@@ -93,10 +93,9 @@ final class AppModel {
         self.store = makeStore(settings.configURL, backups, configKind)
         self.makeKnownHostsStore = makeKnownHostsStore
         self.knownHosts = makeKnownHostsStore(settings.knownHostsURL, backups, knownHostsKind)
-        self.memory = HostMemory(defaults: settings.userDefaults, key: Self.memoryKey(for: settings.configURL, home: settings.homeDirectory))
+        self.memory = Self.makeMemory(for: settings.configURL, settings: settings)
         migrateLegacyKeys(for: settings.configURL, kind: configKind, prefix: "config")
         migrateLegacyKeys(for: settings.knownHostsURL, kind: knownHostsKind, prefix: "known_hosts")
-        self.memory = makeMemory(for: settings.configURL)
         keys.app = self
         observeSavedState()
     }
@@ -171,10 +170,10 @@ final class AppModel {
         do { try backupManager.migrate(from: legacy, to: kind) } catch { AppLog.error(.backups, error) }
     }
 
-    private func makeMemory(for url: URL) -> HostMemory {
+    private static func makeMemory(for url: URL, settings: AppSettings) -> HostMemory {
         let home = settings.homeDirectory
-        let key = Self.memoryKey(for: url, home: home)
-        let legacyKey = "hostMemory." + Self.hashedKind(for: url, prefix: "config")
+        let key = memoryKey(for: url, home: home)
+        let legacyKey = "hostMemory." + hashedKind(for: url, prefix: "config")
         let defaults = settings.userDefaults
         if legacyKey != key, defaults.object(forKey: key) == nil, let old = defaults.object(forKey: legacyKey) {
             defaults.set(old, forKey: key)
@@ -771,7 +770,7 @@ final class AppModel {
         let kind = Self.backupKind(for: url, home: settings.homeDirectory)
         migrateLegacyKeys(for: url, kind: kind, prefix: "config")
         store = makeStore(url, backupManager, kind)
-        memory = makeMemory(for: url)
+        memory = Self.makeMemory(for: url, settings: settings)
         observeSavedState()
         savedHostsCache = nil
         select(nil)
@@ -779,6 +778,8 @@ final class AppModel {
         effectiveConfig.clear()
         statusFilter = nil
         pendingDelete = nil
+        pendingSelection = nil
+        pendingCreation = nil
         searchText = ""
         errorMessage = nil
         return .switched
@@ -788,6 +789,8 @@ final class AppModel {
 
     /// Saves the unsaved changes (validation included), then opens `path`. Nothing is switched unless the save succeeded.
     func saveThenSwitchConfig(to path: String) async -> SaveSwitchResult {
+        // Blocked form edits cannot be saved, and switching would silently drop them: stay and say so.
+        if hasBlockedFormEdits { return .failed(String(localized: "discardForm.message")) }
         applyPendingGroupDraft()
         if hasPendingGroupDraft { return .failed(errorMessage ?? "") }
         if store.hasUnsavedChanges {
@@ -799,7 +802,7 @@ final class AppModel {
             case .review(let preparation): return .failed(Messages.text(for: preparation.validation))
             case .conflict: return .failed(Messages.text(for: ConfigStoreError.conflict))
             case .failed(let message): return .failed(message)
-            case .preparing, .saving: return .failed("")
+            case .preparing, .saving: return .failed(Messages.text(for: ConfigStoreError.saveInProgress))
             }
         }
         return switchConfig(to: path, discardingUnsavedChanges: true) == .invalid ? .invalid : .switched
