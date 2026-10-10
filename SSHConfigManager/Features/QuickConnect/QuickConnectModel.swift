@@ -121,7 +121,7 @@ final class QuickConnectModel {
     /// panel can close at once. A launch that fails opens the main window, where the error shows.
     @discardableResult
     func connectSelected() -> Bool {
-        guard let entry = selectedEntry else { return false }
+        guard !app.launchInFlight, let entry = selectedEntry else { return false }   // a launch is running: ↩ does nothing
         connectTask = Task { [app, openMainWindow] in
             switch await app.connect(alias: entry.alias) {
             case .launched?, nil: break

@@ -345,7 +345,8 @@ final class AppModel {
             errorMessage = String(localized: "connect.invalidCommand")
             return .failed(.failed("control character"))
         }
-        let outcome = await launch(request)
+        guard let outcome = await runLaunch(request) else { return nil }
+        report(outcome)
         switch outcome {
         case .launched, .fellBack: memory.recordConnection(alias)
         default: break
@@ -422,32 +423,39 @@ final class AppModel {
     }
 
     /// "Upload to Server…": `ssh-copy-id -i <pub> [-F <config>] -- <alias>` in the chosen terminal (interactive).
-    /// Returns nil, doing nothing, while another launch is in flight.
+    /// Returns the raw outcome and never touches the main window's alerts (the Keys window reports it).
+    /// Nil, doing nothing, while another launch is in flight.
     @discardableResult
     func uploadKey(publicKey: URL, alias requested: String) async -> Connector.Outcome? {
         guard !launchInFlight else { return nil }
         guard let alias = savedAlias(requested) else {
             AppLog.info(.connect, LaunchError.failed("not in the saved file"))
-            errorMessage = String(localized: "connect.notSaved")
             return .failed(.failed("not in the saved file"))
         }
         let arguments = ["-i", publicKey.path] + commandBuilder.configArguments + ["--", alias]
         let shellCommand = (["ssh-copy-id"] + arguments.map(SSHCommandBuilder.shellQuote)).joined(separator: " ")
         guard !shellCommand.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7F }) else {
             AppLog.info(.connect, LaunchError.failed("control character"))
-            errorMessage = String(localized: "connect.invalidCommand")
             return .failed(.failed("control character"))
         }
-        return await launch(LaunchRequest(sshArguments: arguments, shellCommand: shellCommand, program: "/usr/bin/ssh-copy-id"))
+        return await runLaunch(LaunchRequest(sshArguments: arguments, shellCommand: shellCommand, program: "/usr/bin/ssh-copy-id"))
     }
 
-    /// True from the moment a launch starts until its outcome is known.
+    /// True from the moment a launch starts until its outcome is known (observed by the Connect buttons).
     private(set) var launchInFlight = false
 
-    private func launch(_ request: LaunchRequest) async -> Connector.Outcome {
+    /// Launches and logs; reports nothing to the UI. Nil, doing nothing, while another launch is in flight.
+    private func runLaunch(_ request: LaunchRequest) async -> Connector.Outcome? {
+        guard !launchInFlight else { return nil }
         launchInFlight = true
         defer { launchInFlight = false }
         let outcome = await Connector(choice: settings.terminal, isInstalled: terminalInstalled, makeLauncher: launcherFactory).connect(request)
+        if case .failed(let error) = outcome { AppLog.error(.connect, error) }
+        return outcome
+    }
+
+    /// Main-window reporting of a connect outcome.
+    private func report(_ outcome: Connector.Outcome) {
         switch outcome {
         case .launched:
             errorMessage = nil
@@ -457,14 +465,11 @@ final class AppModel {
             errorMessage = nil
             fallbackNotice = String(localized: "connect.fellBack \(name)")
         case .failed(.automationDenied):
-            AppLog.error(.connect, LaunchError.automationDenied)
             automationDenied = true
         case .failed(let error):
-            AppLog.error(.connect, error)
             let detail = error.userMessage ?? ""
             errorMessage = String(localized: "connect.failed \(detail)")
         }
-        return outcome
     }
 
     func select(_ item: SidebarItem?) {

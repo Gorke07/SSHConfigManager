@@ -268,7 +268,7 @@ struct TerminalLaunchingTests {
     @Test func launchErrorsAreLocalizedExceptOsAndSshMessages() {
         #expect(LaunchError.failed("ssh said no").userMessage == "ssh said no")
         #expect(LaunchError.unsafePath.userMessage == String(localized: "connect.error.unsafePath"))
-        #expect(LaunchError.scriptWriteFailed.userMessage == String(localized: "connect.error.scriptWrite"))
+        #expect(LaunchError.scriptWriteFailed(13).userMessage == String(localized: "connect.error.scriptWrite"))
         #expect(LaunchError.appleScriptUnavailable.userMessage == String(localized: "connect.error.appleScript"))
         #expect(LaunchError.openFailed(1).userMessage == String(localized: "connect.error.open \("1")"))
         #expect(LaunchError.automationDenied.userMessage == nil)
@@ -314,5 +314,16 @@ struct TerminalLaunchingTests {
         await app.test(alias: "Web")
         #expect(app.connectionTests.results["Web"] != nil)
         #expect(app.errorMessage == nil)
+    }
+
+    @Test func theInFlightGuardResetsAfterAFailedLaunch() async throws {
+        let tmp = try TempDir()
+        let launcher = RecordingLauncher()
+        launcher.error = .failed("nope")
+        let app = makeTestModel(tmp, config: "Host a\n", launcher: launcher)
+        #expect(await app.connect(alias: "a") == .failed(.failed("nope")))
+        #expect(!app.launchInFlight)
+        launcher.error = nil
+        #expect(await app.connect(alias: "a") == .launched(.terminal))
     }
 }

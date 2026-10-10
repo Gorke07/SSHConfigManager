@@ -120,29 +120,30 @@ final class KeysModel {
         return ok
     }
 
-    /// "Upload to Server…": the outcome is reported in this window's own state, not the main window's.
+    /// "Upload to Server…": the outcome is reported in this window's own state; the main window's alerts are
+    /// never touched. Nil when another launch is already running.
     @discardableResult
     func upload(_ row: KeyRow, alias: String) async -> Connector.Outcome? {
         guard let app, let pub = row.key.publicURL else { return .failed(.failed("no public key")) }
-        let savedError = app.errorMessage
-        let savedFallback = app.fallbackNotice
-        let savedDenied = app.automationDenied
-        guard let outcome = await app.uploadKey(publicKey: pub, alias: alias) else { return nil }   // another launch is running
+        guard let outcome = await app.uploadKey(publicKey: pub, alias: alias) else { return nil }
         switch outcome {
         case .launched:
             errorMessage = nil
-        case .fellBack:
-            notice = app.fallbackNotice
+        case .fellBack(let from):
+            let name = from.displayName
+            notice = String(localized: "connect.fellBack \(name)")
             noticeIsAutomationDenied = false
         case .failed(.automationDenied):
             notice = String(localized: "connect.automationDenied.message")
             noticeIsAutomationDenied = true
-        case .failed:
-            errorMessage = app.errorMessage
+        case .failed(.failed("not in the saved file")):
+            errorMessage = String(localized: "connect.notSaved")
+        case .failed(.failed("control character")):
+            errorMessage = String(localized: "connect.invalidCommand")
+        case .failed(let error):
+            let detail = error.userMessage ?? ""
+            errorMessage = String(localized: "connect.failed \(detail)")
         }
-        app.errorMessage = savedError
-        app.fallbackNotice = savedFallback
-        app.automationDenied = savedDenied
         return outcome
     }
 

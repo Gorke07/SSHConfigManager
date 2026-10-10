@@ -87,7 +87,7 @@ struct ConnectionBar: View {
             }
             .buttonStyle(.borderedProminent)
             .help(String(localized: "action.connect.help"))
-            .disabled(alias == nil)
+            .disabled(alias == nil || model.launchInFlight)
         }
     }
 }

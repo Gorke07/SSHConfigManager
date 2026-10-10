@@ -17,11 +17,16 @@ enum LaunchError: Error, Equatable {
     /// The script or program path contains characters that are not safe to type into a shell.
     case unsafePath
     /// The launch script could not be written.
-    case scriptWriteFailed
+    case scriptWriteFailed(Int32)   // errno, kept for the log
     /// The AppleScript could not be compiled.
     case appleScriptUnavailable
     /// `open` exited with this status.
     case openFailed(Int32)
+
+    private static func openMessage(_ status: Int32) -> String {
+        let code = String(status)
+        return String(localized: "connect.error.open \(code)")
+    }
 
     /// The text shown to the user; nil for `automationDenied`, which has its own explanation.
     var userMessage: String? {
@@ -31,8 +36,7 @@ enum LaunchError: Error, Equatable {
         case .unsafePath: String(localized: "connect.error.unsafePath")
         case .scriptWriteFailed: String(localized: "connect.error.scriptWrite")
         case .appleScriptUnavailable: String(localized: "connect.error.appleScript")
-        case .openFailed(let status):
-            { let code = String(status); return String(localized: "connect.error.open \(code)") }()
+        case .openFailed(let status): Self.openMessage(status)
         }
     }
 }

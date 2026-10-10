@@ -14,8 +14,10 @@ struct AppleScriptLauncher: TerminalLaunching {
             script = try LaunchScript.write(sshArguments: request.sshArguments, program: request.program, in: scriptDirectory)
         } catch LaunchScript.Failure.unsafePath {
             throw LaunchError.unsafePath
+        } catch LaunchScript.Failure.writeFailed(let code) {
+            throw LaunchError.scriptWriteFailed(code)
         } catch {
-            throw LaunchError.scriptWriteFailed
+            throw LaunchError.scriptWriteFailed(0)
         }
         guard LaunchScript.isSafePath(script.path) else {
             try? FileManager.default.removeItem(at: script)
@@ -61,7 +63,11 @@ enum AppleScriptExecutor {
                 if number == -1743 {
                     continuation.resume(throwing: LaunchError.automationDenied)
                 } else {
-                    continuation.resume(throwing: LaunchError.failed(error[NSAppleScript.errorMessage] as? String ?? String(describing: number)))
+                    // -1712 (errAETimeout: the app did not answer the Apple Event in time, e.g. while the
+                    // permission prompt waits) arrives here as a plain failure; Connector then falls back to
+                    // Terminal for iTerm2, and reports it for Terminal itself.
+                    let message = error[NSAppleScript.errorMessage] as? String
+                    continuation.resume(throwing: LaunchError.failed(message ?? number.map { "AppleScript \($0)" } ?? "AppleScript"))
                 }
             }
         }
@@ -78,22 +84,18 @@ struct GhosttyLauncher: TerminalLaunching {
 
 /// `/usr/bin/open`, awaited with a termination handler (no thread waits for it).
 enum OpenCommand {
-    private final class Box: @unchecked Sendable {
-        let process = Process()
-    }
-
     static func run(_ arguments: [String]) async throws -> Int32 {
-        let box = Box()
-        box.process.executableURL = URL(filePath: "/usr/bin/open")
-        box.process.arguments = arguments
+        let process = Process()
+        process.executableURL = URL(filePath: "/usr/bin/open")
+        process.arguments = arguments
         return try await withCheckedThrowingContinuation { continuation in
-            box.process.terminationHandler = { process in
+            process.terminationHandler = { process in
                 continuation.resume(returning: process.terminationStatus)
             }
             do {
-                try box.process.run()
+                try process.run()
             } catch {
-                box.process.terminationHandler = nil
+                process.terminationHandler = nil
                 continuation.resume(throwing: LaunchError.failed(error.localizedDescription))
             }
         }

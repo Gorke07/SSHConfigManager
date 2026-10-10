@@ -329,7 +329,7 @@ struct AppModelTests {
         let model = makeTestModel(tmp, config: "Host web\n", launcher: launcher)
         #expect(await model.uploadKey(publicKey: tmp.url.appending(path: "k.pub"), alias: "other") == .failed(.failed("not in the saved file")))
         #expect(launcher.requests.isEmpty)
-        #expect(model.errorMessage == String(localized: "connect.notSaved"))
+        #expect(model.errorMessage == nil)   // the Keys window reports it, not the main window
     }
 
     @Test func unsavedHostsAreRecognizedButPatternsAndSavedHostsAreNot() throws {

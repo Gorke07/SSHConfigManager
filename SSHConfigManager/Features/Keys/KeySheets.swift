@@ -194,7 +194,7 @@ struct UploadKeySheet: View {
                     }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(alias.isEmpty || row.key.publicURL == nil || !row.key.hasPrivateKey)
+                .disabled(alias.isEmpty || row.key.publicURL == nil || !row.key.hasPrivateKey || app.launchInFlight)
             }
         }
         .formStyle(.grouped)

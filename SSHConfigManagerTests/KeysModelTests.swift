@@ -248,4 +248,23 @@ struct KeysModelTests {
         #expect(KeysModel.isValidFileName("x_cert"))
         #expect(KeysModel.isValidFileName("deploy"))
     }
+
+    @Test func uploadOutcomeStaysInTheKeysWindowWhileTheMainWindowKeepsItsAlert() async throws {
+        let tmp = try TempDir()
+        let launcher = RecordingLauncher()
+        let model = makeTestModel(tmp, config: "Host web\n", launcher: launcher)
+        let row = try await keyRow(model)
+        var release: CheckedContinuation<Void, Never>?
+        launcher.gate = { await withCheckedContinuation { release = $0 } }
+        launcher.error = .failed("boom")
+        let upload = Task { await model.keys.upload(row, alias: "web") }
+        while release == nil { await Task.yield() }
+        model.errorMessage = "set while the upload runs"
+        launcher.gate = nil
+        release?.resume()
+        _ = await upload.value
+        #expect(model.errorMessage == "set while the upload runs")
+        #expect(model.keys.errorMessage == String(localized: "connect.failed \("boom")"))
+        #expect(!model.automationDenied && model.fallbackNotice == nil)
+    }
 }
