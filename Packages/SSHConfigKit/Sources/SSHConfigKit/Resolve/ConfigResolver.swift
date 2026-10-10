@@ -7,7 +7,8 @@ public enum OptionSource: Equatable, Sendable {
     case otherHost(patterns: [String])
     /// Before the first Host/Match line of the root file.
     case global
-    /// A line in an included file (patterns of its Host block; empty outside any block).
+    /// A line in an included file (patterns of the Host block it sits in; directives before the
+    /// file's first Host line inherit the patterns of the block containing the Include, or [] outside any block).
     case include(file: URL, patterns: [String])
 }
 
@@ -37,13 +38,13 @@ public struct ResolvedConfig: Equatable, Sendable {
 /// obtained value is used — except options that may be given several times, which accumulate.
 public enum ConfigResolver {
     public static let multiValueKeys: Set<String> = [
-        "identityfile", "certificatefile", "localforward", "remoteforward", "dynamicforward", "sendenv", "setenv",
+        "identityfile", "certificatefile", "localforward", "remoteforward", "dynamicforward", "sendenv",
     ]
 
-    /// `*` and `?` wildcards, ASCII case-insensitive (ssh lowercases host names).
+    /// `*` and `?` wildcards; comparison is exact and case-sensitive, as in OpenSSH.
     public static func wildcardMatch(_ pattern: String, _ text: String) -> Bool {
-        let p = Array(pattern.asciiLowercased.unicodeScalars)
-        let t = Array(text.asciiLowercased.unicodeScalars)
+        let p = Array(pattern.unicodeScalars)
+        let t = Array(text.unicodeScalars)
         var pi = 0, ti = 0, star = -1, mark = 0
         while ti < t.count {
             if pi < p.count && (p[pi] == "?" || p[pi] == t[ti]) {
@@ -81,23 +82,26 @@ public enum ConfigResolver {
     ) -> ResolvedConfig {
         var result = ResolvedConfig()
         walk(document, file: nil, depth: 0, alias: alias, targetHeader: targetHeader,
-             active: true, blockSource: .global, includes: includes, into: &result)
+             active: true, blockSource: .global, parentPatterns: [], stack: [], includes: includes, into: &result)
         return result
     }
 
     private static func walk(
         _ document: ConfigDocument, file: URL?, depth: Int, alias: String, targetHeader: Int?,
         active startActive: Bool, blockSource startSource: OptionSource,
+        parentPatterns: [String], stack: Set<String>,
         includes: (IncludeDirective) -> [(file: URL, document: ConfigDocument)],
         into result: inout ResolvedConfig
     ) {
         guard depth < 16 else { return }
         var active = startActive
         var source = startSource
+        var blockPatterns = parentPatterns
         for (index, line) in document.lines.enumerated() {
             switch line.kind {
             case .hostStart(let patterns):
                 active = hostLineMatches(patterns, alias: alias)
+                blockPatterns = patterns
                 if let file {
                     source = .include(file: file, patterns: patterns)
                 } else {
@@ -108,17 +112,33 @@ public enum ConfigResolver {
                 active = false
             case .include(let paths):
                 guard active else { continue }
+                let current: [String]
+                switch source {
+                case .otherHost(let patterns), .include(_, let patterns): current = patterns
+                case .thisBlock: current = blockPatterns
+                case .global: current = []
+                }
                 for (includedFile, included) in includes(IncludeDirective(line: index, paths: paths)) {
-                    walk(included, file: includedFile, depth: depth + 1, alias: alias, targetHeader: nil,
-                         active: true, blockSource: .include(file: includedFile, patterns: []),
+                    let standardized = includedFile.standardizedFileURL
+                    let key = standardized.resolvingSymlinksInPath().path
+                    guard !stack.contains(key) else { continue }
+                    walk(included, file: standardized, depth: depth + 1, alias: alias, targetHeader: nil,
+                         active: true, blockSource: .include(file: standardized, patterns: current),
+                         parentPatterns: current, stack: stack.union([key]),
                          includes: includes, into: &result)
                 }
             case .directive(let key, let rawValue):
                 guard active else { continue }
                 let lower = key.asciiLowercased
                 let value = ResolvedValue(value: ValueFormatter.display(key: key, rawValue: rawValue), source: source)
-                if multiValueKeys.contains(lower) {
-                    result.options[lower, default: []].append(value)
+                if lower == "sendenv", value.value.hasPrefix("-") {
+                    let pattern = String(value.value.dropFirst())
+                    result.options[lower]?.removeAll { wildcardMatch(pattern, $0.value) }
+                } else if multiValueKeys.contains(lower) {
+                    let dedupes = lower == "identityfile" || lower == "certificatefile"
+                    if !(dedupes && result.options[lower]?.contains { $0.value == value.value } == true) {
+                        result.options[lower, default: []].append(value)
+                    }
                 } else if result.options[lower] == nil {
                     result.options[lower] = [value]
                 }
