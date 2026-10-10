@@ -154,7 +154,7 @@ final class AppModel {
     private struct SavedHosts {
         let store: ObjectIdentifier
         let hosts: [SavedHost]
-        /// Lowercased alias → alias as written in the saved file (ssh matches aliases case-insensitively).
+        /// Exact alias → alias as written in the saved file (ssh matches Host patterns case-sensitively).
         let aliases: [String: String]
     }
     @ObservationIgnored private var savedHostsCache: SavedHosts?
@@ -171,7 +171,7 @@ final class AppModel {
         let candidates = store.savedDocument.hosts.map { SavedHost(entry: $0, isIncluded: false) }
             + store.savedIncludedHosts.map { SavedHost(entry: $0.entry, isIncluded: true) }
         for host in candidates where !host.entry.isPattern {
-            let key = host.entry.alias.lowercased()
+            let key = host.entry.alias
             guard aliases[key] == nil else { continue }
             aliases[key] = host.entry.alias
             hosts.append(host)
@@ -181,7 +181,7 @@ final class AppModel {
         return built
     }
 
-    /// Every connectable host of the saved file once (case-insensitive, like ssh), file hosts first.
+    /// Every connectable host of the saved file once (exact, case-sensitive like ssh; the first block of a repeated alias wins), file hosts first.
     var savedConnectableHosts: [SavedHost] { savedHosts.hosts }
 
     /// An editable, non-pattern host that is not in the saved file yet (new or renamed):
@@ -195,7 +195,7 @@ final class AppModel {
 
     /// `alias` as written in the saved file, or nil when the saved file has no such (non-pattern) host.
     func savedAlias(_ alias: String) -> String? {
-        savedHosts.aliases[alias.lowercased()]
+        savedHosts.aliases[alias]
     }
 
     /// Resolver result for a host of the saved file (Includes followed in place, with the store's own resolver).
@@ -388,7 +388,7 @@ final class AppModel {
         if let firstInclude = document.includes.map(\.line).min() {
             for host in store.includedHosts {
                 let plain = host.entry.patterns.filter { !$0.hasPrefix("!") && !$0.contains("*") && !$0.contains("?") }
-                for name in plain.map(EffectiveConfigCache.key) {
+                for name in plain.map(EffectiveConfigCache.asciiFolded) {
                     if let header = firstBlocks[name], header > firstInclude { firstBlocks[name] = -1 }
                 }
             }

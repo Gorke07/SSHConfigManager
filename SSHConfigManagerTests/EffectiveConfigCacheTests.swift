@@ -25,14 +25,29 @@ final class PeakRunner: ProcessRunning, @unchecked Sendable {
 struct EffectiveConfigCacheTests {
     let builder = SSHCommandBuilder(configFile: URL(filePath: "/h/.ssh/config"), homeDirectory: URL(filePath: "/h"))
 
-    @Test func loadsOnceAndCachesCaseInsensitively() async {
+    @Test func loadsOncePerExactAlias() async {
         let runner = PeakRunner(delay: .milliseconds(10), output: "hostname 10.0.0.1\nport 22\n")
         let cache = EffectiveConfigCache(runner: runner)
         await cache.load("web", using: builder)
-        await cache.load("WEB", using: builder)
+        await cache.load("web", using: builder)
         #expect(runner.runs == 1)
-        #expect(cache.options(for: "Web")?.first("hostname") == "10.0.0.1")
+        #expect(cache.options(for: "web")?.first("hostname") == "10.0.0.1")
+        #expect(cache.options(for: "Web") == nil)
         #expect(runner.lastArguments == ["-G", "--", "web"])
+    }
+
+    @Test func differentlyCasedAliasesKeepSeparateResults() async {
+        final class ByAlias: ProcessRunning, @unchecked Sendable {
+            func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
+                ProcessResult(exitCode: 0, stdout: "user \(arguments.last == "Web" ? "upper" : "lower")\n", stderr: "", timedOut: false)
+            }
+        }
+        let cache = EffectiveConfigCache(runner: ByAlias())
+        await cache.load("Web", using: builder)
+        await cache.load("web", using: builder)
+        #expect(cache.options(for: "Web")?.first("user") == "upper")
+        #expect(cache.options(for: "web")?.first("user") == "lower")
+        #expect(cache.options(for: "WEB") == nil)
     }
 
     @Test func atMostTwoRunAtOnceAndConcurrentRequestsShareOneRun() async {

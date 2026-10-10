@@ -20,7 +20,7 @@ enum ProxyChainBuilder {
     static func nodes(for alias: String, options: (String) -> EffectiveOptions?, isSavedAlias: (String) -> String?) -> [ProxyChainNode] {
         typealias Entry = (title: String, alias: String?, isCycle: Bool)
         var chain: [Entry] = [(alias, isSavedAlias(alias), false)]
-        var visited: Set<String> = [EffectiveConfigCache.key(alias)]
+        var visited: Set<String> = [alias]
         var current = alias
         while true {
             let hops = options(current)?.jumpHops ?? []
@@ -37,7 +37,7 @@ enum ProxyChainBuilder {
                     entries.append((title, nil, false))
                     continue
                 }
-                let isCycle = !visited.insert(EffectiveConfigCache.key(saved)).inserted
+                let isCycle = !visited.insert(saved).inserted
                 entries.append((saved, saved, isCycle))
                 cycle = isCycle
                 next = isCycle ? nil : saved

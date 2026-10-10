@@ -50,9 +50,9 @@ final class QuickConnectModel {
     /// Empty query: favorites, recents, then the rest. Otherwise ranked fuzzy matches.
     var entries: [QuickConnectEntry] {
         let saved = app.savedConnectableHosts
-        // Aliases are unique in the list (ssh treats a repeated one as the same host); the first wins.
+        // Aliases are unique in the list (a repeated one is the same host); the first wins. Aliases are exact: Web and web differ.
         var seenAliases = Set<String>()
-        let unique = saved.filter { seenAliases.insert(EffectiveConfigCache.key($0.entry.alias)).inserted }
+        let unique = saved.filter { seenAliases.insert($0.entry.alias).inserted }
         let base: [QuickConnectEntry] = unique.map { host in
             QuickConnectEntry(
                 alias: host.entry.alias,
@@ -72,7 +72,7 @@ final class QuickConnectModel {
             guard let match = FuzzyMatcher.match(fuzzy, alias: entry.alias, others: others) else { return nil }
             var hit = entry
             hit.aliasOffsets = match.aliasOffsets
-            let bonus = entry.isFavorite ? 2 : (recents.contains { HostMemory.same($0, entry.alias) } ? 1 : 0)
+            let bonus = entry.isFavorite ? 2 : (recents.contains(entry.alias) ? 1 : 0)
             return (hit, match.score * 10 + bonus, index)
         }
         return scored.sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.2 < $1.2 }.map(\.0)
@@ -81,9 +81,9 @@ final class QuickConnectModel {
     private func sectioned(_ base: [QuickConnectEntry]) -> [QuickConnectEntry] {
         var used = Set<String>()
         var result: [QuickConnectEntry] = []
-        let byKey = Dictionary(base.map { (EffectiveConfigCache.key($0.alias), $0) }, uniquingKeysWith: { first, _ in first })
+        let byKey = Dictionary(base.map { ($0.alias, $0) }, uniquingKeysWith: { first, _ in first })
         func add(_ alias: String, _ section: QuickConnectSection) {
-            let key = EffectiveConfigCache.key(alias)
+            let key = alias
             guard let entry = byKey[key], used.insert(key).inserted else { return }
             var copy = entry
             copy.section = section
@@ -138,7 +138,7 @@ final class QuickConnectModel {
         guard let entry = selectedEntry else { return }
         app.toggleFavorite(entry.alias)
         // Sections reorder on toggle; keep the selection on the same host.
-        if let index = entries.firstIndex(where: { HostMemory.same($0.alias, entry.alias) }) { selectedIndex = index }
+        if let index = entries.firstIndex(where: { $0.alias == entry.alias }) { selectedIndex = index }
         requestPreview()
     }
 

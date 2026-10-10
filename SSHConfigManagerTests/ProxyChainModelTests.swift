@@ -60,9 +60,11 @@ struct ProxyChainModelTests {
         #expect(wide.count <= ProxyChainBuilder.maxDepth + 1)
     }
 
-    @Test func cycleCheckIsCaseInsensitive() {
+    @Test func cycleCheckIsExact() {
         let nodes = ProxyChainBuilder.nodes(for: "A", options: options(["A": "proxyjump a"]), isSavedAlias: { $0 })
-        #expect(nodes.contains { $0.isCycle })
+        #expect(!nodes.contains { $0.isCycle })
+        let same = ProxyChainBuilder.nodes(for: "a", options: options(["a": "proxyjump a"]), isSavedAlias: { $0 })
+        #expect(same.contains { $0.isCycle })
     }
 
     @Test func chainTestStopsAtTheFirstFailure() async throws {

@@ -24,6 +24,13 @@ struct QuickConnectModelTests {
         return QuickConnectModel(app: app, openMainWindow: openMainWindow)
     }
 
+    @Test func aliasesDifferingOnlyInCaseAreSeparateEntries() throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host Web\n  User upper\nHost web\n  User lower\nHost web\n")
+        let quick = QuickConnectModel(app: app, openMainWindow: {})
+        #expect(quick.entries.map(\.alias) == ["Web", "web"])
+    }
+
     @Test func entriesAreUniqueConnectableAliases() throws {
         let tmp = try TempDir()
         let quick = try model(tmp)

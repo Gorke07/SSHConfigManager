@@ -43,7 +43,7 @@ enum EffectiveSettingsBuilder {
             text = URL(filePath: text).standardizedFileURL.path
         }
         // ssh -G lowercases some values (host names, yes/no): compare ASCII case-insensitively.
-        return EffectiveConfigCache.key(text)
+        return EffectiveConfigCache.asciiFolded(text)
     }
 
     private static func source(key: String, sshValues: [String], resolved: ResolvedConfig, home: URL) -> EffectiveSettingSource {
