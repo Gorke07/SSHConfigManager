@@ -679,6 +679,88 @@ struct AppModelTests {
         #expect(model.groupDraft == nil)
     }
 
+    // MARK: Add/Duplicate with pending form edits (2A-8), Save before switching (2A-5)
+
+    private func blockedEditor(_ model: AppModel, _ item: SidebarItem) throws {
+        model.select(item)
+        let editor = try #require(model.editor(for: item))
+        editor.fields["Port"] = "abc"
+        #expect(!editor.commit())
+        #expect(model.hasPendingFormEdits)
+    }
+
+    @Test func addHostWithPendingEditsCreatesNothingUntilConfirmed() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n")
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        try blockedEditor(model, a)
+        model.addHost()
+        #expect(model.pendingCreation == .new)
+        #expect(model.hasPendingDiscardConfirmation)
+        #expect(model.store.document.hosts.map(\.alias) == ["a"])
+        #expect(!model.store.hasUnsavedChanges)
+
+        model.cancelPendingSelection()
+        #expect(model.pendingCreation == nil)
+        #expect(model.store.document.hosts.map(\.alias) == ["a"])
+        #expect(model.selection == a)
+
+        model.addHost()
+        model.confirmPendingSelection()
+        #expect(model.store.document.hosts.map(\.alias) == ["new-host", "a"] || model.store.document.hosts.map(\.alias) == ["a", "new-host"])
+        #expect(model.selection == .host(alias: "new-host", occurrence: 0))
+        #expect(!model.hasPendingFormEdits)
+    }
+
+    @Test func duplicateHostWithPendingEditsCreatesNothingUntilConfirmed() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n  User u\n")
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        try blockedEditor(model, a)
+        model.duplicateHost(a)
+        #expect(model.pendingCreation == .duplicate(a))
+        #expect(model.store.document.hosts.count == 1)
+        model.cancelPendingSelection()
+        #expect(model.store.document.hosts.count == 1)
+        model.duplicateHost(a)
+        model.confirmPendingSelection()
+        #expect(model.store.document.hosts.map(\.alias) == ["a", "a-copy"])
+        #expect(model.selection == .host(alias: "a-copy", occurrence: 0))
+    }
+
+    @Test func addHostWithoutPendingEditsCreatesAtOnce() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n")
+        model.addHost()
+        #expect(model.pendingCreation == nil)
+        #expect(model.store.document.hosts.count == 2)
+        #expect(model.selection == .host(alias: "new-host", occurrence: 0))
+    }
+
+    @Test func saveThenSwitchWritesBeforeSwitching() async throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n")
+        try tmp.file("other/config", "Host b\n")
+        try model.store.apply { _ = try $0.addHost(HostDraft(patterns: ["new"])) }
+        let other = tmp.url.appending(path: "other/config").path
+        #expect(model.switchConfig(to: other) == .needsConfirmation)
+        #expect(await model.saveThenSwitchConfig(to: other) == .switched)
+        #expect(try tmp.read(".ssh/config").contains("Host new"))
+        #expect(model.store.fileURL.path.hasSuffix("other/config"))
+    }
+
+    @Test func saveThenSwitchStaysWhenTheSaveFails() async throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n", runner: FixedRunner.invalid("line 2: Bad configuration option: bogus"))
+        try tmp.file("other/config", "Host b\n")
+        try model.store.apply { _ = try $0.addHost(HostDraft(patterns: ["new"])) }
+        let result = await model.saveThenSwitchConfig(to: tmp.url.appending(path: "other/config").path)
+        guard case .failed(let message) = result else { Issue.record("failed bekleniyordu"); return }
+        #expect(!message.isEmpty)
+        #expect(!model.store.fileURL.path.hasSuffix("other/config"))
+        #expect(model.store.hasUnsavedChanges)
+        #expect(try tmp.read(".ssh/config") == "Host a\n")
+    }
 }
 
 private final class ReadCounter: @unchecked Sendable {

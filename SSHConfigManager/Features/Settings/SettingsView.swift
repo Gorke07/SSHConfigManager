@@ -136,6 +136,15 @@ struct SettingsView: View {
             isPresented: Binding(get: { pendingPath != nil }, set: { if !$0 { pendingPath = nil } }),
             presenting: pendingPath
         ) { path in
+            Button(String(localized: "settings.switch.save")) {
+                Task {
+                    switch await model.saveThenSwitchConfig(to: path) {
+                    case .switched: invalidMessage = nil
+                    case .invalid: invalidMessage = String(localized: "settings.configFile.invalid")
+                    case .failed(let message): invalidMessage = message
+                    }
+                }
+            }
             Button(String(localized: "settings.switch.discard"), role: .destructive) {
                 _ = model.switchConfig(to: path, discardingUnsavedChanges: true)
             }

@@ -8,7 +8,7 @@ import SSHConfigKit
 @Observable
 final class HostEditorModel {
     /// Directives with their own form field (IdentityFile is a list, everything else is "other options").
-    static let fieldKeys = ["HostName", "User", "Port", "ProxyJump", "ForwardAgent"]
+    static let fieldKeys = HostDraftValidator.singleValueKeys
 
     let store: ConfigStore
     private(set) var item: SidebarItem
@@ -39,11 +39,23 @@ final class HostEditorModel {
         for key in Self.fieldKeys { fields[key] = entry.value(for: key) ?? "" }
         self.fields = fields
         identityFiles = entry.values(for: "IdentityFile")
-        let known = Set((Self.fieldKeys + ["IdentityFile"]).map { $0.lowercased() })
-        otherOptions = entry.directives
-            .filter { !known.contains($0.key.lowercased()) }
-            .map { DraftDirective(key: $0.key, value: $0.value) }
-        validator = HostDraftValidator(fileExists: { HostEditorModel.identityFileExists($0, home: homeDirectory) })
+        // Everything the form fields and the identity list do not show stays in "Other options": unknown keys, and
+        // repeats of a single-value key (the field shows the first; ssh ignores the rest, but they remain in the file).
+        let fieldKeys = Set(Self.fieldKeys.map(\.asciiLowercased))
+        var seen = Set<String>()
+        var others: [DraftDirective] = []
+        for directive in entry.directives {
+            let key = directive.key.asciiLowercased
+            if key == "identityfile" { continue }
+            if fieldKeys.contains(key), seen.insert(key).inserted { continue }
+            others.append(DraftDirective(key: directive.key, value: directive.value))
+        }
+        otherOptions = others
+        let validator = HostDraftValidator(fileExists: { HostEditorModel.identityFileExists($0, home: homeDirectory) })
+        self.validator = validator
+        // Repeated values already in the file are explained as soon as the form opens.
+        issues = validator.issues(for: HostDraft(entry), in: store.document, editing: entry.headerLine)
+            .filter { if case .duplicateFieldKey = $0 { true } else { false } }
     }
 
     var draft: HostDraft {

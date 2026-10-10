@@ -88,11 +88,15 @@ final class AppModel {
         let backups = BackupManager(rootDirectory: backupRoot, keep: settings.backupCount)
         self.backupManager = backups
         self.makeStore = makeStore
-        self.store = makeStore(settings.configURL, backups, Self.backupKind(for: settings.configURL, home: settings.homeDirectory))
+        let configKind = Self.backupKind(for: settings.configURL, home: settings.homeDirectory)
+        let knownHostsKind = Self.knownHostsBackupKind(for: settings.knownHostsURL, home: settings.homeDirectory)
+        self.store = makeStore(settings.configURL, backups, configKind)
         self.makeKnownHostsStore = makeKnownHostsStore
-        self.knownHosts = makeKnownHostsStore(
-            settings.knownHostsURL, backups, Self.knownHostsBackupKind(for: settings.knownHostsURL, home: settings.homeDirectory))
+        self.knownHosts = makeKnownHostsStore(settings.knownHostsURL, backups, knownHostsKind)
         self.memory = HostMemory(defaults: settings.userDefaults, key: Self.memoryKey(for: settings.configURL, home: settings.homeDirectory))
+        migrateLegacyKeys(for: settings.configURL, kind: configKind, prefix: "config")
+        migrateLegacyKeys(for: settings.knownHostsURL, kind: knownHostsKind, prefix: "known_hosts")
+        self.memory = makeMemory(for: settings.configURL)
         keys.app = self
         observeSavedState()
     }
@@ -147,10 +151,35 @@ final class AppModel {
     }
 
     private static func backupKind(for url: URL, defaultPath: URL, prefix: String) -> String {
-        let path = url.standardizedFileURL.path
-        if path == defaultPath.standardizedFileURL.path { return prefix }
-        let digest = SHA256.hash(data: Data(path.utf8))
+        if url.standardizedFileURL.path == defaultPath.standardizedFileURL.path
+            || url.resolvingSymlinksInPath().path == defaultPath.resolvingSymlinksInPath().path { return prefix }
+        return hashedKind(for: url, prefix: prefix)
+    }
+
+    /// The per-path key used before symlinks were resolved: the hash of the standardized path (also the key of
+    /// any other file; only a symlink to the default file moved from it to the plain prefix).
+    private static func hashedKind(for url: URL, prefix: String) -> String {
+        let digest = SHA256.hash(data: Data(url.standardizedFileURL.path.utf8))
         return prefix + "-" + digest.map { String(format: "%02x", $0) }.joined().prefix(12)
+    }
+
+    /// Backups (and favorites/recents) that were saved under the old hashed key of a path that now resolves to the
+    /// default file move to its key, so nothing disappears from the list. A failure is logged and leaves them in place.
+    private func migrateLegacyKeys(for url: URL, kind: String, prefix: String) {
+        let legacy = Self.hashedKind(for: url, prefix: prefix)
+        guard legacy != kind else { return }
+        do { try backupManager.migrate(from: legacy, to: kind) } catch { AppLog.error(.backups, error) }
+    }
+
+    private func makeMemory(for url: URL) -> HostMemory {
+        let home = settings.homeDirectory
+        let key = Self.memoryKey(for: url, home: home)
+        let legacyKey = "hostMemory." + Self.hashedKind(for: url, prefix: "config")
+        let defaults = settings.userDefaults
+        if legacyKey != key, defaults.object(forKey: key) == nil, let old = defaults.object(forKey: legacyKey) {
+            defaults.set(old, forKey: key)
+        }
+        return HostMemory(defaults: defaults, key: key)
     }
 
     /// Opens another known_hosts file. There are no drafts, so nothing needs confirming.
@@ -159,7 +188,9 @@ final class AppModel {
         guard AppSettings.isValidConfigPath(path) else { return false }
         settings.setKnownHostsPath(path)
         let url = settings.knownHostsURL
-        knownHosts = makeKnownHostsStore(url, backupManager, Self.knownHostsBackupKind(for: url, home: settings.homeDirectory))
+        let kind = Self.knownHostsBackupKind(for: url, home: settings.homeDirectory)
+        migrateLegacyKeys(for: url, kind: kind, prefix: "known_hosts")
+        knownHosts = makeKnownHostsStore(url, backupManager, kind)
         return true
     }
 
@@ -599,27 +630,50 @@ final class AppModel {
 
     var hasPendingFormEdits: Bool { hasBlockedFormEdits || hasPendingGroupDraft }
 
-    /// Adds a new host and selects it; a failure is logged and shown.
-    func addHost() {
-        do { requestSelect(try HostCommands.addHost(to: store)) }
-        catch {
+    /// A host creation waiting for the user to confirm discarding blocked form edits.
+    enum HostCreation: Equatable {
+        case new
+        case duplicate(SidebarItem)
+    }
+
+    /// Set while the discard confirmation for an Add/Duplicate is showing; nothing was created yet.
+    var pendingCreation: HostCreation?
+
+    /// Adds a new host and selects it. With unapplied form edits it asks first and creates nothing until confirmed.
+    func addHost() { requestCreation(.new) }
+
+    /// Duplicates `item` and selects the copy (asks first like `addHost`).
+    func duplicateHost(_ item: SidebarItem) { requestCreation(.duplicate(item)) }
+
+    private func requestCreation(_ creation: HostCreation) {
+        if hasPendingFormEdits {
+            pendingSelection = nil
+            pendingCreation = creation
+        } else {
+            performCreation(creation)
+        }
+    }
+
+    /// A failure is logged and shown.
+    private func performCreation(_ creation: HostCreation) {
+        do {
+            switch creation {
+            case .new: select(try HostCommands.addHost(to: store))
+            case .duplicate(let item): if let copy = try HostCommands.duplicate(item, in: store) { select(copy) }
+            }
+        } catch {
             AppLog.error(.edit, error)
             errorMessage = Messages.text(for: error)
         }
     }
 
-    /// Duplicates `item` and selects the copy; a failure is logged and shown.
-    func duplicateHost(_ item: SidebarItem) {
-        do { if let copy = try HostCommands.duplicate(item, in: store) { requestSelect(copy) } }
-        catch {
-            AppLog.error(.edit, error)
-            errorMessage = Messages.text(for: error)
-        }
-    }
+    /// True while a discard confirmation (a selection or a host creation) is showing.
+    var hasPendingDiscardConfirmation: Bool { pendingSelection != nil || pendingCreation != nil }
 
     /// Selects `item`, unless the form holds edits that were never applied; then asks first.
     func requestSelect(_ item: SidebarItem?) {
         if hasPendingFormEdits, item != nil {
+            pendingCreation = nil
             pendingSelection = item
         } else {
             select(item)
@@ -627,6 +681,11 @@ final class AppModel {
     }
 
     func confirmPendingSelection() {
+        if let creation = pendingCreation {
+            pendingCreation = nil
+            performCreation(creation)
+            return
+        }
         let item = pendingSelection
         pendingSelection = nil
         select(item)
@@ -634,6 +693,17 @@ final class AppModel {
 
     func cancelPendingSelection() {
         pendingSelection = nil
+        pendingCreation = nil
+    }
+
+    /// The alias `ssh -G` probes when saving: the selected host as it is now in the document (a rename counts).
+    var probeAlias: String? {
+        guard let item = selection, let entry = SidebarBuilder.hostEntry(for: item, in: store.document), !entry.isPattern else { return nil }
+        return entry.alias
+    }
+
+    func makeSaveFlow() -> SaveFlowModel {
+        SaveFlowModel(store: store, probeAlias: probeAlias)
     }
 
     /// Called by the editor after it renamed the selected host.
@@ -698,8 +768,10 @@ final class AppModel {
         if (store.hasUnsavedChanges || hasPendingFormEdits) && !discardingUnsavedChanges { return .needsConfirmation }
         settings.setConfigPath(path)
         store.onDiskStateChange = nil
-        store = makeStore(url, backupManager, Self.backupKind(for: url, home: settings.homeDirectory))
-        memory = HostMemory(defaults: settings.userDefaults, key: Self.memoryKey(for: url, home: settings.homeDirectory))
+        let kind = Self.backupKind(for: url, home: settings.homeDirectory)
+        migrateLegacyKeys(for: url, kind: kind, prefix: "config")
+        store = makeStore(url, backupManager, kind)
+        memory = makeMemory(for: url)
         observeSavedState()
         savedHostsCache = nil
         select(nil)
@@ -710,6 +782,27 @@ final class AppModel {
         searchText = ""
         errorMessage = nil
         return .switched
+    }
+
+    enum SaveSwitchResult: Equatable { case switched, invalid, failed(String) }
+
+    /// Saves the unsaved changes (validation included), then opens `path`. Nothing is switched unless the save succeeded.
+    func saveThenSwitchConfig(to path: String) async -> SaveSwitchResult {
+        applyPendingGroupDraft()
+        if hasPendingGroupDraft { return .failed(errorMessage ?? "") }
+        if store.hasUnsavedChanges {
+            let flow = makeSaveFlow()
+            await flow.prepare()
+            await flow.confirm()
+            switch flow.phase {
+            case .done: break
+            case .review(let preparation): return .failed(Messages.text(for: preparation.validation))
+            case .conflict: return .failed(Messages.text(for: ConfigStoreError.conflict))
+            case .failed(let message): return .failed(message)
+            case .preparing, .saving: return .failed("")
+            }
+        }
+        return switchConfig(to: path, discardingUnsavedChanges: true) == .invalid ? .invalid : .switched
     }
 
     func setBackupCount(_ count: Int) {

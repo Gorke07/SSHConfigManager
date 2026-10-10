@@ -12,7 +12,16 @@ final class BackupsModel {
     let model: AppModel
     private(set) var backups: [Backup] = []
     var selectedURL: URL?
+    /// Why the list could not be read.
     private(set) var errorMessage: String?
+    /// Why the last restore failed (shown in the Backups window, not the main window).
+    var restoreFailure: String?
+
+    /// What the Backups window's alert shows; dismissing clears both.
+    var alertMessage: String? {
+        get { restoreFailure ?? errorMessage }
+        set { if newValue == nil { restoreFailure = nil; errorMessage = nil } }
+    }
 
     init(model: AppModel) {
         self.model = model
@@ -78,7 +87,18 @@ final class BackupsModel {
         let contents = try model.backupManager.contents(of: backup)
         switch fileKind {
         case .config:
-            try model.store.apply { $0 = ConfigDocument(parsing: contents) }
+            // A missing config file is created first (empty); if the restore then fails, the empty file is removed again.
+            let created = model.store.loadState == .missing
+            if created { try model.store.createFile() }
+            do {
+                try model.store.apply { $0 = ConfigDocument(parsing: contents) }
+            } catch {
+                if created, (try? Data(contentsOf: model.store.fileURL))?.isEmpty == true {
+                    try? FileManager.default.removeItem(at: model.store.fileURL)
+                    model.store.discardChanges()
+                }
+                throw error
+            }
             model.resetEditor()
         case .knownHosts:
             // Switched file (the backup belongs to another file), a backup no longer listed, or a reload

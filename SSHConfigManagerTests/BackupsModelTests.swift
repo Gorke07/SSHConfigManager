@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import SSHConfigKit
 import Testing
@@ -139,5 +140,87 @@ struct BackupsModelTests {
         #expect(throws: KnownHostsStoreError.staleSelection) { try backups.restore(backup, seen: seen) }
         #expect(try tmp.read(".ssh/known_hosts") == appended)
         #expect(throws: KnownHostsStoreError.staleSelection) { try backups.restore(backup) }   // no snapshot: refused
+    }
+
+    // MARK: symlink-aware backupKind (2A-13)
+
+    @Test func symlinkToTheDefaultFileUsesTheDefaultKind() throws {
+        let tmp = try TempDir()
+        let home = tmp.url
+        try tmp.file("dotfiles/ssh_config", "Host a\n")
+        let ssh = home.appending(path: ".ssh")
+        try FileManager.default.createDirectory(at: ssh, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: ssh.appending(path: "config"), withDestinationURL: home.appending(path: "dotfiles/ssh_config"))
+        #expect(AppModel.backupKind(for: ssh.appending(path: "config"), home: home) == "config")
+        // The real target of the symlinked default is the same file.
+        #expect(AppModel.backupKind(for: home.appending(path: "dotfiles/ssh_config"), home: home) == "config")
+        // Another file keeps its hashed key.
+        #expect(AppModel.backupKind(for: home.appending(path: "dotfiles/other"), home: home).hasPrefix("config-"))
+    }
+
+    @Test func backupsKeyedByTheOldHashedKindAreMigrated() async throws {
+        let tmp = try TempDir()
+        let home = tmp.url
+        try tmp.file("dotfiles/ssh_config", "Host a\n")
+        let ssh = home.appending(path: ".ssh")
+        try FileManager.default.createDirectory(at: ssh, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: ssh.appending(path: "config"), withDestinationURL: home.appending(path: "dotfiles/ssh_config"))
+        let real = home.appending(path: "dotfiles/ssh_config")
+        // A backup written when the real file's path still had its own hashed folder, and one under "config".
+        let manager = BackupManager(rootDirectory: home.appending(path: "Backups"), keep: 10)
+        let legacy = try legacyKind(for: real)
+        try manager.backup(fileAt: real, kind: legacy)
+        #expect(try manager.list(kind: "config").isEmpty)
+
+        let settings = AppSettings(defaults: tmp.defaults, homeDirectory: home)
+        settings.setConfigPath(real.path)
+        let app = AppModel(settings: settings, backupRoot: home.appending(path: "Backups"),
+                           processRunner: FixedRunner.valid,
+                           makeStore: { url, backups, kind in
+                               ConfigStore(fileURL: url, writer: SafeFileWriter(backups: backups), validator: ConfigValidator(runner: FixedRunner.valid),
+                                           includeResolver: IncludeResolver(homeDirectory: home), watchForChanges: false, backupKind: kind)
+                           })
+        #expect(app.store.backupKind == "config")
+        #expect(try app.backupManager.list(kind: "config").count == 1)
+        #expect(try app.backupManager.list(kind: legacy).isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: home.appending(path: "Backups/\(legacy)").path))
+        #expect(BackupsModel(model: app).backups.count == 1)
+    }
+
+    /// The pre-symlink key: the hash of the standardized path (what the app used before).
+    private func legacyKind(for url: URL) throws -> String {
+        let digest = SHA256.hash(data: Data(url.standardizedFileURL.path.utf8))
+        return "config-" + digest.map { String(format: "%02x", $0) }.joined().prefix(12)
+    }
+
+    // MARK: restore errors and a missing file (2A-4a, 2A-7)
+
+    @Test func restoreWorksWhenTheConfigFileIsMissing() async throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\n")
+        try await saveEdit(app, port: "1")
+        let backups = BackupsModel(model: app)
+        let backup = try #require(backups.backups.first)
+        let url = tmp.url.appending(path: ".ssh/config")
+        try FileManager.default.removeItem(at: url)
+        app.store.discardChanges()
+        #expect(app.store.loadState == .missing)
+
+        try backups.restore(backup)
+        #expect(app.store.loadState == .loaded)
+        #expect(app.store.document.render() == "Host a\n")
+        #expect(app.store.hasUnsavedChanges)
+    }
+
+    @Test func failedRestoreIsShownInTheBackupsWindowModel() async throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\n")
+        try await saveEdit(app, port: "1")
+        let backups = BackupsModel(model: app)
+        #expect(backups.alertMessage == nil)
+        backups.restoreFailure = "boom"
+        #expect(backups.alertMessage == "boom")
+        backups.alertMessage = nil
+        #expect(backups.restoreFailure == nil)
     }
 }

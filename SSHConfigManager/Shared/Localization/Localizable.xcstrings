@@ -645,6 +645,13 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Anahtar dosyası bulunamadı: %@" } }
       }
     },
+    "issue.duplicateFieldKey %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ appears more than once. ssh uses the first value and ignores the others." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "%@ birden fazla kez geçiyor. ssh ilk değeri kullanır, diğerlerini yok sayar." } }
+      }
+    },
     "edit.hostNotFound" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1740,8 +1747,15 @@
     "settings.switch.title" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Discard unsaved changes?" } },
-        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kaydedilmemiş değişiklikler atılsın mı?" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save unsaved changes?" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kaydedilmemiş değişiklikler kaydedilsin mi?" } }
+      }
+    },
+    "settings.switch.save" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save and Switch" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kaydet ve Değiştir" } }
       }
     },
     "settings.switch.discard" : {

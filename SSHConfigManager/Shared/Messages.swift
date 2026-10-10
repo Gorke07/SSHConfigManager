@@ -15,6 +15,7 @@ enum Messages {
         case .emptyDirectiveValue(let key): String(localized: "issue.emptyDirectiveValue \(key)")
         case .duplicateAliasCaseOnly(let alias): String(localized: "issue.lint.duplicateCaseOnly \(alias)")
         case .identityFileMissing(let path): String(localized: "issue.identityFileMissing \(path)")
+        case .duplicateFieldKey(let key): String(localized: "issue.duplicateFieldKey \(key)")
         }
     }
 

@@ -11,11 +11,14 @@ public enum DraftIssue: Equatable, Sendable {
     case forbiddenDirectiveKey(String)
     case emptyDirectiveValue(String)
     case identityFileMissing(String)
+    /// A single-value directive (HostName, User, Port, ProxyJump, ForwardAgent) appears more than once in the draft:
+    /// ssh uses the first value and ignores the rest (a warning; the lines stay in the file).
+    case duplicateFieldKey(String)
 
     /// Blocking issues prevent applying the draft; warnings do not.
     public var isBlocking: Bool {
         switch self {
-        case .identityFileMissing, .duplicateAliasCaseOnly: false
+        case .identityFileMissing, .duplicateAliasCaseOnly, .duplicateFieldKey: false
         default: true
         }
     }
@@ -35,6 +38,9 @@ enum DirectiveKeyRules {
 }
 
 public struct HostDraftValidator: Sendable {
+    /// Directives for which ssh keeps only the first value it finds.
+    public static let singleValueKeys = ["HostName", "User", "Port", "ProxyJump", "ForwardAgent"]
+
     private let fileExists: @Sendable (String) -> Bool
 
     /// - Parameter fileExists: receives the IdentityFile value as typed (may start with "~").
@@ -122,6 +128,12 @@ public struct HostDraftValidator: Sendable {
             if key == "identityfile", !directive.value.contains("%"), !fileExists(directive.value) {
                 issues.append(.identityFileMissing(directive.value))
             }
+        }
+
+        var counts: [String: Int] = [:]
+        for directive in draft.directives { counts[directive.key.asciiLowercased, default: 0] += 1 }
+        for key in Self.singleValueKeys where counts[key.asciiLowercased, default: 0] > 1 {
+            issues.append(.duplicateFieldKey(key))
         }
         return issues
     }
