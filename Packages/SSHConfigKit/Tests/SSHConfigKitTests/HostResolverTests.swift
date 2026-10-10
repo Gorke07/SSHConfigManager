@@ -101,6 +101,19 @@ struct HostResolverTests {
         #expect(host?.hostname == "a")
     }
 
+    // `ssh -G` (checked with -F <temp>) prints `UserKnownHostsFile "/tmp/a b/kh" ~/.ssh/kh2 %d/foo` as
+    // `userknownhostsfile /tmp/a b/kh /Users/x/.ssh/kh2 /Users/x/foo`: unquoted, expanded, space-joined.
+    @Test func aPathWithSpacesIsOneOfTheCandidates() {
+        let host = HostResolver.parse("hostname a\nport 22\nuserknownhostsfile /tmp/a b/kh /Users/x/.ssh/kh2\n")
+        #expect(host?.userKnownHostsFileCandidates.contains("/tmp/a b/kh") == true)
+        #expect(host?.userKnownHostsFileCandidates.contains("/Users/x/.ssh/kh2") == true)
+    }
+
+    @Test func quotedPathsAreUnquoted() {
+        let host = HostResolver.parse("hostname a\nport 22\nuserknownhostsfile \"/tmp/a b/kh\" /x/kh2\n")
+        #expect(host?.userKnownHostsFiles == ["/tmp/a b/kh", "/x/kh2"])
+    }
+
     @Test func valueIsTrimmed() {
         #expect(HostResolver.parse("hostname   a  \nport 22\n")?.hostname == "a")
     }

@@ -31,6 +31,8 @@ final class AppModel {
     var mainWindowIsKey = false
     /// The "Delete known_hosts entry…" flow for one alias; drives `HostKeyRemovalSheet`.
     var hostKeyRemoval: HostKeyRemoval?
+    /// The running `ssh -G` lookup of that flow; cancelling the flow cancels it (and so ssh).
+    @ObservationIgnored var hostKeyRemovalTask: Task<Void, Never>?
     /// Informational: the chosen terminal was unavailable and the connection opened in Terminal.
     var fallbackNotice: String?
     /// The form for the current selection. Owned here (not by the view) so edits that validation

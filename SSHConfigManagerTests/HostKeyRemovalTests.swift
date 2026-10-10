@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import SSHConfigKit
 import Testing
 @testable import SSH_Config_Manager
@@ -155,5 +156,68 @@ struct HostKeyRemovalTests {
         let model = make(tmp, sshG: "hostname web.example.com\nport 22\nuserknownhostsfile \(path)\n")
         await model.requestHostKeyRemoval(alias: "web")
         #expect(model.hostKeyRemoval?.otherKnownHostsFile == nil)
+    }
+
+    @Test func aQuotedUserKnownHostsFileWithSpacesIsRecognised() async throws {
+        let tmp = try TempDir()
+        // ssh -G prints it unquoted and expanded; the path has a space.
+        _ = try tmp.file("My Hosts/known_hosts", Self.knownHosts)
+        let model = make(tmp, sshG: "hostname web.example.com\nport 22\nuserknownhostsfile /x/other \(tmp.url.path)/My Hosts/known_hosts\n")
+        #expect(model.switchKnownHosts(to: tmp.url.path + "/My Hosts/known_hosts"))
+        await model.requestHostKeyRemoval(alias: "web")
+        #expect(model.hostKeyRemoval?.otherKnownHostsFile == nil)
+    }
+
+    @Test func percentDAndTildeExpandToTheHome() async throws {
+        let tmp = try TempDir()
+        let model = make(tmp, sshG: "hostname web.example.com\nport 22\nuserknownhostsfile %d/.ssh/known_hosts\n")
+        await model.requestHostKeyRemoval(alias: "web")
+        #expect(model.hostKeyRemoval?.otherKnownHostsFile == nil)
+    }
+
+    @Test func aSymlinkedPathIsTheSameFile() async throws {
+        let tmp = try TempDir()
+        let model = make(tmp, sshG: "hostname web.example.com\nport 22\nuserknownhostsfile \(tmp.url.path)/link/known_hosts\n")
+        try FileManager.default.createSymbolicLink(at: tmp.url.appendingPathComponent("link"), withDestinationURL: tmp.url.appendingPathComponent(".ssh"))
+        await model.requestHostKeyRemoval(alias: "web")
+        #expect(model.hostKeyRemoval?.otherKnownHostsFile == nil)
+    }
+
+    @Test func cancellingTheFlowCancelsTheRunningSsh() async throws {
+        let tmp = try TempDir()
+        _ = try tmp.file(".ssh/known_hosts", Self.knownHosts)
+        let runner = CancellableRunner()
+        let model = makeTestModel(tmp, config: Self.config, runner: runner)
+        model.startHostKeyRemoval(alias: "web")
+        for await _ in runner.entries { break }   // ssh -G is running (validation runs go through the same runner only on save)
+        model.cancelHostKeyRemoval()
+        for await _ in runner.cancellations { break }
+        #expect(runner.cancelledCount == 1)
+        #expect(model.hostKeyRemoval == nil)
+    }
+}
+
+/// Suspends until its task is cancelled, then reports it and throws like ProcessRunner does.
+final class CancellableRunner: ProcessRunning, @unchecked Sendable {
+    let entries: AsyncStream<Void>
+    private let entered: AsyncStream<Void>.Continuation
+    let cancellations: AsyncStream<Void>
+    private let cancelled: AsyncStream<Void>.Continuation
+    private let count = Mutex(0)
+    var cancelledCount: Int { count.withLock { $0 } }
+    init() {
+        (entries, entered) = AsyncStream.makeStream()
+        (cancellations, cancelled) = AsyncStream.makeStream()
+    }
+    func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
+        entered.yield()
+        do {
+            try await Task.sleep(for: .seconds(60))
+        } catch {
+            count.withLock { $0 += 1 }
+            cancelled.yield()
+            throw CancellationError()
+        }
+        return ProcessResult(exitCode: 0, stdout: "hostname web.example.com\nport 22\n", stderr: "", timedOut: false)
     }
 }

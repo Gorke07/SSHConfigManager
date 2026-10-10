@@ -38,6 +38,12 @@ struct HostKeyRemoval: Equatable, Identifiable {
 }
 
 extension AppModel {
+    /// Starts the flow in a task the model owns, so `cancelHostKeyRemoval` can stop `ssh -G`.
+    func startHostKeyRemoval(alias: String) {
+        hostKeyRemovalTask?.cancel()
+        hostKeyRemovalTask = Task { await requestHostKeyRemoval(alias: alias) }
+    }
+
     /// ssh -G → real host name, port and HostKeyAlias → matching entries (hashed included, patterns
     /// and marker lines never) → confirmation.
     func requestHostKeyRemoval(alias requested: String) async {
@@ -58,7 +64,7 @@ extension AppModel {
             revision = knownHosts.revision
             store = knownHosts
             checkHostIP = host.checkHostIP
-            otherFile = otherKnownHostsFile(sshReads: host.userKnownHostsFiles)
+            otherFile = otherKnownHostsFile(sshReads: host.userKnownHostsFiles, candidates: host.userKnownHostsFileCandidates)
             switch knownHosts.loadState {
             case .notUTF8, .unreadable:
                 // An unreadable file has an empty document: "nothing found" would be a lie.
@@ -83,13 +89,23 @@ extension AppModel {
         hostKeyRemoval?.otherKnownHostsFile = otherFile
     }
 
-    /// ssh's first UserKnownHostsFile when none of them (`~` expanded against the settings' home)
-    /// is the known_hosts file this app manages; nil when one is, or when ssh printed none.
-    func otherKnownHostsFile(sshReads files: [String]) -> String? {
+    /// ssh's first UserKnownHostsFile when none of them is the known_hosts file this app manages; nil
+    /// when one is, or when ssh printed none. `ssh -G` prints expanded, unquoted, space-joined paths, so
+    /// a path with spaces arrives split: `candidates` also holds the joined runs. `~` and `%d` expand
+    /// against the settings' home, and symlinks are resolved on both sides before comparing.
+    func otherKnownHostsFile(sshReads files: [String], candidates: [String]? = nil) -> String? {
         guard let first = files.first else { return nil }
-        let managed = knownHosts.fileURL.standardizedFileURL.path
-        let reads = files.contains { AppSettings.expand($0, home: settings.homeDirectory).standardizedFileURL.path == managed }
+        let managed = knownHosts.fileURL.resolvingSymlinksInPath().standardizedFileURL.path
+        let reads = (candidates ?? files).contains { path in
+            expandedKnownHostsPath(path).resolvingSymlinksInPath().standardizedFileURL.path == managed
+        }
         return reads ? nil : first
+    }
+
+    private func expandedKnownHostsPath(_ path: String) -> URL {
+        let home = settings.homeDirectory
+        let withHome = path.replacingOccurrences(of: "%d", with: home.path)
+        return AppSettings.expand(withHome, home: home)
     }
 
     func confirmHostKeyRemoval() {
@@ -109,6 +125,8 @@ extension AppModel {
     }
 
     func cancelHostKeyRemoval() {
+        hostKeyRemovalTask?.cancel()
+        hostKeyRemovalTask = nil
         hostKeyRemoval = nil
     }
 }

@@ -62,7 +62,7 @@ struct ConnectionBar: View {
                 }
                 if model.connectionTests.results[alias]?.status == .hostKeyChanged {
                     Button(String(localized: "action.removeKnownHost")) {
-                        Task { await model.requestHostKeyRemoval(alias: alias) }
+                        model.startHostKeyRemoval(alias: alias)
                     }
                 }
             }

@@ -24,6 +24,7 @@ struct KnownHostsWindow: View {
                         if row.isUnparsable {
                             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                                 .help(String(localized: "knownHosts.unparsable.help"))
+                                .accessibilityLabel(String(localized: "knownHosts.unparsable.help"))
                         }
                         if row.isHashed { Image(systemName: "lock.fill").foregroundStyle(.secondary).accessibilityHidden(true) }
                         Text(verbatim: row.hosts).lineLimit(1).textSelection(.enabled)
@@ -54,16 +55,17 @@ struct KnownHostsWindow: View {
                 } label: {
                     Label(String(localized: "knownHosts.delete"), systemImage: "trash")
                 }
-                .disabled(model.selection.isEmpty || model.app.knownHosts.loadState != .loaded)
+                .disabled(!model.canRemoveSelection)
             }
         }
         .confirmationDialog(
             String(localized: "knownHosts.delete.confirm.title"),
-            isPresented: Binding(get: { model.pendingRemoval != nil }, set: { if !$0 { model.cancelRemoval() } })
-        ) {
+            isPresented: Binding(get: { model.pendingRemoval != nil }, set: { if !$0 { model.cancelRemoval() } }),
+            presenting: model.pendingRemoval
+        ) { _ in
             Button(String(localized: "knownHosts.delete"), role: .destructive) { model.confirmRemoval() }
-        } message: {
-            Text(verbatim: model.pendingSummary + "\n\n" + String(localized: "knownHosts.delete.confirm.message"))
+        } message: { rows in
+            Text(verbatim: KnownHostsModel.summary(of: rows) + "\n\n" + String(localized: "knownHosts.delete.confirm.message"))
         }
         .alert(
             String(localized: "error.title"),

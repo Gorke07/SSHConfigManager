@@ -103,7 +103,7 @@ struct SidebarView: View {
                 Task { await model.test(alias: alias) }
             }
             Button(String(localized: "action.removeKnownHost")) {
-                Task { await model.requestHostKeyRemoval(alias: alias) }
+                model.startHostKeyRemoval(alias: alias)
             }
         }
     }

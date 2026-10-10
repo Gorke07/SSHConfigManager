@@ -25,16 +25,18 @@ struct HostMatcherTests {
         ("example.com:22", "example.com"),
         ("example.com:2222", "[example.com]:2222"),
         ("[example.com]:2222", "[example.com]:2222"),
-        ("[example.com]:22", "example.com"),
+        ("[example.com]:22", "[example.com]:22"),
         ("192.0.2.1", "192.0.2.1"),
         ("::1", "::1"),
+        ("2001:DB8::1", "2001:db8::1"),
+        ("fe80::1:2", "fe80::1:2"),
         ("  example.com  ", "example.com"),
     ])
     func queriesThatLookLikeHosts(_ query: String, _ expected: String) {
         #expect(HostMatcher.lookupName(forQuery: query) == expected)
     }
 
-    @Test(arguments: ["", "two words", "*.example.com", "example.com:abc", "[example.com", "a/b", "SHA256:abc", "..."])
+    @Test(arguments: ["", "two words", "*.example.com", "example.com:abc", "[example.com", "a/b", "SHA256:abc", "...", "a:b:c", "1:2:3", "host:80:90", "::g"])
     func queriesThatDoNotLookLikeHosts(_ query: String) {
         #expect(HostMatcher.lookupName(forQuery: query) == nil)
     }
@@ -90,5 +92,45 @@ struct HostMatcherTests {
         #expect(HostMatcher.entries(in: doc, matchingAny: ["host-a.example.com"]).count == 1)
         #expect(HostMatcher.entries(in: doc, matchingAny: [HostMatcher.lookupName(host: "host-b.example.com", port: 2200)]).count == 1)
         #expect(HostMatcher.entries(in: doc, matchingAny: ["host-c.example.com"]).isEmpty)
+    }
+
+    // Observed with the real ssh-keygen (macOS, temp file): `-F host` finds only the bare `host` line,
+    // `-F '[host]:22'` only the literal `[host]:22` line, `-F '[host]:2222'` only that line; `-R` removes
+    // exactly the lines `-F` finds. The same holds for hashed lines (`ssh-keygen -H`).
+    @Test func bracketedPort22IsADifferentNameFromTheBareHost() {
+        let doc = KnownHostsDocument(parsing: """
+        host ssh-ed25519 \(Self.ed)
+        [host]:22 ssh-ed25519 \(Self.ed)
+        [host]:2222 ssh-ed25519 \(Self.ed)
+
+        """)
+        #expect(HostMatcher.entries(in: doc, matchingAny: ["host"]).map(\.lineIndex) == [0])
+        #expect(HostMatcher.entries(in: doc, matchingAny: ["[host]:22"]).map(\.lineIndex) == [1])
+        #expect(HostMatcher.entries(in: doc, matchingAny: ["[host]:2222"]).map(\.lineIndex) == [2])
+        // ssh connecting to port 22 looks up the bare name only.
+        #expect(HostMatcher.lookupName(host: "host", port: 22) == "host")
+    }
+
+    @Test func hashedBareAndBracketedPort22AreSeparateLikeSshKeygen() async throws {
+        let tmp = try TempDir()
+        let runner = ProcessRunner()
+        let keygen = URL(filePath: "/usr/bin/ssh-keygen")
+        let key = tmp.url.appending(path: "k")
+        _ = try await runner.run(keygen, arguments: ["-q", "-t", "ed25519", "-N", "", "-f", key.path], environment: [:], timeout: .seconds(30))
+        let pub = try tmp.read("k.pub").split(separator: " ")
+        let line = "\(pub[0]) \(pub[1])"
+        let file = try tmp.file("kh", "host \(line)\n[host]:22 \(line)\n[host]:2222 \(line)\n")
+        for (query, expected) in [("host", [0]), ("[host]:22", [1]), ("[host]:2222", [2])] {
+            let found = try await runner.run(keygen, arguments: ["-F", query, "-f", file.path], environment: [:], timeout: .seconds(30))
+            let plain = KnownHostsDocument(parsing: try tmp.read("kh"))
+            #expect(found.stdout.contains(query + " "))
+            #expect(HostMatcher.entries(in: plain, matchingAny: [query]).map(\.lineIndex) == expected)
+        }
+        _ = try await runner.run(keygen, arguments: ["-H", "-f", file.path], environment: [:], timeout: .seconds(30))
+        let hashed = KnownHostsDocument(parsing: try tmp.read("kh"))
+        #expect(hashed.entries.allSatisfy { $0.isHashed })
+        for (query, expected) in [("host", [0]), ("[host]:22", [1]), ("[host]:2222", [2])] {
+            #expect(HostMatcher.entries(in: hashed, matchingAny: [query]).map(\.lineIndex) == expected)
+        }
     }
 }
