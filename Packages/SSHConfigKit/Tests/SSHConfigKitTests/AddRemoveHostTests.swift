@@ -38,6 +38,19 @@ struct AddRemoveHostTests {
         #expect(Array(doc.render().utf8) == Array("Host a\r\n\r\nHost new\r\n    HostName n.example\r\n".utf8))
     }
 
+    @Test func addToCRLFFileWithoutFinalNewlineKeepsCRLF() throws {
+        var doc = ConfigDocument(parsing: "Host a\r\n  User u")
+        try doc.addHost(draft)
+        #expect(Array(doc.render().utf8) == Array("Host a\r\n  User u\r\n\r\nHost new\r\n  HostName n.example\r\n".utf8))
+        #expect(!doc.render().replacingOccurrences(of: "\r\n", with: "").contains("\n"))
+    }
+
+    @Test func duplicateAtEndOfCRLFFileWithoutFinalNewlineKeepsCRLF() throws {
+        var doc = ConfigDocument(parsing: "Host a\r\n  User u")
+        try doc.duplicateHost(at: 0, newAlias: "b")
+        #expect(Array(doc.render().utf8) == Array("Host a\r\n  User u\r\n\r\nHost b\r\n  User u".utf8))
+    }
+
     @Test func removeDeletesAttachedCommentAndKeepsNextHostsComment() throws {
         var doc = ConfigDocument(parsing: "# web\nHost web\n  HostName a\n\n# db\nHost db\n  HostName b\n")
         try doc.removeHost(at: 1)

@@ -23,6 +23,13 @@ struct ConnectionTesterTests {
         (255, "", true, .timeout),
         (255, "kex_exchange_identification: read: Connection reset by peer\r\n", false, .other),
         (1, "PTY allocation request failed\r\nHi user! You've successfully authenticated, but GitHub does not provide shell access.\r\n", false, .reachable),
+        // Server banner prose on stderr must not decide the outcome (ssh failed for another reason).
+        (255, "Permission denied for unauthorized users.\r\nkex_exchange_identification: Connection closed by remote host\r\n", false, .other),
+        (255, "NOTICE: Connection refused by policy for guests\r\nkex_exchange_identification: read: Connection reset by peer\r\n", false, .other),
+        (255, "Permission denied (this is a private system)\r\nConnection closed by 1.2.3.4 port 22\r\n", false, .other),
+        (255, "Warning: Permanently added 'x' (ED25519) to the list of known hosts.\r\nweb@x: Permission denied (publickey,keyboard-interactive).\r\n", false, .authenticationRequired),
+        (255, "Welcome. Permission denied (publickey) is what you get if you are not staff.\r\n", false, .other),
+        (255, "web@x: Permission denied, please try again.\r\n", false, .authenticationRequired),
     ])
     func classification(exitCode: Int32, stderr: String, timedOut: Bool, expected: ConnectionStatus) {
         #expect(ConnectionClassifier.classify(exitCode: exitCode, stderr: stderr, timedOut: timedOut) == expected)
@@ -31,6 +38,10 @@ struct ConnectionTesterTests {
     @Test func firstLineSkipsBannersAndBlankLines() {
         #expect(ConnectionClassifier.firstLine("\r\n  \nssh: boom\r\nnext") == "ssh: boom")
         #expect(ConnectionClassifier.firstLine(Self.changedKey) == "@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @")
+    }
+
+    @Test func firstLineSkipsWarnings() {
+        #expect(ConnectionClassifier.firstLine("Warning: Permanently added 'x' to the list of known hosts.\r\nweb@x: Permission denied (publickey).\r\n") == "web@x: Permission denied (publickey).")
     }
 
     @Test func testBuildsSafeArguments() async throws {

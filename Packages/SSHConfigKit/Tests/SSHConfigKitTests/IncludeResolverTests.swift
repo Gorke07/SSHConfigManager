@@ -38,6 +38,22 @@ struct IncludeResolverTests {
         #expect(hosts.map(\.entry.alias) == ["tilde", "abs"])
     }
 
+    @Test func tildeUserExpandsViaPasswordDatabase() throws {
+        let root = try #require(getpwnam("root"))
+        let rootHome = String(cString: try #require(root.pointee.pw_dir))
+        #expect(IncludeResolver.expandUserTilde("~root") == rootHome)
+        #expect(IncludeResolver.expandUserTilde("~root/.ssh/extra") == rootHome + "/.ssh/extra")
+        #expect(IncludeResolver.expandUserTilde("~no-such-user-sshcm/x") == nil)
+        #expect(IncludeResolver.expandUserTilde("~") == nil)
+    }
+
+    @Test func unknownUserIncludeStaysUnresolved() throws {
+        let home = try TempDir()
+        let resolver = IncludeResolver(homeDirectory: home.url)
+        let doc = ConfigDocument(parsing: "Include ~no-such-user-sshcm/config\n")
+        #expect(resolver.includedHosts(of: doc, rootFile: nil).isEmpty)
+    }
+
     @Test func nestedIncludesAndCyclesTerminate() throws {
         let home = try TempDir()
         try home.file(".ssh/one", "Host one\nInclude two\n")

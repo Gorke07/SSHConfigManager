@@ -30,6 +30,19 @@ struct KnownHostsStoreTests {
         #expect(store.document.entries.isEmpty)
     }
 
+    @Test func notUTF8IsNotReloadedOnEveryDirectoryEvent() throws {
+        let tmp = try TempDir()
+        try Data([0xFF, 0xFE, 0x00]).write(to: tmp.url.appending(path: "known_hosts"))
+        let store = try makeStore(tmp, contents: nil)
+        let revision = store.revision
+        store.fileDidChange()
+        store.fileDidChange()
+        #expect(store.revision == revision)
+        try tmp.file("known_hosts", Self.text, permissions: 0o644)
+        store.fileDidChange()
+        #expect(store.loadState == .loaded)
+    }
+
     @Test func notUTF8IsNeverEditable() throws {
         let tmp = try TempDir()
         try Data([0xFF, 0xFE, 0x00]).write(to: tmp.url.appending(path: "known_hosts"))

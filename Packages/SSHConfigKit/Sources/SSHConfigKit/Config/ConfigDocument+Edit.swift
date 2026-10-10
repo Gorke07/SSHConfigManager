@@ -153,6 +153,7 @@ extension ConfigDocument {
             return position + lead.count
         }
 
+        terminateLastLineForAppend()
         if let last = lines.last, last.kind != .blank { lines.append(blank) }
         let header = lines.count
         lines += hostLines
@@ -188,7 +189,15 @@ extension ConfigDocument {
 
         var copy = Array(lines[header..<end])
         copy[0] = ConfigLine(raw: LineTokenizer.replacingValue(in: parts, with: newAlias))
+        if end == lines.count { terminateLastLineForAppend() }
         lines.insert(contentsOf: [ConfigLine(raw: lineEndingSuffix)] + copy, at: end)
         return end + 1
+    }
+
+    /// A CRLF file whose last line has no terminator keeps the "\r" off that line; appending after
+    /// it would put a bare "\n" there. Add the "\r" (the only byte touched) so the file stays CRLF.
+    private mutating func terminateLastLineForAppend() {
+        guard usesCRLF, !hasTrailingNewline, let last = lines.last, !last.raw.hasSuffix("\r") else { return }
+        lines[lines.count - 1] = ConfigLine(raw: last.raw + "\r")
     }
 }
