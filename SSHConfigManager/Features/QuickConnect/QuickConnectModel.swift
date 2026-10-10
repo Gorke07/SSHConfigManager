@@ -118,14 +118,19 @@ final class QuickConnectModel {
         Task { await app.connectionTests.test(entry.alias, using: builder) }
     }
 
-    func copySelectedCommand() {
-        guard let entry = selectedEntry else { return }
+    @discardableResult
+    func copySelectedCommand() -> Bool {
+        guard let entry = selectedEntry else { return false }
         copyToPasteboard(app.commandBuilder.shellCommand(alias: entry.alias))
+        return true
     }
 
     func toggleFavoriteSelected() {
         guard let entry = selectedEntry else { return }
         app.toggleFavorite(entry.alias)
+        // Sections reorder on toggle; keep the selection on the same host.
+        if let index = entries.firstIndex(where: { HostMemory.same($0.alias, entry.alias) }) { selectedIndex = index }
+        requestPreview()
     }
 
     /// `user@host:port · via hop`, or nil until ssh -G answered.

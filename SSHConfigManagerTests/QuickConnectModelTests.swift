@@ -130,7 +130,7 @@ struct QuickConnectModelTests {
         let app = makeTestModel(tmp, config: "Host web\n")
         var copied: [String] = []
         let model = QuickConnectModel(app: app, copyToPasteboard: { copied.append($0) })
-        model.copySelectedCommand()
+        #expect(model.copySelectedCommand())
         #expect(copied == ["ssh -- web"])
         model.toggleFavoriteSelected()
         #expect(app.favoriteAliases == ["web"])
@@ -157,5 +157,32 @@ struct QuickConnectModelTests {
         await app.effectiveConfig.load("web", using: app.commandBuilder)
         #expect(model.previewText(for: entry) == nil)
         #expect(!model.isPreviewLoading(for: entry))
+    }
+
+    @Test func togglingFavoriteKeepsTheSelectionOnTheSameHost() throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\nHost b\nHost c\nHost d\n")
+        app.toggleFavorite("c")
+        _ = app.connect(alias: "b")
+        let model = QuickConnectModel(app: app)
+        model.query = ""
+        #expect(model.entries.map(\.alias) == ["c", "b", "a", "d"])
+        model.selectedIndex = 3
+        model.toggleFavoriteSelected()
+        #expect(model.selectedEntry?.alias == "d")
+        #expect(app.favoriteAliases.contains("d"))
+        model.toggleFavoriteSelected()
+        #expect(model.selectedEntry?.alias == "d")
+        #expect(!app.favoriteAliases.contains("d"))
+    }
+
+    @Test func copyWithNoMatchingEntryReportsFalse() throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host web\n")
+        var copied: [String] = []
+        let model = QuickConnectModel(app: app, copyToPasteboard: { copied.append($0) })
+        model.query = "zzz"
+        #expect(!model.copySelectedCommand())
+        #expect(copied.isEmpty)
     }
 }

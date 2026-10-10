@@ -25,8 +25,7 @@ struct QuickConnectView: View {
                     if press.modifiers.contains(.command) {
                         model.testSelected()
                     } else if press.modifiers.contains(.option) {
-                        model.copySelectedCommand()
-                        dismiss()
+                        if model.copySelectedCommand() { dismiss() }
                     } else if model.connectSelected() {
                         dismiss()
                     }
@@ -140,7 +139,8 @@ struct QuickConnectView: View {
             ConnectionStatusBadge(model: model.app.connectionTests, alias: entry.alias, showsTitle: false)
                 .frame(width: 16)
             Text(FuzzyMatcher.highlighted(entry.alias, offsets: entry.aliasOffsets)).fontWeight(.medium)
-            if entry.isFavorite { Image(systemName: "star.fill").font(.caption).foregroundStyle(.yellow).accessibilityHidden(true) }
+            if entry.isFavorite { Image(systemName: "star.fill").font(.caption).foregroundStyle(.yellow)
+                    .accessibilityLabel(String(localized: "quick.favorite.accessibility")) }
             if entry.isIncluded { Image(systemName: "lock").foregroundStyle(.secondary).accessibilityHidden(true) }
             Spacer()
             Text(verbatim: entry.group.map { "\($0) · \(entry.subtitle)" } ?? entry.subtitle).foregroundStyle(.secondary).lineLimit(1)

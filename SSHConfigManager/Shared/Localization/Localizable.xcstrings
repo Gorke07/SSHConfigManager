@@ -1009,6 +1009,13 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Eşleşen host yok." } }
       }
     },
+    "quick.favorite.accessibility" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Favorite" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Favori" } }
+      }
+    },
     "quick.hint.more" : {
       "extractionState" : "manual",
       "localizations" : {
