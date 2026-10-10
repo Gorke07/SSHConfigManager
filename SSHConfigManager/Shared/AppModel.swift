@@ -48,6 +48,8 @@ final class AppModel {
     }
 
     let connectionTests: ConnectionTestsModel
+    /// `ssh -G` results per alias; cleared with the connection tests.
+    let effectiveConfig: EffectiveConfigCache
     let keys: KeysModel
 
     init(settings: AppSettings,
@@ -61,6 +63,7 @@ final class AppModel {
         self.settings = settings
         self.processRunner = processRunner
         self.connectionTests = ConnectionTestsModel(runner: processRunner)
+        self.effectiveConfig = EffectiveConfigCache(runner: processRunner)
         self.launcherFactory = launcherFactory
         self.terminalInstalled = isTerminalInstalled
         self.keys = KeysModel(tools: keyTools)
@@ -85,6 +88,7 @@ final class AppModel {
     private func savedStateDidChange() {
         savedHostsCache = nil
         connectionTests.clear()
+        effectiveConfig.clear()
     }
 
     static func liveStore(url: URL, backups: BackupManager, backupKind: String) -> ConfigStore {
@@ -380,6 +384,7 @@ final class AppModel {
         savedHostsCache = nil
         select(nil)
         connectionTests.clear()
+        effectiveConfig.clear()
         searchText = ""
         errorMessage = nil
         return .switched
