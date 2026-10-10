@@ -35,7 +35,10 @@ struct BannerStack: View {
         case .missingFile:
             BannerRow(icon: "doc.badge.plus", tint: .yellow, message: Messages.text(for: ConfigLoadState.missing) ?? "") {
                 Button(String(localized: "banner.missing.create")) {
-                    do { try model.store.createFile() } catch { model.errorMessage = Messages.text(for: error) }
+                    do { try model.store.createFile() } catch {
+                        AppLog.error(.edit, error)
+                        model.errorMessage = Messages.text(for: error)
+                    }
                 }
                 Button(String(localized: "banner.missing.choose")) { openSettings() }
             }
@@ -80,7 +83,7 @@ private struct BannerRow<Actions: View>: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: icon).foregroundStyle(tint)
+            Image(systemName: icon).foregroundStyle(tint).accessibilityHidden(true)
             Text(message).frame(maxWidth: .infinity, alignment: .leading)
             actions()
         }

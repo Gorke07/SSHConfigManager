@@ -69,7 +69,6 @@ struct SettingsView: View {
                     }
                 }
                 Toggle(String(localized: "settings.launchAtLogin"), isOn: Binding(get: { loginItem.isOn }, set: { loginItem.set($0) }))
-                KeyboardShortcuts.Recorder(String(localized: "settings.shortcut"), name: .quickConnect)
                 if loginItem.needsApproval {
                     Text(String(localized: "settings.launchAtLogin.needsApproval")).font(.footnote).foregroundStyle(.secondary)
                     Button(String(localized: "settings.launchAtLogin.openSettings")) {
@@ -79,6 +78,7 @@ struct SettingsView: View {
                 if let message = loginItem.errorMessage {
                     Text(message).font(.footnote).foregroundStyle(.red)
                 }
+                KeyboardShortcuts.Recorder(String(localized: "settings.shortcut"), name: .quickConnect)
             }
 
             Section(String(localized: "settings.backups")) {
@@ -111,7 +111,20 @@ struct SettingsView: View {
             isPresented: $importing,
             allowedContentTypes: [.data]
         ) { result in
-            guard case .success(let url) = result, let target = lastImportTarget else { return }
+            let url: URL
+            switch result {
+            case .success(let picked): url = picked
+            case .failure(let error):
+                if AppLog.isUserCancel(error) { return }
+                AppLog.error(.settings, error)
+                switch lastImportTarget {
+                case .config: invalidMessage = String(localized: "settings.configFile.invalid")
+                case .knownHosts: knownHostsInvalid = true
+                case nil: break
+                }
+                return
+            }
+            guard let target = lastImportTarget else { return }
             let path = model.settings.displayPath(for: url)
             switch target {
             case .config: requestSwitch(path)
@@ -123,6 +136,15 @@ struct SettingsView: View {
             isPresented: Binding(get: { pendingPath != nil }, set: { if !$0 { pendingPath = nil } }),
             presenting: pendingPath
         ) { path in
+            Button(String(localized: "settings.switch.save")) {
+                Task {
+                    switch await model.saveThenSwitchConfig(to: path) {
+                    case .switched: invalidMessage = nil
+                    case .invalid: invalidMessage = String(localized: "settings.configFile.invalid")
+                    case .failed(let message): invalidMessage = message
+                    }
+                }
+            }
             Button(String(localized: "settings.switch.discard"), role: .destructive) {
                 _ = model.switchConfig(to: path, discardingUnsavedChanges: true)
             }

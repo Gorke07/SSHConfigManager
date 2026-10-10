@@ -13,6 +13,13 @@ struct AboutPanelTests {
         #expect(text.contains("Copyright (c) Sindre Sorhus"))
     }
 
+    @Test func userCancelIsRecognised() {
+        #expect(AppLog.isUserCancel(CocoaError(.userCancelled)))
+        #expect(AppLog.isUserCancel(NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError)))
+        #expect(!AppLog.isUserCancel(CocoaError(.fileReadNoSuchFile)))
+        #expect(!AppLog.isUserCancel(NSError(domain: "other", code: NSUserCancelledError)))
+    }
+
     @Test func logDescriptionsNameTheErrorKindWithoutItsPayloadInThePublicPart() {
         let described = AppLog.describe(KeyManagerError.failed("Load key \"/Users/x/.ssh/id\": bad"))
         #expect(described.kind == "KeyManagerError.failed")

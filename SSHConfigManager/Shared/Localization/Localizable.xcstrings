@@ -106,6 +106,13 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "(hash'li kayıt)" } }
       }
     },
+    "knownHosts.hashedMore" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "+ hashed" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "+ hash'li" } }
+      }
+    },
     "knownHosts.missing" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -286,6 +293,13 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "This private key has no passphrase. Anyone who copies the file can use it." } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu özel anahtarın parolası yok. Dosyayı kopyalayan herkes kullanabilir." } }
+      }
+    },
+    "keys.unreadable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The private key cannot be read (check its permissions)" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Özel anahtar okunamıyor (izinlerini kontrol edin)" } }
       }
     },
     "keys.noPrivateKey" : {
@@ -561,6 +575,13 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Parola doğru değil." } }
       }
     },
+    "keys.error.passphraseRequired" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This key is encrypted and needs a passphrase." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu anahtar şifreli; parola gerekiyor." } }
+      }
+    },
     "keys.error.noAgent" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -643,6 +664,13 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Key file not found: %@" } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Anahtar dosyası bulunamadı: %@" } }
+      }
+    },
+    "issue.duplicateFieldKey %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ appears more than once. ssh uses the first one in the file, which may not be the value in the field above." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "%@ birden fazla kez geçiyor. ssh dosyadaki ilk değeri kullanır; bu, yukarıdaki alandaki değer olmayabilir." } }
       }
     },
     "edit.hostNotFound" : {
@@ -1740,8 +1768,15 @@
     "settings.switch.title" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Discard unsaved changes?" } },
-        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kaydedilmemiş değişiklikler atılsın mı?" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save unsaved changes?" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kaydedilmemiş değişiklikler kaydedilsin mi?" } }
+      }
+    },
+    "settings.switch.save" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save and Switch" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kaydet ve Değiştir" } }
       }
     },
     "settings.switch.discard" : {
@@ -1889,6 +1924,34 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Could not open the terminal: %@" } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Terminal açılamadı: %@" } }
+      }
+    },
+    "connect.error.unsafePath" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "the path contains characters that are not safe to run" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "yol çalıştırmak için güvenli olmayan karakterler içeriyor" } }
+      }
+    },
+    "connect.error.scriptWrite" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "the launch script could not be written" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "başlatma betiği yazılamadı" } }
+      }
+    },
+    "connect.error.appleScript" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "the AppleScript could not be prepared" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "AppleScript hazırlanamadı" } }
+      }
+    },
+    "connect.error.open %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "open exited with status %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "open %@ durum koduyla çıktı" } }
       }
     },
     "favorite.limit %@" : {

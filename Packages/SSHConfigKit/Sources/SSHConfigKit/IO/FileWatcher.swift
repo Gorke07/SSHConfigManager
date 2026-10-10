@@ -62,3 +62,49 @@ public final class FileWatcher: @unchecked Sendable {
         FSEventStreamRelease(stream)
     }
 }
+
+/// Watches the directory a file lives in and, when the file is a symlink, the directory it
+/// resolves to. `refresh()` re-resolves the link and restarts the watchers when the target
+/// directory moved, so replacing the symlink (or moving its target) does not leave the
+/// stores watching a stale directory. Used from one actor (the stores' main actor).
+final class FileWatcherGroup {
+    private let file: URL
+    private let latency: TimeInterval
+    private let onChange: @Sendable () -> Void
+    private var watched: [String] = []
+    private var watchers: [FileWatcher] = []
+
+    /// Returns nil when no directory could be watched.
+    init?(file: URL, latency: TimeInterval = 0.2, onChange: @escaping @Sendable () -> Void) {
+        self.file = file
+        self.latency = latency
+        self.onChange = onChange
+        rebuild(directories: Self.directories(of: file))
+        if watchers.isEmpty { return nil }
+    }
+
+    /// The link's own directory first, then the resolved target's, without duplicates.
+    static func directories(of file: URL) -> [String] {
+        var result: [String] = []
+        for url in [file.deletingLastPathComponent(), file.resolvingSymlinksInPath().deletingLastPathComponent()] {
+            let path = url.resolvingSymlinksInPath().path
+            if !result.contains(path) { result.append(path) }
+        }
+        return result
+    }
+
+    var watchedDirectories: [String] { watched }
+
+    func refresh() {
+        let current = Self.directories(of: file)
+        guard current != watched else { return }
+        rebuild(directories: current)
+    }
+
+    private func rebuild(directories: [String]) {
+        // Create the new watchers before dropping the old ones: no gap in coverage.
+        let created = directories.compactMap { FileWatcher(directory: URL(filePath: $0), latency: latency, onChange: onChange) }
+        watchers = created
+        watched = directories
+    }
+}

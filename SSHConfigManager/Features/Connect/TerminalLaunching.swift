@@ -12,12 +12,45 @@ struct LaunchRequest: Equatable, Sendable {
 enum LaunchError: Error, Equatable {
     /// macOS refused to let this app control the terminal (Apple Events, error -1743).
     case automationDenied
+    /// A message from ssh, the OS or the terminal, shown as is.
     case failed(String)
+    /// The script or program path contains characters that are not safe to type into a shell.
+    case unsafePath
+    /// The launch script could not be written.
+    case scriptWriteFailed(Int32)   // errno, kept for the log
+    /// The AppleScript could not be compiled.
+    case appleScriptUnavailable
+    /// `open` exited with this status.
+    case openFailed(Int32)
+    /// The alias is not in the saved file (nothing was launched).
+    case notSaved
+    /// The command would contain a control character (nothing was launched).
+    case invalidCommand
+
+    private static func openMessage(_ status: Int32) -> String {
+        let code = String(status)
+        return String(localized: "connect.error.open \(code)")
+    }
+
+    /// The text shown to the user; nil for `automationDenied`, which has its own explanation.
+    var userMessage: String? {
+        switch self {
+        case .automationDenied: nil
+        case .failed(let detail): detail
+        case .unsafePath: String(localized: "connect.error.unsafePath")
+        case .scriptWriteFailed: String(localized: "connect.error.scriptWrite")
+        case .appleScriptUnavailable: String(localized: "connect.error.appleScript")
+        case .openFailed(let status): Self.openMessage(status)
+        case .notSaved: String(localized: "connect.notSaved")
+        case .invalidCommand: String(localized: "connect.invalidCommand")
+        }
+    }
 }
 
+/// `launch` suspends until the terminal was asked to open; it never blocks the main thread.
 @MainActor
 protocol TerminalLaunching {
-    func launch(_ request: LaunchRequest) throws
+    func launch(_ request: LaunchRequest) async throws
 }
 
 enum AppleScriptBuilder {
@@ -49,12 +82,13 @@ enum AppleScriptBuilder {
 }
 
 enum GhosttyArguments {
-    /// `open -na Ghostty.app --args -e /usr/bin/ssh …` (verified with Ghostty 1.2.2; `-n` opens a new instance).
+    /// `open -n -b com.mitchellh.ghostty --args -e /usr/bin/ssh …` (`-n` opens a new instance; `-b` is the same
+    /// bundle id `isInstalled` checks, so a renamed or relocated Ghostty still opens).
     static func openArguments(for request: LaunchRequest) -> [String] {
         // Only ssh keeps its old argv. Other programs (ssh-copy-id) print a result the user must be able to
         // read: --wait-after-command keeps the window open until a keypress (Ghostty 1.2.2 docs).
         let wait = request.program == "/usr/bin/ssh" ? [] : ["--wait-after-command=true"]
-        return ["-na", "Ghostty.app", "--args"] + wait + ["-e", request.program] + request.sshArguments
+        return ["-n", "-b", TerminalChoice.ghostty.bundleIdentifier, "--args"] + wait + ["-e", request.program] + request.sshArguments
     }
 }
 
@@ -100,6 +134,7 @@ enum LaunchScript {
             var written = 0
             while written < bytes.count {
                 let count = bytes[written...].withUnsafeBytes { Foundation.write(descriptor, $0.baseAddress, $0.count) }
+                if count < 0 && errno == EINTR { continue }
                 guard count > 0 else { throw Failure.writeFailed(errno) }
                 written += count
             }
@@ -108,5 +143,31 @@ enum LaunchScript {
             throw error
         }
         return url
+    }
+
+    /// Script file names are `sshcm-<UUID>.sh`; anything else in the directory is not ours.
+    static func isOwnScriptName(_ name: String) -> Bool {
+        guard name.hasPrefix("sshcm-"), name.hasSuffix(".sh") else { return false }
+        return UUID(uuidString: String(name.dropFirst(6).dropLast(3))) != nil
+    }
+
+    /// A script that never ran (the terminal accepted the Apple Event but the shell did not execute it) stays
+    /// behind; deletes our own regular files, owned by this user, last modified before `now - age`.
+    /// Returns how many were removed. Never follows symlinks.
+    @discardableResult
+    static func sweepStale(in directory: URL, olderThan age: TimeInterval = 600, now: Date = Date()) -> Int {
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path) else { return 0 }
+        var removed = 0
+        for name in names where isOwnScriptName(name) {
+            let path = directory.appending(path: name).path
+            var info = stat()
+            guard lstat(path, &info) == 0,
+                  (info.st_mode & S_IFMT) == S_IFREG,
+                  info.st_uid == getuid() else { continue }
+            let modified = Date(timeIntervalSince1970: TimeInterval(info.st_mtimespec.tv_sec))
+            guard now.timeIntervalSince(modified) > age else { continue }
+            if unlink(path) == 0 { removed += 1 }
+        }
+        return removed
     }
 }

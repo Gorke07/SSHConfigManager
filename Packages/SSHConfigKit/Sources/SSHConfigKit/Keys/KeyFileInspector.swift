@@ -17,12 +17,36 @@ public struct PublicKeyInfo: Equatable, Sendable {
     public init?(text: String) {
         let lines = text.unicodeScalars.split(whereSeparator: { $0 == "\n" || $0 == "\r" }).map { String(String.UnicodeScalarView($0)) }
         guard let line = lines.first(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) else { return nil }
-        let parts = line.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
-        guard parts.count >= 2, let fingerprint = Fingerprint.sha256(base64Key: parts[1]) else { return nil }
-        type = parts[0]
-        base64 = parts[1]
-        comment = parts.count > 2 ? parts[2...].joined(separator: " ") : nil
+        // type, base64, then the comment exactly as written (inner spacing kept).
+        func isBlank(_ c: Character) -> Bool { c == " " || c == "\t" }
+        var rest = Substring(line)
+        func field() -> String? {
+            rest = rest.drop(while: isBlank)
+            let word = rest.prefix { !isBlank($0) }
+            rest = rest.dropFirst(word.count)
+            return word.isEmpty ? nil : String(word)
+        }
+        guard let typeField = field(), let blob = field(),
+              Self.blobType(base64: blob) == typeField,
+              let fingerprint = Fingerprint.sha256(base64Key: blob) else { return nil }
+        var remainder = rest.drop(while: isBlank)
+        while let last = remainder.last, isBlank(last) { remainder = remainder.dropLast() }
+        type = typeField
+        base64 = blob
+        comment = remainder.isEmpty ? nil : String(remainder)
         self.fingerprint = fingerprint
+    }
+}
+
+extension PublicKeyInfo {
+    /// The key type name the blob itself starts with (uint32 length + string), nil if malformed.
+    static func blobType(base64: String) -> String? {
+        guard let data = Data(base64Encoded: base64) else { return nil }
+        let bytes = Array(data.prefix(4 + 64))
+        guard bytes.count >= 4 else { return nil }
+        let length = bytes[0..<4].reduce(0) { $0 << 8 | Int($1) }
+        guard (1...64).contains(length), bytes.count >= 4 + length else { return nil }
+        return String(decoding: bytes[4..<4 + length], as: UTF8.self)
     }
 }
 
@@ -69,8 +93,16 @@ public enum KeyFileInspector {
             return .unencrypted
         default:   // traditional PEM: RSA / EC / DSA
             guard lines.count > 1 else { return .unknown }
-            return lines[1].hasPrefix("Proc-Type:") && lines[1].contains("ENCRYPTED") ? .encrypted : .unencrypted
+            return Self.isEncryptedProcType(lines[1]) ? .encrypted : .unencrypted
         }
+    }
+
+    /// `Proc-Type: 4,ENCRYPTED` exactly (spaces around the fields allowed).
+    static func isEncryptedProcType(_ line: String) -> Bool {
+        guard line.hasPrefix("Proc-Type:") else { return false }
+        let fields = line.dropFirst("Proc-Type:".count).split(separator: ",", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+        return fields == ["4", "ENCRYPTED"]
     }
 
     /// openssh-key-v1: magic "openssh-key-v1\0", then a uint32 (big endian) length and the cipher name.

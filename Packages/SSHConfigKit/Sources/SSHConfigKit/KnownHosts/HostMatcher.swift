@@ -18,7 +18,8 @@ public enum HostMatcher {
         if text.hasPrefix("[") {
             guard let address = KnownHostsDocument.parseAddress(text), !address.isPattern,
                   isHost(address.host) else { return nil }
-            return lookupName(host: address.host, port: address.port)
+            // The bracket form is kept as written: `[host]:22` is not `host` (ssh-keygen -F).
+            return "[\(address.host.asciiLowercased)]:\(address.port)"
         }
         guard isHost(text) else { return nil }
         let colons = text.filter { $0 == ":" }.count
@@ -27,6 +28,11 @@ public enum HostMatcher {
             guard isHost(host), !host.contains(":"),
                   let port = Int(text[text.index(after: colon)...]), (1...65535).contains(port) else { return nil }
             return lookupName(host: host, port: port)
+        }
+        if colons >= 2 {
+            // Several colons: only a real IPv6 literal is a host (`a:b:c` is not).
+            var buffer = in6_addr()
+            guard inet_pton(AF_INET6, text, &buffer) == 1 else { return nil }
         }
         return lookupName(host: text, port: 22)   // plain host or IPv6 literal
     }
@@ -41,7 +47,8 @@ public enum HostMatcher {
         case .plain(let address):
             // Patterns are never a match for one host: deleting them would drop wider trust.
             guard !address.isPattern else { return false }
-            return Self.lookupName(host: address.host, port: address.port) == lookupName.asciiLowercased
+            // The literal form, as ssh-keygen compares it: a `[host]:22` line is not a match for `host`.
+            return address.literal.asciiLowercased == lookupName.asciiLowercased
         case .hashed(let salt, let hash):
             let code = HMAC<Insecure.SHA1>.authenticationCode(for: Data(lookupName.utf8), using: SymmetricKey(data: salt))
             return Data(code) == hash
@@ -52,7 +59,19 @@ public enum HostMatcher {
     /// matching any of `lookupNames`.
     public static func entries(in document: KnownHostsDocument, matchingAny lookupNames: [String]) -> [KnownHostEntry] {
         document.entries.filter { entry in
-            entry.marker == nil && entry.names.contains { name in lookupNames.contains { matches(name, lookupName: $0) } }
+            entry.marker == nil && lookupNames.contains { lookup in
+                entry.names.contains { matches($0, lookupName: lookup) } && !isNegated(lookup, in: entry)
+            }
+        }
+    }
+
+    /// ssh's match_hostname: a `!name` on the line that matches the lookup name makes the whole line a
+    /// non-match (`!host,host` is never found by `ssh-keygen -F host`).
+    private static func isNegated(_ lookupName: String, in entry: KnownHostEntry) -> Bool {
+        entry.names.contains { name in
+            guard case .plain(let address) = name, address.literal.hasPrefix("!") else { return false }
+            // Wildcards in the negated pattern count (`host,!h*st` vetoes `host`), case-sensitive like ssh's match_pattern.
+            return ConfigResolver.wildcardMatch(String(address.literal.dropFirst()).asciiLowercased, lookupName.asciiLowercased)
         }
     }
 }

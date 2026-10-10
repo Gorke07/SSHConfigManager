@@ -6,6 +6,8 @@ struct ConnectionStatusBadge: View {
     let model: ConnectionTestsModel
     let alias: String
     let showsTitle: Bool
+    /// The connection bar prints the detail next to the badge, so its tooltip omits it.
+    var showsDetailInHelp = true
 
     var body: some View {
         if model.running.contains(alias) {
@@ -20,7 +22,7 @@ struct ConnectionStatusBadge: View {
             Image(systemName: style.symbol).foregroundStyle(style.tint)
             if showsTitle { Text(style.title) }
         }
-        .help(detail.map { style.title + "\n" + $0 } ?? style.title)
+        .help(showsDetailInHelp ? (detail.map { style.title + "\n" + $0 } ?? style.title) : style.title)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(style.title)
     }
@@ -54,13 +56,13 @@ struct ConnectionBar: View {
     private var buttons: some View {
         HStack {
             if let alias {
-                ConnectionStatusBadge(model: model.connectionTests, alias: alias, showsTitle: true)
+                ConnectionStatusBadge(model: model.connectionTests, alias: alias, showsTitle: true, showsDetailInHelp: false)
                 if let detail = model.connectionTests.results[alias]?.detail, !detail.isEmpty {
                     Text(verbatim: detail).font(.caption).foregroundStyle(.secondary).lineLimit(1).textSelection(.enabled)
                 }
                 if model.connectionTests.results[alias]?.status == .hostKeyChanged {
                     Button(String(localized: "action.removeKnownHost")) {
-                        Task { await model.requestHostKeyRemoval(alias: alias) }
+                        model.startHostKeyRemoval(alias: alias)
                     }
                 }
             }
@@ -77,15 +79,15 @@ struct ConnectionBar: View {
             }
             Button(String(localized: "action.test")) {
                 guard let alias else { return }
-                Task { await model.connectionTests.test(alias, using: model.commandBuilder) }
+                Task { await model.test(alias: alias) }
             }
             .disabled(alias == nil || model.connectionTests.running.contains(alias ?? ""))
             Button(String(localized: "action.connect")) {
-                if let alias { model.connect(alias: alias) }
+                if let alias { Task { await model.connect(alias: alias) } }
             }
             .buttonStyle(.borderedProminent)
             .help(String(localized: "action.connect.help"))
-            .disabled(alias == nil)
+            .disabled(alias == nil || model.launchInFlight)
         }
     }
 }

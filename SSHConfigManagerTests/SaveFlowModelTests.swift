@@ -140,4 +140,74 @@ struct SaveFlowModelTests {
         guard case .failed = flow.phase else { Issue.record("failed bekleniyordu"); return }
         #expect(try Data(contentsOf: url) == bytes)
     }
+
+    @Test func probesTheGivenAlias() async throws {
+        final class Recorder: ProcessRunning, @unchecked Sendable {
+            let lock = NSLock()
+            private var seen: [[String]] = []
+            var arguments: [[String]] { lock.withLock { seen } }
+            func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
+                lock.withLock { seen.append(arguments) }
+                return ProcessResult(exitCode: 0, stdout: "", stderr: "", timedOut: false)
+            }
+        }
+        let tmp = try TempDir()
+        let recorder = Recorder()
+        let app = makeTestModel(tmp, config: "Host a\nHost b\n", runner: recorder)
+        app.select(.host(alias: "b", occurrence: 0))
+        try addPort(app)
+        let flow = app.makeSaveFlow()
+        #expect(flow.probeAlias == "b")
+        await flow.prepare()
+        await flow.confirm()
+        #expect(recorder.arguments.count == 2)
+        #expect(recorder.arguments.allSatisfy { $0.last == "b" })
+
+        // The edited (new) alias is probed, not the saved one.
+        let editor = try #require(app.editor(for: .host(alias: "b", occurrence: 0)))
+        editor.aliasText = "b-new"
+        #expect(editor.commit())
+        #expect(app.probeAlias == "b-new")
+    }
+
+    @Test func unreadableDiskInConflictShowsAReasonNotADiff() async throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\n  User u\n")
+        try addPort(app)
+        try tmp.file(".ssh/config", "Host a\n  User vim\n")
+        let flow = SaveFlowModel(store: app.store)
+        await flow.prepare()
+        await flow.confirm()
+        #expect(flow.phase == .conflict)
+        #expect(flow.conflictUnreadableMessage == nil)
+
+        // Not UTF-8: the conflict view gets a note instead of an "everything added" diff (a fresh flow snapshots it).
+        let url = tmp.url.appending(path: ".ssh/config")
+        try Data([0x48, 0xFF]).write(to: url)
+        let second = SaveFlowModel(store: app.store)
+        await second.prepare()
+        await second.confirm()
+        #expect(second.phase == .conflict)
+        #expect(second.conflictDiskText == nil)
+        #expect(second.conflictUnreadableMessage == Messages.text(for: ConfigLoadState.notUTF8))
+        #expect(second.conflictHunks().isEmpty)
+    }
+
+    @Test func unreadableDiskKeepsTheRealError() async throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\n  User u\n")
+        try addPort(app)
+        try tmp.file(".ssh/config", "Host a\n  User vim\n")
+        let flow = SaveFlowModel(store: app.store)
+        await flow.prepare()
+        await flow.confirm()
+        #expect(flow.phase == .conflict)
+        let url = tmp.url.appending(path: ".ssh/config")
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: url.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path) }
+        await flow.overwrite()
+        guard case .failed(let message) = flow.phase else { Issue.record("failed bekleniyordu"); return }
+        #expect(!message.isEmpty)
+        #expect(!message.hasSuffix(": "))
+    }
 }

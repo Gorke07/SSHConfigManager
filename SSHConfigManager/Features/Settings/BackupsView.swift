@@ -69,6 +69,14 @@ struct BackupsView: View {
             if backups.fileKind == .knownHosts { backups.selectedURL = nil }
             backups.refresh()
         }
+        .alert(
+            String(localized: "error.title"),
+            isPresented: Binding(get: { backups.alertMessage != nil }, set: { if !$0 { backups.alertMessage = nil } })
+        ) {
+            Button(String(localized: "action.close")) { backups.alertMessage = nil }
+        } message: {
+            Text(backups.alertMessage ?? "")
+        }
         .confirmationDialog(
             String(localized: "backups.restore.knownHosts.title"),
             isPresented: Binding(get: { confirmingKnownHostsRestore != nil }, set: { if !$0 { confirmingKnownHostsRestore = nil } }),
@@ -90,16 +98,13 @@ struct BackupsView: View {
     private var restoreDisabled: Bool {
         switch backups.fileKind {
         case .config:
-            backups.model.store.loadState != .loaded
+            backups.model.store.loadState != .loaded && backups.model.store.loadState != .missing
         case .knownHosts:
             backups.model.knownHosts.loadState != .loaded && backups.model.knownHosts.loadState != .missing
         }
     }
 
     private func restore(_ backup: Backup, seen: BackupsModel.KnownHostsSnapshot? = nil) {
-        do { try backups.restore(backup, seen: seen) } catch {
-            AppLog.error(.backups, error)
-            backups.model.errorMessage = Messages.text(for: error)
-        }
+        backups.performRestore(backup, seen: seen)
     }
 }

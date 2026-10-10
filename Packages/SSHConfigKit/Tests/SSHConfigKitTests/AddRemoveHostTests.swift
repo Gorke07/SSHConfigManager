@@ -38,6 +38,34 @@ struct AddRemoveHostTests {
         #expect(Array(doc.render().utf8) == Array("Host a\r\n\r\nHost new\r\n    HostName n.example\r\n".utf8))
     }
 
+    @Test func addToCRLFFileWithoutFinalNewlineKeepsCRLF() throws {
+        var doc = ConfigDocument(parsing: "Host a\r\n  User u")
+        try doc.addHost(draft)
+        #expect(Array(doc.render().utf8) == Array("Host a\r\n  User u\r\n\r\nHost new\r\n  HostName n.example\r\n".utf8))
+        #expect(!doc.render().replacingOccurrences(of: "\r\n", with: "").contains("\n"))
+    }
+
+    @Test func duplicateAtEndOfCRLFFileWithoutFinalNewlineKeepsCRLF() throws {
+        var doc = ConfigDocument(parsing: "Host a\r\n  User u")
+        try doc.duplicateHost(at: 0, newAlias: "b")
+        #expect(Array(doc.render().utf8) == Array("Host a\r\n  User u\r\n\r\nHost b\r\n  User u".utf8))
+    }
+
+    private func updatedPort(_ text: String) throws -> String {
+        var doc = ConfigDocument(parsing: text)
+        var d = HostDraft(doc.hosts[0])
+        d.directives.append(DraftDirective(key: "Port", value: "2"))
+        try doc.updateHost(at: doc.hosts[0].headerLine, to: d)
+        return doc.render()
+    }
+
+    @Test func updateAtEOFOfCRLFFileWithoutFinalNewlineKeepsCRLF() throws {
+        #expect(try updatedPort("Host a\r\n  User u") == "Host a\r\n  User u\r\n  Port 2")
+        #expect(try updatedPort("Host a\r\n  User u\r\n") == "Host a\r\n  User u\r\n  Port 2\r\n")
+        #expect(try updatedPort("Host a\n  User u") == "Host a\n  User u\n  Port 2")
+        #expect(try updatedPort("Host a\n  User u\n") == "Host a\n  User u\n  Port 2\n")
+    }
+
     @Test func removeDeletesAttachedCommentAndKeepsNextHostsComment() throws {
         var doc = ConfigDocument(parsing: "# web\nHost web\n  HostName a\n\n# db\nHost db\n  HostName b\n")
         try doc.removeHost(at: 1)

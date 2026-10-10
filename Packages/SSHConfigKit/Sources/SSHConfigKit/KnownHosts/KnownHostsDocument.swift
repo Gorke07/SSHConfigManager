@@ -125,7 +125,7 @@ public struct KnownHostsDocument: Sendable {
             guard !host.isEmpty, after.unicodeScalars.first == ":",
                   !digits.isEmpty, digits.allSatisfy({ ("0"..."9").contains($0) }),
                   let port = Int(String(after.dropFirst())), (1...65535).contains(port) else { return nil }
-            return KnownHostAddress(host: host, port: port, isPattern: isPattern)
+            return KnownHostAddress(host: host, port: port, isPattern: isPattern, isBracketed: true)
         }
         return KnownHostAddress(host: text, port: 22, isPattern: isPattern)
     }

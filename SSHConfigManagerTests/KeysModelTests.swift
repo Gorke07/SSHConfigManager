@@ -4,6 +4,7 @@ import Testing
 @testable import SSH_Config_Manager
 
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct KeysModelTests {
     @Test func refreshListsKeysWithUsageAndAgentUnknown() async throws {
         let tmp = try TempDir()
@@ -134,16 +135,25 @@ struct KeysModelTests {
         let row = try await keyRow(model)
 
         launcher.error = .automationDenied
-        #expect(model.keys.upload(row, alias: "web") == .failed(.automationDenied))
+        #expect(await model.keys.upload(row, alias: "web") == .failed(.automationDenied))
         #expect(model.keys.notice == String(localized: "connect.automationDenied.message"))
         #expect(model.keys.errorMessage == nil)
         #expect(!model.automationDenied && model.errorMessage == nil && model.fallbackNotice == nil)
 
         launcher.error = .failed("x")
-        #expect(model.keys.upload(row, alias: "web") == .failed(.failed("x")))
+        #expect(await model.keys.upload(row, alias: "web") == .failed(.failed("x")))
         #expect(model.keys.errorMessage == String(localized: "connect.failed \("x")"))
         #expect(!model.automationDenied && model.errorMessage == nil && model.fallbackNotice == nil)
         #expect(launcher.requests.isEmpty)
+    }
+
+    @Test func uploadOfAnUnsavedAliasShowsTheNotSavedMessage() async throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\n", launcher: RecordingLauncher())
+        let row = try await keyRow(model)
+        #expect(await model.keys.upload(row, alias: "other") == .failed(.notSaved))
+        #expect(model.keys.errorMessage == String(localized: "connect.notSaved"))
+        #expect(model.errorMessage == nil)
     }
 
     @Test func uploadFallbackNoticeShowsInTheKeysWindow() async throws {
@@ -152,13 +162,13 @@ struct KeysModelTests {
         let model = makeTestModel(tmp, config: "Host web\n", launcher: launcher, isTerminalInstalled: { $0 == .terminal })
         model.settings.setTerminal(.ghostty)
         let row = try await keyRow(model)
-        #expect(model.keys.upload(row, alias: "web") == .fellBack(from: .ghostty))
+        #expect(await model.keys.upload(row, alias: "web") == .fellBack(from: .ghostty))
         #expect(model.keys.notice == String(localized: "connect.fellBack \(TerminalChoice.ghostty.displayName)"))
         #expect(model.fallbackNotice == nil && model.errorMessage == nil)
         #expect(launcher.requests.count == 1)
 
         model.settings.setTerminal(.terminal)
-        #expect(model.keys.upload(row, alias: "web") == .launched(.terminal))
+        #expect(await model.keys.upload(row, alias: "web") == .launched(.terminal))
         #expect(model.keys.errorMessage == nil)
         #expect(launcher.requests.count == 2)
     }
@@ -186,29 +196,27 @@ struct KeysModelTests {
         #expect(model.keys.rows.first?.inAgent == nil)
     }
 
-    @Test func createdButNotAssignedKeepsTheSheetConsistent() async throws {
+    @Test(.timeLimit(.minutes(1))) func createdButNotAssignedClosesWithAWindowNotice() async throws {
         let tmp = try TempDir()
-        let model = makeTestModel(tmp, config: "Host web\n  HostName 10.0.0.1\n")
+        let keygen = GatedKeygenRunner()
+        let actions = RecordingKeyActions()
+        actions.managerRunner = keygen
+        let model = makeTestModel(tmp, config: "Host web\n  HostName 10.0.0.1\n", keyActions: actions)
         let item = SidebarItem.host(alias: "web", occurrence: 0)
         model.select(item)
         let editor = try #require(model.editor(for: item))
         let keys = model.keys
-        // rsa 4096 takes long enough to dirty the form while ssh-keygen runs (the main actor is free meanwhile).
-        let task = Task { await keys.generate(type: .rsa, fileName: "deploy", comment: "c", passphrase: "", assignTo: "web") }
-        let privateKey = tmp.url.appending(path: ".ssh/deploy").path
-        let deadline = ContinuousClock.now + .seconds(30)
-        while !FileManager.default.fileExists(atPath: privateKey) {
-            if ContinuousClock.now > deadline { Issue.record("key file never appeared"); break }
-            await Task.yield()
-        }
-        editor.fields["Port"] = "abc"
+        let task = Task { await keys.generate(type: .ed25519, fileName: "deploy", comment: "c", passphrase: "", assignTo: "web") }
+        await keygen.waitUntilEntered()          // ssh-keygen is running (suspended); the main actor is free
+        editor.fields["Port"] = "abc"            // dirty the form while the key is being made
         #expect(!editor.commit())
+        keygen.release()
         #expect(await task.value == true)
-        #expect(keys.createdButNotAssigned)
+        let privateKey = tmp.url.appending(path: ".ssh/deploy").path
         let prefix = String(localized: "keys.error.createdNotAssigned \("~/.ssh/deploy")")
         #expect(keys.notice == prefix + String(localized: "keys.error.pendingFormEdits"))
         #expect(FileManager.default.fileExists(atPath: privateKey))
-        #expect(keys.suggestedFileName(for: .rsa) == "id_rsa")   // a fresh name, so Create again cannot hit "file exists"
+        #expect(keys.suggestedFileName(for: .ed25519) == "id_ed25519")   // a fresh name, so Create again cannot hit "file exists"
         #expect(!model.store.hasUnsavedChanges)
     }
 
@@ -221,7 +229,7 @@ struct KeysModelTests {
         _ = await model.keys.generate(type: .ed25519, fileName: "k", comment: "c", passphrase: "", assignTo: nil)
         await model.keys.refresh()
         let row = try #require(model.keys.rows.first)
-        guard case .fellBack = model.keys.upload(row, alias: "web") else { Issue.record("expected fellBack"); return }
+        guard case .fellBack? = await model.keys.upload(row, alias: "web") else { Issue.record("expected fellBack"); return }
         model.keys.errorMessage = nil                             // what the sheet's onDisappear does
         let name = TerminalChoice.ghostty.displayName
         #expect(model.keys.notice == String(localized: "connect.fellBack \(name)"))
@@ -236,7 +244,7 @@ struct KeysModelTests {
         let model = makeTestModel(tmp, config: "Host web\n", launcher: launcher)
         _ = await model.keys.generate(type: .ed25519, fileName: "k", comment: "c", passphrase: "", assignTo: nil)
         await model.keys.refresh()
-        _ = model.keys.upload(try #require(model.keys.rows.first), alias: "web")
+        _ = await model.keys.upload(try #require(model.keys.rows.first), alias: "web")
         #expect(model.keys.notice == String(localized: "connect.automationDenied.message"))
         #expect(model.keys.noticeIsAutomationDenied)
         #expect(model.automationDenied == false)
@@ -247,5 +255,111 @@ struct KeysModelTests {
         #expect(!KeysModel.isValidFileName("x-cert"))
         #expect(KeysModel.isValidFileName("x_cert"))
         #expect(KeysModel.isValidFileName("deploy"))
+    }
+
+    @Test func uploadOutcomeStaysInTheKeysWindowWhileTheMainWindowKeepsItsAlert() async throws {
+        let tmp = try TempDir()
+        let launcher = RecordingLauncher()
+        let model = makeTestModel(tmp, config: "Host web\n", launcher: launcher)
+        let row = try await keyRow(model)
+        var release: CheckedContinuation<Void, Never>?
+        launcher.gate = { await withCheckedContinuation { release = $0 } }
+        launcher.error = .failed("boom")
+        let upload = Task { await model.keys.upload(row, alias: "web") }
+        while release == nil { await Task.yield() }
+        model.errorMessage = "set while the upload runs"
+        launcher.gate = nil
+        release?.resume()
+        _ = await upload.value
+        #expect(model.errorMessage == "set while the upload runs")
+        #expect(model.keys.errorMessage == String(localized: "connect.failed \("boom")"))
+        #expect(!model.automationDenied && model.fallbackNotice == nil)
+    }
+
+    @Test func refreshIfStaleRefreshesWhenNeverRefreshedAndWhenOld() async throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\n")
+        let keys = model.keys
+        _ = try await TestSupportKeygen.make(tmp.url.appending(path: ".ssh/a"))   // nothing has refreshed yet
+        await keys.refreshIfStale()                       // lastRefresh is nil: refreshes
+        #expect(keys.rows.map(\.key.name) == ["a"])
+        _ = try await TestSupportKeygen.make(tmp.url.appending(path: ".ssh/b"))
+        await keys.refreshIfStale()                       // within the 5 s window: no scan
+        #expect(keys.rows.map(\.key.name) == ["a"])
+        keys.staleAfter = .milliseconds(1)                // the last refresh is now older than the window
+        try await Task.sleep(for: .milliseconds(30))
+        await keys.refreshIfStale()
+        #expect(keys.rows.map(\.key.name) == ["a", "b"])
+    }
+
+    @Test func aMissingPassphraseAsksForOneInsteadOfShowingAnError() async throws {
+        let tmp = try TempDir()
+        let actions = RecordingKeyActions()
+        actions.managerRunner = AskedRunner()
+        let model = makeTestModel(tmp, config: "Host web\n", keyActions: actions)
+        _ = try await TestSupportKeygen.make(tmp.url.appending(path: ".ssh/k"))
+        await model.keys.refresh()
+        let row = try #require(model.keys.rows.first)
+        #expect(await model.keys.addToAgent(row, passphrase: nil))
+        #expect(model.keys.passphraseRequestedFor == row.id)
+        #expect(model.keys.errorMessage == nil)
+    }
+
+    @Test func assignIdentityFileSkipsAnEquivalentSpelling() async throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\n  IdentityFile ~/.ssh/../.ssh/k\n")
+        _ = try await TestSupportKeygen.make(tmp.url.appending(path: ".ssh/k"))
+        try model.assignIdentityFile(tmp.url.appending(path: ".ssh/k"), toAlias: "web")
+        let entry = try #require(model.store.document.hosts.first { $0.alias == "web" })
+        #expect(entry.values(for: "IdentityFile") == ["~/.ssh/../.ssh/k"])
+    }
+}
+
+/// Real ssh-keygen on a temp file only.
+enum TestSupportKeygen {
+    static func make(_ url: URL) async throws -> ProcessResult {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        return try await ProcessRunner().run(URL(filePath: "/usr/bin/ssh-keygen"),
+                                             arguments: ["-q", "-t", "ed25519", "-N", "", "-f", url.path],
+                                             environment: [:], timeout: .seconds(30))
+    }
+}
+
+/// Stands in for ssh-keygen: writes the key pair where it was asked to, but only after the test calls `release()`.
+private final class GatedKeygenRunner: ProcessRunning, @unchecked Sendable {
+    private let entries: AsyncStream<Void>
+    private let entered: AsyncStream<Void>.Continuation
+    private let gate: AsyncStream<Void>
+    private let opener: AsyncStream<Void>.Continuation
+
+    init() {
+        (entries, entered) = AsyncStream.makeStream()
+        (gate, opener) = AsyncStream.makeStream()
+    }
+
+    func waitUntilEntered() async { for await _ in entries { return } }
+    func release() { opener.yield() }
+
+    func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
+        guard executable.lastPathComponent == "ssh-keygen", let flag = arguments.firstIndex(of: "-f") else {
+            return ProcessResult(exitCode: 1, stdout: "", stderr: "", timedOut: false)
+        }
+        entered.yield()
+        for await _ in gate { break }
+        let path = arguments[flag + 1]
+        FileManager.default.createFile(atPath: path, contents: Data("private".utf8), attributes: [.posixPermissions: 0o600])
+        FileManager.default.createFile(atPath: path + ".pub", contents: Data("public".utf8), attributes: [.posixPermissions: 0o644])
+        return ProcessResult(exitCode: 0, stdout: "", stderr: "", timedOut: false)
+    }
+}
+
+/// Stands in for ssh-add: asks for the passphrase once (as askpass would), then fails.
+private struct AskedRunner: ProcessRunning {
+    func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
+        if executable.lastPathComponent == "ssh-add", let state = environment["SSHCM_ASKPASS_STATE"] {
+            FileManager.default.createFile(atPath: state, contents: Data())
+            return ProcessResult(exitCode: 1, stdout: "", stderr: "Bad passphrase, try again", timedOut: false)
+        }
+        return ProcessResult(exitCode: 1, stdout: "", stderr: "", timedOut: false)
     }
 }

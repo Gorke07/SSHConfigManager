@@ -29,7 +29,8 @@ struct HostResolverTests {
         let host = HostResolver.parse(Self.output)
         #expect(host == ResolvedHost(hostname: "example.com", port: 2222, hostKeyAlias: "myalias",
                                      userKnownHostsFiles: ["/h/.ssh/known_hosts", "/h/.ssh/known_hosts2"]))
-        #expect(host?.lookupNames == ["myalias", "[example.com]:2222"])
+        #expect(host?.lookupNames == ["myalias"])   // alias replaces the host name and is never port-bracketed
+        #expect(HostResolver.parse("hostname example.com\nport 22\nhostkeyalias MyAlias\n")?.lookupNames == ["myalias"])
     }
 
     @Test func withoutAliasOnlyTheHostName() {
@@ -99,6 +100,19 @@ struct HostResolverTests {
     @Test func valuesWithSpacesDoNotBreakParsing() {
         let host = HostResolver.parse("userknownhostsfile /a b/known_hosts /c/known_hosts2\nhostname a\nport 22\n")
         #expect(host?.hostname == "a")
+    }
+
+    // `ssh -G` (checked with -F <temp>) prints `UserKnownHostsFile "/tmp/a b/kh" ~/.ssh/kh2 %d/foo` as
+    // `userknownhostsfile /tmp/a b/kh /Users/x/.ssh/kh2 /Users/x/foo`: unquoted, expanded, space-joined.
+    @Test func aPathWithSpacesIsOneOfTheCandidates() {
+        let host = HostResolver.parse("hostname a\nport 22\nuserknownhostsfile /tmp/a b/kh /Users/x/.ssh/kh2\n")
+        #expect(host?.userKnownHostsFileCandidates.contains("/tmp/a b/kh") == true)
+        #expect(host?.userKnownHostsFileCandidates.contains("/Users/x/.ssh/kh2") == true)
+    }
+
+    @Test func quotedPathsAreUnquoted() {
+        let host = HostResolver.parse("hostname a\nport 22\nuserknownhostsfile \"/tmp/a b/kh\" /x/kh2\n")
+        #expect(host?.userKnownHostsFiles == ["/tmp/a b/kh", "/x/kh2"])
     }
 
     @Test func valueIsTrimmed() {

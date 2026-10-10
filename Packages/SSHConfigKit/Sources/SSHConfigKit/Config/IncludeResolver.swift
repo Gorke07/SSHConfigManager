@@ -81,12 +81,28 @@ public struct IncludeResolver: Sendable {
         }
     }
 
+    static func expandUserTilde(_ pattern: String) -> String? {
+        let body = pattern.dropFirst()
+        let name = body.prefix { $0 != "/" }
+        guard !name.isEmpty else { return nil }
+        var entry = passwd()
+        var result: UnsafeMutablePointer<passwd>?
+        var buffer = [CChar](repeating: 0, count: 4096)
+        let rc = getpwnam_r(String(name), &entry, &buffer, buffer.count, &result)
+        guard rc == 0, result != nil, let dir = entry.pw_dir else { return nil }
+        return String(cString: dir) + body.dropFirst(name.count)
+    }
+
     private func expand(_ pattern: String) -> [URL] {
         let path: String
         if pattern == "~" {
             path = homeDirectory.path
         } else if pattern.hasPrefix("~/") {
             path = homeDirectory.appending(path: String(pattern.dropFirst(2))).path
+        } else if pattern.hasPrefix("~") {
+            // `~name` or `~name/rest`: that user's home directory; unknown user: leave unresolved.
+            guard let expanded = Self.expandUserTilde(pattern) else { return [] }
+            path = expanded
         } else if pattern.hasPrefix("/") {
             path = pattern
         } else {

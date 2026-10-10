@@ -125,4 +125,16 @@ struct HostDraftValidatorTests {
         let found = issues(HostDraft(patterns: ["n"], directives: [DraftDirective(key: "Port", value: "22\n")]))
         #expect(found.contains(.controlCharacter("Port")))
     }
+
+    @Test func repeatedSingleValueKeyWarnsOnce() {
+        let draft = HostDraft(patterns: ["new"], directives: [
+            DraftDirective(key: "User", value: "a"),
+            DraftDirective(key: "user", value: "b"),
+            DraftDirective(key: "User", value: "c"),
+            DraftDirective(key: "IdentityFile", value: "~/.ssh/id_ok"),
+            DraftDirective(key: "IdentityFile", value: "~/.ssh/id_ok"),
+        ])
+        #expect(issues(draft) == [.duplicateFieldKey("User")])
+        #expect(!DraftIssue.duplicateFieldKey("User").isBlocking)
+    }
 }

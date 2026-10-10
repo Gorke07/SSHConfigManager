@@ -119,4 +119,40 @@ struct KeyFileInspectorSafetyTests {
         #expect(try KeyFileInspector.readHead(of: file).count > 0)
         #expect(try KeyFileInspector.readHead(of: link).count > 0)
     }
+
+    @Test func procTypeIsParsedExactly() {
+        func head(_ proc: String) -> Data { Data("-----BEGIN RSA PRIVATE KEY-----\n\(proc)\nMIIE\n".utf8) }
+        #expect(KeyFileInspector.encryption(ofPrivateKeyHead: head("Proc-Type: 4,ENCRYPTED")) == .encrypted)
+        #expect(KeyFileInspector.encryption(ofPrivateKeyHead: head("Proc-Type: 4, ENCRYPTED")) == .encrypted)
+        #expect(KeyFileInspector.encryption(ofPrivateKeyHead: head("Proc-Type: 4,MIC-ONLY")) == .unencrypted)
+        #expect(KeyFileInspector.encryption(ofPrivateKeyHead: head("Proc-Type: 4,NOTENCRYPTED")) == .unencrypted)
+        #expect(KeyFileInspector.encryption(ofPrivateKeyHead: head("Proc-Type: 4,ENCRYPTED,extra")) == .unencrypted)
+    }
+
+    @Test func publicKeyTypeMustMatchTheBlob() async throws {
+        let tmp = try TempDir()
+        _ = try await keygen(["-q", "-t", "ed25519", "-N", "", "-C", "c", "-f", tmp.url.appending(path: "k").path])
+        let parts = try tmp.read("k.pub").split(separator: " ").map(String.init)
+        #expect(PublicKeyInfo(text: "\(parts[0]) \(parts[1]) c")?.type == "ssh-ed25519")
+        #expect(PublicKeyInfo(text: "ssh-rsa \(parts[1]) c") == nil)
+        #expect(PublicKeyInfo(text: "bogus \(parts[1])") == nil)
+        // certificates and security-key types name themselves in the blob too
+        func blob(_ name: String) -> String {
+            var bytes = [UInt8(0), 0, 0, UInt8(name.utf8.count)] + Array(name.utf8)
+            bytes += [1, 2, 3]
+            return Data(bytes).base64EncodedString()
+        }
+        for name in ["ssh-ed25519-cert-v01@openssh.com", "sk-ssh-ed25519@openssh.com", "sk-ecdsa-sha2-nistp256@openssh.com"] {
+            #expect(PublicKeyInfo(text: "\(name) \(blob(name))")?.type == name)
+        }
+    }
+
+    @Test func commentKeepsItsSpacing() async throws {
+        let tmp = try TempDir()
+        _ = try await keygen(["-q", "-t", "ed25519", "-N", "", "-C", "c", "-f", tmp.url.appending(path: "k").path])
+        let parts = try tmp.read("k.pub").split(separator: " ").map(String.init)
+        #expect(PublicKeyInfo(text: "ssh-ed25519 \(parts[1]) my   work  key\n")?.comment == "my   work  key")
+        #expect(PublicKeyInfo(text: "ssh-ed25519  \(parts[1])\t a\tb \n")?.comment == "a\tb")
+        #expect(PublicKeyInfo(text: "ssh-ed25519 \(parts[1])  \n")?.comment == nil)
+    }
 }

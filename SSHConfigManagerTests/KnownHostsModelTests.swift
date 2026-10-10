@@ -51,6 +51,17 @@ struct KnownHostsModelTests {
         #expect(model.rows.map(\.id) == [1])
     }
 
+    /// The search uses locale-free `lowercased()` (no locale parameter to inject): "I" finds "i", never the dotless "ı" of a Turkish lowercase.
+    @Test func searchLowercasesAsciiWithoutLocaleRules() throws {
+        let tmp = try TempDir()
+        _ = try tmp.file(".ssh/known_hosts", "istanbul.example.com ssh-ed25519 \(Self.ed)\n")
+        let model = KnownHostsModel(app: makeTestModel(tmp))
+        model.searchText = "ISTANBUL"
+        #expect(model.rows.map(\.id) == [0])
+        model.searchText = "istanbul"
+        #expect(model.rows.map(\.id) == [0])
+    }
+
     @Test func aHostLikeQueryAlsoFindsHashedEntries() throws {
         let tmp = try TempDir()
         let model = make(tmp)
@@ -157,7 +168,59 @@ struct KnownHostsModelTests {
         let model = make(tmp)
         model.selection = [0, 1, 4]
         model.requestRemoveSelection()
-        #expect(model.pendingSummary == "web.example.com, 192.0.2.10  ssh-ed25519\ndb.example.com  ecdsa-sha2-nistp256\ngarbage")
+        let lines = KnownHostsModel.summary(of: model.pendingRemoval ?? []).split(separator: "\n").map(String.init)
+        #expect(lines == [
+            "web.example.com, 192.0.2.10  ssh-ed25519  SHA256:la2oUdtS09OZ…",
+            "[db.example.com]:2222  ecdsa-sha2-nistp256  SHA256:kmAs9qUu4Gav…",
+            "garbage"])
+    }
+
+    @Test func twoHashedRowsAreToldApartByFingerprint() throws {
+        let rows = [
+            KnownHostsModel.row(for: KnownHostEntry(lineIndex: 0, marker: nil, names: [.hashed(salt: Data([1]), hash: Data([2]))],
+                                                    keyType: "ssh-ed25519", keyBase64: Self.ed, comment: nil)),
+            KnownHostsModel.row(for: KnownHostEntry(lineIndex: 1, marker: nil, names: [.hashed(salt: Data([3]), hash: Data([4]))],
+                                                    keyType: "ecdsa-sha2-nistp256", keyBase64: Self.ec, comment: nil)),
+        ]
+        let lines = KnownHostsModel.summary(of: rows).split(separator: "\n")
+        #expect(lines.count == 2)
+        #expect(lines[0] != lines[1])
+        #expect(lines[0].contains("SHA256:la2oUdtS09OZ"))
+    }
+
+    @Test func aRowWithPlainAndHashedNamesKeepsThePlainOnesSearchable() throws {
+        let entry = KnownHostEntry(
+            lineIndex: 0, marker: nil,
+            names: [.plain(KnownHostAddress(host: "mixed.example.com", port: 22, isPattern: false)), .hashed(salt: Data([1]), hash: Data([2]))],
+            keyType: "ssh-ed25519", keyBase64: Self.ed, comment: nil)
+        let row = KnownHostsModel.row(for: entry)
+        #expect(!row.isHashed)
+        #expect(row.plainHosts == "mixed.example.com")
+        #expect(row.hosts == "mixed.example.com " + String(localized: "knownHosts.hashedMore"))
+    }
+
+    @Test func deleteIsDisabledWhenEverySelectedRowIsHiddenByTheSearch() throws {
+        let tmp = try TempDir()
+        let model = make(tmp)
+        model.selection = [0]
+        #expect(model.canRemoveSelection)
+        model.searchText = "db."
+        #expect(!model.canRemoveSelection)
+        model.requestRemoveSelection()
+        #expect(model.pendingRemoval == nil)
+    }
+
+    @Test func deleteIsRefusedWhileTheFileIsNotLoaded() throws {
+        let tmp = try TempDir()
+        let model = make(tmp)
+        model.selection = [0]
+        try Data([0xFF, 0xFE]).write(to: tmp.url.appendingPathComponent(".ssh/known_hosts"))
+        model.app.knownHosts.load()
+        #expect(model.app.knownHosts.loadState != .loaded)
+        model.selection = [0]
+        model.requestRemoveSelection()
+        #expect(model.pendingRemoval == nil)
+        #expect(!model.canRemoveSelection)
     }
 
     @Test func aHostPortQueryFindsPlainBracketedEntries() throws {

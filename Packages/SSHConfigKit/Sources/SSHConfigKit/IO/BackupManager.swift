@@ -75,6 +75,32 @@ public struct BackupManager: Sendable {
             }
     }
 
+    /// Moves every backup of `old` into `new` (a file keeps its timestamp; a name already taken there gets the next
+    /// sequence number) and removes the emptied folder. It never prunes (the next normal backup does), so launch deletes nothing. Used when a file's backup key changes, so no backup is orphaned.
+    public func migrate(from old: String, to new: String) throws {
+        guard old != new else { return }
+        let fm = FileManager.default
+        let oldBackups = try list(kind: old)
+        guard !oldBackups.isEmpty else { return }
+        let directory = rootDirectory.appending(path: new, directoryHint: .isDirectory)
+        try fm.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        let formatter = Self.makeFormatter()
+        for backup in oldBackups {
+            let stamp = formatter.string(from: backup.date)
+            var sequence = backup.sequence
+            func target() -> URL {
+                let prefix = sequence == 1 ? stamp : "\(stamp)_\(sequence)"
+                return directory.appending(path: "\(prefix)-\(backup.originalName)")
+            }
+            while fm.fileExists(atPath: target().path) { sequence += 1 }
+            try fm.moveItem(at: backup.url, to: target())
+        }
+        let oldDirectory = rootDirectory.appending(path: old, directoryHint: .isDirectory)
+        if (try? fm.contentsOfDirectory(atPath: oldDirectory.path))?.isEmpty == true {
+            try? fm.removeItem(at: oldDirectory)
+        }
+    }
+
     public func prune(kind: String) throws {
         for old in try list(kind: kind).dropFirst(max(keep, 1)) {
             try FileManager.default.removeItem(at: old.url)

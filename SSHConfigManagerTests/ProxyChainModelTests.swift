@@ -69,7 +69,7 @@ struct ProxyChainModelTests {
 
     @Test func chainTestStopsAtTheFirstFailure() async throws {
         let tmp = try TempDir()
-        let app = makeTestModel(tmp, config: "Host bastion\nHost db\n", runner: FixedRunner.invalid("Connection refused"))
+        let app = makeTestModel(tmp, config: "Host bastion\nHost db\n", runner: FixedRunner.invalid("ssh: connect to host h port 22: Connection refused"))
         let nodes = [ProxyChainNode(id: 0, title: "bastion", alias: "bastion", isCycle: false),
                      ProxyChainNode(id: 1, title: "db", alias: "db", isCycle: false)]
         let test = ProxyChainTest()
@@ -80,7 +80,7 @@ struct ProxyChainModelTests {
 
     @Test func everyNodeAfterAFailureIsSkippedIncludingPlainHops() async throws {
         let tmp = try TempDir()
-        let app = makeTestModel(tmp, config: "Host bastion\nHost db\n", runner: FixedRunner.invalid("Connection refused"))
+        let app = makeTestModel(tmp, config: "Host bastion\nHost db\n", runner: FixedRunner.invalid("ssh: connect to host h port 22: Connection refused"))
         let nodes = [ProxyChainNode(id: 0, title: "plain-before", alias: nil, isCycle: false),
                      ProxyChainNode(id: 1, title: "bastion", alias: "bastion", isCycle: false),
                      ProxyChainNode(id: 2, title: "plain-after", alias: nil, isCycle: false),
@@ -95,7 +95,7 @@ struct ProxyChainModelTests {
 
     @Test func aCycleNodeAfterAFailureIsSkipped() async throws {
         let tmp = try TempDir()
-        let app = makeTestModel(tmp, config: "Host bastion\nHost db\n", runner: FixedRunner.invalid("Connection refused"))
+        let app = makeTestModel(tmp, config: "Host bastion\nHost db\n", runner: FixedRunner.invalid("ssh: connect to host h port 22: Connection refused"))
         let nodes = [ProxyChainNode(id: 0, title: "bastion", alias: "bastion", isCycle: false),
                      ProxyChainNode(id: 1, title: "bastion", alias: "bastion", isCycle: true),
                      ProxyChainNode(id: 2, title: "db", alias: "db", isCycle: false)]

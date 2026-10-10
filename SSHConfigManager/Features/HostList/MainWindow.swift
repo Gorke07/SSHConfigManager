@@ -32,8 +32,7 @@ struct MainWindow: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    do { model.requestSelect(try HostCommands.addHost(to: model.store)) }
-                    catch { model.errorMessage = Messages.text(for: error) }
+                    model.addHost()
                 } label: {
                     Label(String(localized: "toolbar.addHost"), systemImage: "plus")
                 }
@@ -87,7 +86,7 @@ struct MainWindow: View {
                     } else if model.hasPendingGroupDraft {
                         // The draft could not be applied; its error is showing. Do not save without it.
                     } else {
-                        saveFlow = SaveFlowModel(store: model.store)
+                        saveFlow = model.makeSaveFlow()
                     }
                 } label: {
                     Label(String(localized: "action.save"), systemImage: "square.and.arrow.down")
@@ -107,13 +106,13 @@ struct MainWindow: View {
         .confirmationDialog(
             String(localized: "saveWithPending.title"), isPresented: $confirmSaveWithPending
         ) {
-            Button(String(localized: "action.save")) { saveFlow = SaveFlowModel(store: model.store) }
+            Button(String(localized: "action.save")) { saveFlow = model.makeSaveFlow() }
         } message: {
             Text(String(localized: "saveWithPending.message"))
         }
         .confirmationDialog(
             String(localized: "discardForm.title"),
-            isPresented: Binding(get: { model.pendingSelection != nil }, set: { if !$0 { model.cancelPendingSelection() } })
+            isPresented: Binding(get: { model.hasPendingDiscardConfirmation }, set: { if !$0 { model.cancelPendingSelection() } })
         ) {
             Button(String(localized: "discardForm.discard"), role: .destructive) { model.confirmPendingSelection() }
         } message: {

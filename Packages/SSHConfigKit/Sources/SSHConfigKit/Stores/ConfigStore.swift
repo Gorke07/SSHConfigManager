@@ -59,7 +59,7 @@ public final class ConfigStore {
     @ObservationIgnored private let validator: ConfigValidator
     /// The resolver the store follows Includes with (read-only, so other readers resolve identically).
     @ObservationIgnored public let includeResolver: IncludeResolver
-    @ObservationIgnored private var watcher: FileWatcher?
+    @ObservationIgnored private var watcher: FileWatcherGroup?
     @ObservationIgnored private var loadGeneration = 0
     /// Counts loads from disk (initial, reload, discard, external change without unsaved edits); saves and change notices do not count.
     public var loadRevision: Int { loadGeneration }
@@ -111,7 +111,7 @@ public final class ConfigStore {
             return
         }
         guard let text = String(validating: data, as: UTF8.self) else {
-            reset(state: .notUTF8)
+            reset(state: .notUTF8, fingerprint: FileFingerprint(data: data))
             return
         }
         document = ConfigDocument(parsing: text)
@@ -226,7 +226,11 @@ public final class ConfigStore {
         onDiskStateChange?()
     }
 
+    /// Directories currently watched (test visibility).
+    var watchedDirectories: [String] { watcher?.watchedDirectories ?? [] }
+
     func fileDidChange() {
+        watcher?.refresh()   // the symlink or its target directory may have moved
         let current = try? FileFingerprint.of(fileAt: fileURL)
         guard current != diskFingerprint else {
             // Reverted to what we loaded: the saved view returns to `diskText` and the conflict is gone.
@@ -284,12 +288,14 @@ public final class ConfigStore {
         }
     }
 
-    private func reset(state: ConfigLoadState) {
+    /// `fingerprint` is kept for a file that exists but cannot be shown (not UTF-8), so the
+    /// directory watcher does not reload it on every unrelated event.
+    private func reset(state: ConfigLoadState, fingerprint: FileFingerprint? = nil) {
         document = .empty
         diskText = ""
         savedViewText = nil
         savedDocument = .empty
-        diskFingerprint = nil
+        diskFingerprint = fingerprint
         includedHosts = []
         savedIncludedHosts = []
         savedIncludeStates = []
@@ -298,9 +304,8 @@ public final class ConfigStore {
     }
 
     private func startWatching() {
-        let directory = fileURL.resolvingSymlinksInPath().deletingLastPathComponent()
         let weakStore = WeakStore(self)   // store → watcher → closure must not retain the store
-        watcher = FileWatcher(directory: directory) {
+        watcher = FileWatcherGroup(file: fileURL) {
             Task { @MainActor in weakStore.value?.fileDidChange() }
         }
         isWatching = watcher != nil

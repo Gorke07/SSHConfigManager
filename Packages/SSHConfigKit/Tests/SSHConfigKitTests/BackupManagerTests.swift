@@ -127,4 +127,26 @@ struct BackupManagerTests {
         #expect(try FileFingerprint.of(fileAt: file) == FileFingerprint(data: Data("abc".utf8)))
         #expect(try FileFingerprint.of(fileAt: tmp.url.appending(path: "missing")) == nil)
     }
+
+    @Test func migrateMovesBackupsAndKeepsOrder() throws {
+        let tmp = try TempDir()
+        let source = try tmp.file("config", "x")
+        let clock = TestClock(start)
+        let manager = BackupManager(rootDirectory: tmp.url.appending(path: "Backups"), keep: 10, now: { clock.now })
+        try manager.backup(fileAt: source, kind: "config-old")
+        try manager.backup(fileAt: source, kind: "config")   // same second and name in the target: must not be overwritten
+        clock.advance(5)
+        try manager.backup(fileAt: source, kind: "config-old")
+
+        let pruning = BackupManager(rootDirectory: tmp.url.appending(path: "Backups"), keep: 1, now: { clock.now })
+        try pruning.migrate(from: "config-old", to: "config")   // keep is 1, yet nothing is deleted
+
+        #expect(try manager.list(kind: "config").count == 3)
+        #expect(try manager.list(kind: "config-old").isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: tmp.url.appending(path: "Backups/config-old").path))
+        // Migrating a kind that does not exist, or onto itself, is a no-op.
+        try manager.migrate(from: "missing", to: "config")
+        try manager.migrate(from: "config", to: "config")
+        #expect(try manager.list(kind: "config").count == 3)
+    }
 }

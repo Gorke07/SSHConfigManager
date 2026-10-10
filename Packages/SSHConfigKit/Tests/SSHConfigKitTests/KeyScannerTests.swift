@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 @testable import SSHConfigKit
 
@@ -185,5 +186,67 @@ struct KeyScannerTests {
         #expect(KeyUsage.hosts(using: real, in: doc.hosts, home: tmp.url) == ["a", "b c", "*"])
         // real_key, link_key (same file through the symlink) and .ssh/real_key are one file; other is the second.
         #expect(KeyUsage.identityFiles(of: doc.hosts, home: tmp.url).count == 2)
+    }
+
+    @Test func unreadablePrivateKeyIsListedAsUnreadableNotPublicOnly() async throws {
+        let tmp = try TempDir()
+        let ssh = tmp.url.appending(path: "ssh")
+        try FileManager.default.createDirectory(at: ssh, withIntermediateDirectories: true)
+        let key = ssh.appending(path: "locked")
+        _ = try await keygen(["-q", "-t", "ed25519", "-N", "", "-C", "c", "-f", key.path])
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: key.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: key.path) }
+        guard access(key.path, R_OK) != 0 else { return }   // running as root: nothing is unreadable
+        let keys = KeyScanner.discover(directories: [ssh], extraPrivateKeys: [])
+        #expect(keys.count == 1)
+        let found = try #require(keys.first)
+        #expect(found.privateURL == key && found.hasPrivateKey && found.unreadable)
+        #expect(found.encryption == .unknown && found.publicKey != nil)
+    }
+
+    /// Future guard only: it pins the Task.detached hop so a later refactor cannot silently move discovery back
+    /// onto the caller's actor. It is not proof that the original blocking was observed.
+    @Test func scanDiscoveryRunsOffTheCallingThreadFutureGuard() async throws {
+        let tmp = try TempDir()
+        let ssh = try await makeDirectory(tmp)
+        let onMain = Mutex(Bool?.none)
+        let scanner = KeyScanner(discovery: { directories, extra in
+            onMain.withLock { $0 = Thread.isMainThread }
+            return KeyScanner.discover(directories: directories, extraPrivateKeys: extra)
+        })
+        let keys = await Task { @MainActor in await scanner.scan(directories: [ssh], extraPrivateKeys: []) }.value
+        #expect(onMain.withLock { $0 } == false)
+        #expect(keys.map(\.name) == ["gone.pub", "id_ed25519", "work"])
+    }
+
+    @Test func fileIdentityFollowsSymlinksDotDotAndCase() throws {
+        let tmp = try TempDir()
+        let real = try tmp.file("a/Key", "x")
+        try FileManager.default.createDirectory(at: tmp.url.appending(path: "b"), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: tmp.url.appending(path: "b/link"), withDestinationURL: real)
+        try FileManager.default.createSymbolicLink(at: tmp.url.appending(path: "dirlink"), withDestinationURL: tmp.url.appending(path: "a"))
+        let other = try tmp.file("a/Other", "x")
+        #expect(KeyUsage.sameFile(real, tmp.url.appending(path: "b/link")))
+        #expect(KeyUsage.sameFile(real, tmp.url.appending(path: "b/../a/Key")))
+        #expect(KeyUsage.sameFile(real, tmp.url.appending(path: "dirlink/Key")))
+        #expect(!KeyUsage.sameFile(real, other))
+        // On a case-insensitive volume (APFS default) `key` is the same file; elsewhere it does not exist.
+        let lower = tmp.url.appending(path: "a/key")
+        let insensitive = FileManager.default.fileExists(atPath: lower.path)
+        #expect(KeyUsage.sameFile(real, lower) == insensitive)
+        // Missing files fall back to the canonical path.
+        #expect(KeyUsage.sameFile(tmp.url.appending(path: "nope/x"), tmp.url.appending(path: "nope/../nope/x")))
+        #expect(!KeyUsage.sameFile(tmp.url.appending(path: "nope/x"), tmp.url.appending(path: "nope/y")))
+    }
+
+    @Test func discoverListsAKeyOnceThroughACaseOrSymlinkSpelling() async throws {
+        let tmp = try TempDir()
+        let ssh = tmp.url.appending(path: "ssh")
+        try FileManager.default.createDirectory(at: ssh, withIntermediateDirectories: true)
+        _ = try await keygen(["-q", "-t", "ed25519", "-N", "", "-f", ssh.appending(path: "k").path])
+        try FileManager.default.createSymbolicLink(at: tmp.url.appending(path: "sshlink"), withDestinationURL: ssh)
+        let keys = KeyScanner.discover(directories: [ssh, tmp.url.appending(path: "sshlink"), tmp.url.appending(path: "ssh/../ssh")],
+                                       extraPrivateKeys: [tmp.url.appending(path: "sshlink/k")])
+        #expect(keys.map(\.name) == ["k"])
     }
 }

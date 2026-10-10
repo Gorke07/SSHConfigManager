@@ -31,6 +31,8 @@ final class AppModel {
     var mainWindowIsKey = false
     /// The "Delete known_hosts entry…" flow for one alias; drives `HostKeyRemovalSheet`.
     var hostKeyRemoval: HostKeyRemoval?
+    /// The running `ssh -G` lookup of that flow; cancelling the flow cancels it (and so ssh).
+    @ObservationIgnored var hostKeyRemovalTask: Task<Void, Never>?
     /// Informational: the chosen terminal was unavailable and the connection opened in Terminal.
     var fallbackNotice: String?
     /// The form for the current selection. Owned here (not by the view) so edits that validation
@@ -88,11 +90,14 @@ final class AppModel {
         let backups = BackupManager(rootDirectory: backupRoot, keep: settings.backupCount)
         self.backupManager = backups
         self.makeStore = makeStore
-        self.store = makeStore(settings.configURL, backups, Self.backupKind(for: settings.configURL, home: settings.homeDirectory))
+        let configKind = Self.backupKind(for: settings.configURL, home: settings.homeDirectory)
+        let knownHostsKind = Self.knownHostsBackupKind(for: settings.knownHostsURL, home: settings.homeDirectory)
+        self.store = makeStore(settings.configURL, backups, configKind)
         self.makeKnownHostsStore = makeKnownHostsStore
-        self.knownHosts = makeKnownHostsStore(
-            settings.knownHostsURL, backups, Self.knownHostsBackupKind(for: settings.knownHostsURL, home: settings.homeDirectory))
-        self.memory = HostMemory(defaults: settings.userDefaults, key: Self.memoryKey(for: settings.configURL, home: settings.homeDirectory))
+        self.knownHosts = makeKnownHostsStore(settings.knownHostsURL, backups, knownHostsKind)
+        self.memory = Self.makeMemory(for: settings.configURL, settings: settings)
+        migrateLegacyKeys(for: settings.configURL, kind: configKind, prefix: "config")
+        migrateLegacyKeys(for: settings.knownHostsURL, kind: knownHostsKind, prefix: "known_hosts")
         keys.app = self
         observeSavedState()
     }
@@ -147,10 +152,56 @@ final class AppModel {
     }
 
     private static func backupKind(for url: URL, defaultPath: URL, prefix: String) -> String {
-        let path = url.standardizedFileURL.path
-        if path == defaultPath.standardizedFileURL.path { return prefix }
-        let digest = SHA256.hash(data: Data(path.utf8))
+        if url.standardizedFileURL.path == defaultPath.standardizedFileURL.path
+            || url.resolvingSymlinksInPath().path == defaultPath.resolvingSymlinksInPath().path { return prefix }
+        return hashedKind(for: url, prefix: prefix)
+    }
+
+    /// The per-path key used before symlinks were resolved: the hash of the standardized path (also the key of
+    /// any other file; only a symlink to the default file moved from it to the plain prefix).
+    private static func hashedKind(for url: URL, prefix: String) -> String {
+        let digest = SHA256.hash(data: Data(url.standardizedFileURL.path.utf8))
         return prefix + "-" + digest.map { String(format: "%02x", $0) }.joined().prefix(12)
+    }
+
+    /// Backups (and favorites/recents) that were saved under the old hashed key of a path that now resolves to the
+    /// default file move to its key, so nothing disappears from the list. A failure is logged and leaves them in place.
+    private func migrateLegacyKeys(for url: URL, kind: String, prefix: String) {
+        let legacy = Self.hashedKind(for: url, prefix: prefix)
+        guard legacy != kind else { return }
+        do { try backupManager.migrate(from: legacy, to: kind) } catch { AppLog.error(.backups, error) }
+    }
+
+    /// Moves the memory saved under the old hashed key to `key`. When both exist the new entries come first,
+    /// then the old ones, exact duplicates removed and each list capped; the old key is removed either way.
+    static func mergeLegacyMemory(defaults: UserDefaults, key: String, legacyKey: String) {
+        guard legacyKey != key, let old = defaults.object(forKey: legacyKey) else { return }
+        defer { defaults.removeObject(forKey: legacyKey) }
+        guard let current = defaults.object(forKey: key) else {
+            defaults.set(old, forKey: key)
+            return
+        }
+        let new = current as? [String: Any] ?? [:]
+        let previous = old as? [String: Any] ?? [:]
+        func merged(_ field: String, cap: Int) -> [String] {
+            var seen = Set<String>()
+            var result: [String] = []
+            for value in ((new[field] as? [Any]) ?? []) + ((previous[field] as? [Any]) ?? []) {
+                guard let alias = value as? String, !alias.isEmpty, seen.insert(alias).inserted else { continue }
+                result.append(alias)
+            }
+            return Array(result.prefix(cap))
+        }
+        defaults.set(["favorites": merged("favorites", cap: HostMemory.maxFavorites),
+                      "recents": merged("recents", cap: HostMemory.maxRecents)], forKey: key)
+    }
+
+    private static func makeMemory(for url: URL, settings: AppSettings) -> HostMemory {
+        let home = settings.homeDirectory
+        let key = memoryKey(for: url, home: home)
+        let legacyKey = "hostMemory." + hashedKind(for: url, prefix: "config")
+        mergeLegacyMemory(defaults: settings.userDefaults, key: key, legacyKey: legacyKey)
+        return HostMemory(defaults: settings.userDefaults, key: key)
     }
 
     /// Opens another known_hosts file. There are no drafts, so nothing needs confirming.
@@ -159,7 +210,9 @@ final class AppModel {
         guard AppSettings.isValidConfigPath(path) else { return false }
         settings.setKnownHostsPath(path)
         let url = settings.knownHostsURL
-        knownHosts = makeKnownHostsStore(url, backupManager, Self.knownHostsBackupKind(for: url, home: settings.homeDirectory))
+        let kind = Self.knownHostsBackupKind(for: url, home: settings.homeDirectory)
+        migrateLegacyKeys(for: url, kind: kind, prefix: "known_hosts")
+        knownHosts = makeKnownHostsStore(url, backupManager, kind)
         return true
     }
 
@@ -298,26 +351,39 @@ final class AppModel {
         savedHosts.hosts.map(\.entry.alias)
     }
 
+    /// Connects in the chosen terminal. Returns nil, doing nothing, while another launch is still in flight
+    /// (a double click or a repeated shortcut must not open two windows).
     @discardableResult
-    func connect(alias requested: String) -> Connector.Outcome {
+    func connect(alias requested: String) async -> Connector.Outcome? {
+        guard !launchInFlight else { return nil }
         guard let alias = savedAlias(requested) else {
-            AppLog.info(.connect, LaunchError.failed("not in the saved file"))
+            AppLog.info(.connect, LaunchError.notSaved)
             errorMessage = String(localized: "connect.notSaved")
-            return .failed(.failed("not in the saved file"))
+            return .failed(.notSaved)
         }
         let builder = commandBuilder
         let request = LaunchRequest(sshArguments: builder.sshArguments(alias: alias), shellCommand: builder.shellCommand(alias: alias))
         guard !request.shellCommand.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7F }) else {
-            AppLog.info(.connect, LaunchError.failed("control character"))
+            AppLog.info(.connect, LaunchError.invalidCommand)
             errorMessage = String(localized: "connect.invalidCommand")
-            return .failed(.failed("control character"))
+            return .failed(.invalidCommand)
         }
-        let outcome = launch(request)
+        guard let outcome = await runLaunch(request) else { return nil }
+        report(outcome)
         switch outcome {
         case .launched, .fellBack: memory.recordConnection(alias)
         default: break
         }
         return outcome
+    }
+
+    /// Tests the saved file's host (exact alias, as `connect` does); an unsaved or edited alias is not tested.
+    func test(alias requested: String) async {
+        guard let alias = savedAlias(requested) else {
+            errorMessage = String(localized: "connect.notSaved")
+            return
+        }
+        await connectionTests.test(alias, using: commandBuilder)
     }
 
     /// Favorites that are hosts of the saved file, as written there.
@@ -380,25 +446,39 @@ final class AppModel {
     }
 
     /// "Upload to Server…": `ssh-copy-id -i <pub> [-F <config>] -- <alias>` in the chosen terminal (interactive).
+    /// Returns the raw outcome and never touches the main window's alerts (the Keys window reports it).
+    /// Nil, doing nothing, while another launch is in flight.
     @discardableResult
-    func uploadKey(publicKey: URL, alias requested: String) -> Connector.Outcome {
+    func uploadKey(publicKey: URL, alias requested: String) async -> Connector.Outcome? {
+        guard !launchInFlight else { return nil }
         guard let alias = savedAlias(requested) else {
-            AppLog.info(.connect, LaunchError.failed("not in the saved file"))
-            errorMessage = String(localized: "connect.notSaved")
-            return .failed(.failed("not in the saved file"))
+            AppLog.info(.connect, LaunchError.notSaved)
+            return .failed(.notSaved)
         }
         let arguments = ["-i", publicKey.path] + commandBuilder.configArguments + ["--", alias]
         let shellCommand = (["ssh-copy-id"] + arguments.map(SSHCommandBuilder.shellQuote)).joined(separator: " ")
         guard !shellCommand.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7F }) else {
-            AppLog.info(.connect, LaunchError.failed("control character"))
-            errorMessage = String(localized: "connect.invalidCommand")
-            return .failed(.failed("control character"))
+            AppLog.info(.connect, LaunchError.invalidCommand)
+            return .failed(.invalidCommand)
         }
-        return launch(LaunchRequest(sshArguments: arguments, shellCommand: shellCommand, program: "/usr/bin/ssh-copy-id"))
+        return await runLaunch(LaunchRequest(sshArguments: arguments, shellCommand: shellCommand, program: "/usr/bin/ssh-copy-id"))
     }
 
-    private func launch(_ request: LaunchRequest) -> Connector.Outcome {
-        let outcome = Connector(choice: settings.terminal, isInstalled: terminalInstalled, makeLauncher: launcherFactory).connect(request)
+    /// True from the moment a launch starts until its outcome is known (observed by the Connect buttons).
+    private(set) var launchInFlight = false
+
+    /// Launches and logs; reports nothing to the UI. Nil, doing nothing, while another launch is in flight.
+    private func runLaunch(_ request: LaunchRequest) async -> Connector.Outcome? {
+        guard !launchInFlight else { return nil }
+        launchInFlight = true
+        defer { launchInFlight = false }
+        let outcome = await Connector(choice: settings.terminal, isInstalled: terminalInstalled, makeLauncher: launcherFactory).connect(request)
+        if case .failed(let error) = outcome { AppLog.error(.connect, error) }
+        return outcome
+    }
+
+    /// Main-window reporting of a connect outcome.
+    private func report(_ outcome: Connector.Outcome) {
         switch outcome {
         case .launched:
             errorMessage = nil
@@ -408,13 +488,11 @@ final class AppModel {
             errorMessage = nil
             fallbackNotice = String(localized: "connect.fellBack \(name)")
         case .failed(.automationDenied):
-            AppLog.error(.connect, LaunchError.automationDenied)
             automationDenied = true
-        case .failed(.failed(let detail)):
-            AppLog.error(.connect, LaunchError.failed(detail))
+        case .failed(let error):
+            let detail = error.userMessage ?? ""
             errorMessage = String(localized: "connect.failed \(detail)")
         }
-        return outcome
     }
 
     func select(_ item: SidebarItem?) {
@@ -599,9 +677,50 @@ final class AppModel {
 
     var hasPendingFormEdits: Bool { hasBlockedFormEdits || hasPendingGroupDraft }
 
+    /// A host creation waiting for the user to confirm discarding blocked form edits.
+    enum HostCreation: Equatable {
+        case new
+        case duplicate(SidebarItem)
+    }
+
+    /// Set while the discard confirmation for an Add/Duplicate is showing; nothing was created yet.
+    var pendingCreation: HostCreation?
+
+    /// Adds a new host and selects it. With unapplied form edits it asks first and creates nothing until confirmed.
+    func addHost() { requestCreation(.new) }
+
+    /// Duplicates `item` and selects the copy (asks first like `addHost`).
+    func duplicateHost(_ item: SidebarItem) { requestCreation(.duplicate(item)) }
+
+    private func requestCreation(_ creation: HostCreation) {
+        if hasPendingFormEdits {
+            pendingSelection = nil
+            pendingCreation = creation
+        } else {
+            performCreation(creation)
+        }
+    }
+
+    /// A failure is logged and shown.
+    private func performCreation(_ creation: HostCreation) {
+        do {
+            switch creation {
+            case .new: select(try HostCommands.addHost(to: store))
+            case .duplicate(let item): if let copy = try HostCommands.duplicate(item, in: store) { select(copy) }
+            }
+        } catch {
+            AppLog.error(.edit, error)
+            errorMessage = Messages.text(for: error)
+        }
+    }
+
+    /// True while a discard confirmation (a selection or a host creation) is showing.
+    var hasPendingDiscardConfirmation: Bool { pendingSelection != nil || pendingCreation != nil }
+
     /// Selects `item`, unless the form holds edits that were never applied; then asks first.
     func requestSelect(_ item: SidebarItem?) {
         if hasPendingFormEdits, item != nil {
+            pendingCreation = nil
             pendingSelection = item
         } else {
             select(item)
@@ -609,6 +728,11 @@ final class AppModel {
     }
 
     func confirmPendingSelection() {
+        if let creation = pendingCreation {
+            pendingCreation = nil
+            performCreation(creation)
+            return
+        }
         let item = pendingSelection
         pendingSelection = nil
         select(item)
@@ -616,6 +740,17 @@ final class AppModel {
 
     func cancelPendingSelection() {
         pendingSelection = nil
+        pendingCreation = nil
+    }
+
+    /// The alias `ssh -G` probes when saving: the selected host as it is now in the document (a rename counts).
+    var probeAlias: String? {
+        guard let item = selection, let entry = SidebarBuilder.hostEntry(for: item, in: store.document), !entry.isPattern else { return nil }
+        return entry.alias
+    }
+
+    func makeSaveFlow() -> SaveFlowModel {
+        SaveFlowModel(store: store, probeAlias: probeAlias)
     }
 
     /// Called by the editor after it renamed the selected host.
@@ -628,7 +763,7 @@ final class AppModel {
     /// ~/.ssh and the active config file's directory (spec §8.1), each once.
     var keyDirectories: [URL] {
         let configDirectory = store.fileURL.deletingLastPathComponent()
-        return configDirectory.standardizedFileURL == sshDirectory.standardizedFileURL ? [sshDirectory] : [sshDirectory, configDirectory]
+        return KeyUsage.sameFile(configDirectory, sshDirectory) ? [sshDirectory] : [sshDirectory, configDirectory]
     }
 
     /// Host blocks of the saved file and its saved Include files: what ssh reads.
@@ -657,7 +792,11 @@ final class AppModel {
             throw KeyAssignmentError.hostNotFound(alias)
         }
         let path = settings.displayPath(for: url)
-        guard !entry.values(for: "IdentityFile").contains(path) else { return }
+        let home = settings.homeDirectory
+        // Already assigned, however it is spelled (~/…, absolute, through a symlink or `..`).
+        guard !entry.values(for: "IdentityFile").contains(where: { value in
+            value == path || KeyUsage.resolve(value, home: home).map { KeyUsage.sameFile($0, url) } ?? false
+        }) else { return }
         var draft = HostDraft(entry)
         draft.directives.append(DraftDirective(key: "IdentityFile", value: path))
         try store.apply { try $0.updateHost(at: entry.headerLine, to: draft) }
@@ -680,8 +819,10 @@ final class AppModel {
         if (store.hasUnsavedChanges || hasPendingFormEdits) && !discardingUnsavedChanges { return .needsConfirmation }
         settings.setConfigPath(path)
         store.onDiskStateChange = nil
-        store = makeStore(url, backupManager, Self.backupKind(for: url, home: settings.homeDirectory))
-        memory = HostMemory(defaults: settings.userDefaults, key: Self.memoryKey(for: url, home: settings.homeDirectory))
+        let kind = Self.backupKind(for: url, home: settings.homeDirectory)
+        migrateLegacyKeys(for: url, kind: kind, prefix: "config")
+        store = makeStore(url, backupManager, kind)
+        memory = Self.makeMemory(for: url, settings: settings)
         observeSavedState()
         savedHostsCache = nil
         select(nil)
@@ -689,9 +830,34 @@ final class AppModel {
         effectiveConfig.clear()
         statusFilter = nil
         pendingDelete = nil
+        pendingSelection = nil
+        pendingCreation = nil
         searchText = ""
         errorMessage = nil
         return .switched
+    }
+
+    enum SaveSwitchResult: Equatable { case switched, invalid, failed(String) }
+
+    /// Saves the unsaved changes (validation included), then opens `path`. Nothing is switched unless the save succeeded.
+    func saveThenSwitchConfig(to path: String) async -> SaveSwitchResult {
+        // Blocked form edits cannot be saved, and switching would silently drop them: stay and say so.
+        if hasBlockedFormEdits { return .failed(String(localized: "discardForm.message")) }
+        applyPendingGroupDraft()
+        if hasPendingGroupDraft { return .failed(errorMessage ?? "") }
+        if store.hasUnsavedChanges {
+            let flow = makeSaveFlow()
+            await flow.prepare()
+            await flow.confirm()
+            switch flow.phase {
+            case .done: break
+            case .review(let preparation): return .failed(Messages.text(for: preparation.validation))
+            case .conflict: return .failed(Messages.text(for: ConfigStoreError.conflict))
+            case .failed(let message): return .failed(message)
+            case .preparing, .saving: return .failed(Messages.text(for: ConfigStoreError.saveInProgress))
+            }
+        }
+        return switchConfig(to: path, discardingUnsavedChanges: true) == .invalid ? .invalid : .switched
     }
 
     func setBackupCount(_ count: Int) {

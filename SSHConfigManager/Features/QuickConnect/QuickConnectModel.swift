@@ -34,14 +34,18 @@ final class QuickConnectModel {
     private let openMainWindow: @MainActor () -> Void
 
     private let copyToPasteboard: @MainActor (String) -> Void
+    /// Feedback for ↩ while a launch is in flight (silent in tests).
+    private let beep: @MainActor () -> Void
     @ObservationIgnored private var previewTask: Task<Void, Never>?
 
     init(app: AppModel, openMainWindow: @escaping @MainActor () -> Void = {},
          copyToPasteboard: @escaping @MainActor (String) -> Void = {
              NSPasteboard.general.clearContents()
              NSPasteboard.general.setString($0, forType: .string)
-         }) {
+         },
+         beep: @escaping @MainActor () -> Void = { NSSound.beep() }) {
         self.app = app
+        self.beep = beep
         self.openMainWindow = openMainWindow
         self.copyToPasteboard = copyToPasteboard
     }
@@ -114,17 +118,27 @@ final class QuickConnectModel {
         if let index = entries.firstIndex(of: entry) { selectedIndex = index }
     }
 
+    /// The launch of the last `connectSelected` (tests await it).
+    private(set) var connectTask: Task<Void, Never>?
+
+    /// True when there was a selection to connect to; the launch itself runs in `connectTask`, so the
+    /// panel can close at once. A launch that fails opens the main window, where the error shows.
     @discardableResult
     func connectSelected() -> Bool {
         guard let entry = selectedEntry else { return false }
-        if case .launched = app.connect(alias: entry.alias) {} else { openMainWindow() }
+        guard !app.launchInFlight else { beep(); return false }   // a launch is running: ↩ beeps and does nothing
+        connectTask = Task { [app, openMainWindow] in
+            switch await app.connect(alias: entry.alias) {
+            case .launched?, nil: break
+            default: openMainWindow()
+            }
+        }
         return true
     }
 
     func testSelected() {
         guard let entry = selectedEntry else { return }
-        let builder = app.commandBuilder
-        Task { await app.connectionTests.test(entry.alias, using: builder) }
+        Task { await app.test(alias: entry.alias) }
     }
 
     @discardableResult

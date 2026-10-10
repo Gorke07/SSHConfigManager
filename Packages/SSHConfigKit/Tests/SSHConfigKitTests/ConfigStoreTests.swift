@@ -3,6 +3,7 @@ import Testing
 @testable import SSHConfigKit
 
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct ConfigStoreTests {
     private func makeStore(_ tmp: TempDir, name: String = "config", watch: Bool = false, validator: ConfigValidator = ConfigValidator()) -> ConfigStore {
         ConfigStore(
@@ -102,6 +103,55 @@ struct ConfigStoreTests {
         #expect(store.loadState == .notUTF8)
         await #expect(throws: ConfigStoreError.notEditable) { try await store.save() }
         #expect(try Data(contentsOf: tmp.url.appending(path: "config")) == Data([0x48, 0x6F, 0x73, 0x74, 0x20, 0xFF]))
+    }
+
+    @Test func nonUTF8FileIsNotReloadedOnEveryDirectoryEvent() throws {
+        let tmp = try TempDir()
+        try Data([0x48, 0x6F, 0x73, 0x74, 0x20, 0xFF]).write(to: tmp.url.appending(path: "config"))
+        let store = makeStore(tmp)
+        var notified = 0
+        store.onDiskStateChange = { notified += 1 }
+        store.fileDidChange()
+        store.fileDidChange()
+        #expect(notified == 0)
+        #expect(store.loadState == .notUTF8)
+        // A real change still reloads.
+        try tmp.file("config", "Host a\n")
+        store.fileDidChange()
+        #expect(store.loadState == .loaded)
+    }
+
+    @Test func watcherFollowsSymlinkRetargetedToAnotherDirectory() async throws {
+        let tmp = try TempDir()
+        try tmp.file("a/config", "Host a\n")
+        try tmp.file("b/config", "Host a\n")
+        try FileManager.default.createDirectory(at: tmp.url.appending(path: "ssh"), withIntermediateDirectories: true)
+        let link = tmp.url.appending(path: "ssh/config")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: tmp.url.appending(path: "a/config"))
+        let store = makeStore(tmp, name: "ssh/config", watch: true)
+        #expect(store.isWatching)
+        try await Task.sleep(for: .milliseconds(300))
+
+        // Retarget the link (atomic replace). Same content, so this alone changes nothing visible.
+        let newLink = tmp.url.appending(path: "ssh/config.new")
+        try FileManager.default.createSymbolicLink(at: newLink, withDestinationURL: tmp.url.appending(path: "b/config"))
+        #expect(rename(newLink.path, link.path) == 0)
+        // The link directory's own event restarts the watcher on the new target directory.
+        let bDirectory = tmp.url.appending(path: "b").resolvingSymlinksInPath().path
+        var waited = 0
+        while !store.watchedDirectories.contains(bDirectory) && waited < 50 {
+            try await Task.sleep(for: .milliseconds(100))
+            waited += 1
+        }
+        #expect(store.watchedDirectories.contains(bDirectory))
+
+        try Data("Host z\n".utf8).write(to: tmp.url.appending(path: "b/config"))
+        var attempts = 0
+        while store.document.hosts.first?.alias != "z" && attempts < 50 {
+            try await Task.sleep(for: .milliseconds(100))
+            attempts += 1
+        }
+        #expect(store.document.hosts.first?.alias == "z")
     }
 
     @Test func bomFileIsReportedNotSilentlyChangedAndCanBeFixed() async throws {
@@ -216,7 +266,7 @@ struct ConfigStoreTests {
         #expect(!store.externalChangePending)
     }
 
-    @Test func externalEditDuringValidationIsAConflict() async throws {
+    @Test(.timeLimit(.minutes(1))) func externalEditDuringValidationIsAConflict() async throws {
         let tmp = try TempDir()
         try tmp.file("config", "Host a\n")
         let runner = GatedRunner()
@@ -237,7 +287,7 @@ struct ConfigStoreTests {
         #expect(try tmp.read("config") == "Host external\n")
     }
 
-    @Test func discardDuringValidationCancelsSave() async throws {
+    @Test(.timeLimit(.minutes(1))) func discardDuringValidationCancelsSave() async throws {
         let tmp = try TempDir()
         try tmp.file("config", "Host a\n  User u\n")
         let runner = GatedRunner()
@@ -259,7 +309,7 @@ struct ConfigStoreTests {
         #expect(!store.isSaving)
     }
 
-    @Test func secondConcurrentSaveIsRejected() async throws {
+    @Test(.timeLimit(.minutes(1))) func secondConcurrentSaveIsRejected() async throws {
         let tmp = try TempDir()
         try tmp.file("config", "Host a\n  User u\n")
         let runner = GatedRunner()

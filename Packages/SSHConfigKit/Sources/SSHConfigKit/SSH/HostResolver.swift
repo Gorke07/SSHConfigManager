@@ -6,8 +6,24 @@ public struct ResolvedHost: Equatable, Sendable {
     public let hostKeyAlias: String?
     /// `CheckHostIP yes`: ssh also keeps and checks an entry for the host's IP address.
     public let checkHostIP: Bool
-    /// The `UserKnownHostsFile` paths as ssh prints them (`~` not expanded).
+    /// The `UserKnownHostsFile` paths, split like config arguments (quotes honoured). `ssh -G` prints the
+    /// value space-separated, paths already expanded and unquoted, so a path with spaces is split here:
+    /// compare with `userKnownHostsFileCandidates`, not just this list.
     public let userKnownHostsFiles: [String]
+
+    /// Every way the printed value can be cut into paths: each token, and each run of adjacent tokens
+    /// joined by single spaces (the whole value included). A path with spaces is among them.
+    public var userKnownHostsFileCandidates: [String] {
+        var result: [String] = []
+        let tokens = userKnownHostsFiles
+        for start in tokens.indices {
+            for end in start..<tokens.count {
+                let joined = tokens[start...end].joined(separator: " ")
+                if !result.contains(joined) { result.append(joined) }
+            }
+        }
+        return result
+    }
 
     public init(hostname: String, port: Int, hostKeyAlias: String?, checkHostIP: Bool = false, userKnownHostsFiles: [String] = []) {
         self.hostname = hostname
@@ -17,13 +33,12 @@ public struct ResolvedHost: Equatable, Sendable {
         self.userKnownHostsFiles = userKnownHostsFiles
     }
 
-    /// Names to look up in known_hosts: the HostKeyAlias as written (ssh uses it instead of the
-    /// host name, without a port) and the host name in ssh's `host` / `[host]:port` form.
+    /// The name ssh looks up in known_hosts, in its `host` / `[host]:port` form. With a HostKeyAlias ssh
+    /// uses the alias INSTEAD of the host name, as written and without port brackets (verified with
+    /// OpenSSH 10.3 against a local sshd on a non-default port: `[alias]:port` entries are not found).
     public var lookupNames: [String] {
-        var names: [String] = []
-        if let hostKeyAlias { names.append(hostKeyAlias) }
-        names.append(HostMatcher.lookupName(host: hostname, port: port))
-        return names
+        if let hostKeyAlias { return [HostMatcher.lookupName(host: hostKeyAlias, port: 22)] }
+        return [HostMatcher.lookupName(host: hostname, port: port)]
     }
 }
 
@@ -56,6 +71,8 @@ public struct HostResolver: Sendable {
         } catch {
             throw HostResolverError.failed(error.localizedDescription)
         }
+        // Cancelled: a signalled ssh reports a failure that nobody wants to see.
+        try Task.checkCancellation()
         if result.timedOut { throw HostResolverError.timedOut }
         guard result.exitCode == 0 else { throw HostResolverError.failed(ConnectionClassifier.firstLine(result.stderr)) }
         guard let host = Self.parse(result.stdout) else { throw HostResolverError.unparsable }
@@ -75,7 +92,7 @@ public struct HostResolver: Sendable {
               let port = Int(values["port"] ?? "22"), (1...65535).contains(port) else { return nil }
         let alias = values["hostkeyalias"].flatMap { $0.isEmpty || $0 == "none" ? nil : $0 }
         let checkHostIP = values["checkhostip"]?.asciiLowercased == "yes"
-        let files = (values["userknownhostsfile"] ?? "").split(separator: " ").map(String.init)
+        let files = LineTokenizer.arguments(of: values["userknownhostsfile"] ?? "")
         return ResolvedHost(hostname: hostname, port: port, hostKeyAlias: alias, checkHostIP: checkHostIP, userKnownHostsFiles: files)
     }
 }

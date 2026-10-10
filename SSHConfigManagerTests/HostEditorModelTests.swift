@@ -207,4 +207,95 @@ struct HostEditorModelTests {
         #expect(editor.hasPendingChanges)
         #expect(app.hasPendingFormEdits)
     }
+
+    // MARK: repeated single-value directives (2A-10) and field keys in "Other options" (2A-11)
+
+    @Test func repeatedUserIsShownInOtherOptionsAndSurvivesAnEdit() throws {
+        let tmp = try TempDir()
+        let original = "Host web\n  User a\n  HostName h\n  User b\n  Port 22\n"
+        let app = model(tmp, original)
+        let editor = try #require(HostEditorModel(item: .host(alias: "web", occurrence: 0), store: app.store, homeDirectory: tmp.url))
+        #expect(editor.fields["User"] == "a")
+        #expect(editor.otherOptions == [DraftDirective(key: "User", value: "b")])
+        #expect(editor.issues.contains(.duplicateFieldKey("User")))   // explained as soon as the form opens
+        #expect(!editor.hasBlockingIssues)
+
+        // Nothing edited: the round trip is lossless.
+        #expect(editor.commit())
+        #expect(app.store.document.render() == original)
+
+        // Editing another field keeps both User lines, once each.
+        editor.fields["Port"] = "2222"
+        #expect(editor.commit())
+        #expect(app.store.document.render() == "Host web\n  User a\n  HostName h\n  User b\n  Port 2222\n")
+
+        // Editing the first value changes only that line; the extra stays.
+        editor.fields["User"] = "c"
+        #expect(editor.commit())
+        #expect(app.store.document.render() == "Host web\n  User c\n  HostName h\n  User b\n  Port 2222\n")
+
+        // Removing the extra from "Other options" removes only that line.
+        editor.otherOptions.removeAll()
+        #expect(editor.commit())
+        #expect(app.store.document.render() == "Host web\n  User c\n  HostName h\n  Port 2222\n")
+    }
+
+    /// Swapping the field value and the "Other options" value does NOT reorder the file: updateHost pairs equal
+    /// values first, so both lines stay where they are and ssh still uses the first one in the file. That is why
+    /// the warning says "the first one in the file", not "the value in the field".
+    @Test func swappingRepeatedValuesLeavesFileOrderUnchanged() throws {
+        let tmp = try TempDir()
+        let original = "Host web\n  User a\n  User b\n"
+        let app = model(tmp, original)
+        let editor = try #require(HostEditorModel(item: .host(alias: "web", occurrence: 0), store: app.store, homeDirectory: tmp.url))
+        editor.fields["User"] = "b"
+        editor.otherOptions = [DraftDirective(key: "User", value: "a")]
+        #expect(editor.commit())
+        #expect(app.store.document.render() == original)
+        #expect(editor.issues.contains(.duplicateFieldKey("User")))
+    }
+
+    @Test func repeatedLowercasedKeyKeepsItsSpelling() throws {
+        let tmp = try TempDir()
+        let original = "Host web\n  port 22\n  Port 23\n  Port 24\n"
+        let app = model(tmp, original)
+        let editor = try #require(HostEditorModel(item: .host(alias: "web", occurrence: 0), store: app.store, homeDirectory: tmp.url))
+        #expect(editor.fields["Port"] == "22")
+        #expect(editor.otherOptions.map(\.value) == ["23", "24"])
+        #expect(editor.commit())
+        #expect(app.store.document.render() == original)
+        editor.fields["HostName"] = "h"
+        #expect(editor.commit())
+        #expect(app.store.document.render() == original + "  HostName h\n")
+    }
+
+    @Test func fieldKeyTypedInOtherOptionsIsKeptOnceWithAWarning() throws {
+        let tmp = try TempDir()
+        let app = model(tmp, "Host web\n  Port 22\n  IdentityFile ~/.ssh/a\n")
+        let editor = try #require(HostEditorModel(item: .host(alias: "web", occurrence: 0), store: app.store, homeDirectory: tmp.url))
+        #expect(editor.issues.isEmpty)
+        editor.otherOptions.append(DraftDirective(key: "Port", value: "2200"))
+        #expect(editor.commit())   // a warning, not a block
+        #expect(editor.issues.contains(.duplicateFieldKey("Port")))
+        #expect(!editor.hasBlockingIssues)
+        #expect(app.store.document.render() == "Host web\n  Port 22\n  IdentityFile ~/.ssh/a\n  Port 2200\n")
+
+        // Committing again changes nothing (no duplicate, no loss), and a reopened form shows both values.
+        #expect(editor.commit())
+        #expect(app.store.document.render() == "Host web\n  Port 22\n  IdentityFile ~/.ssh/a\n  Port 2200\n")
+        let reopened = try #require(HostEditorModel(item: .host(alias: "web", occurrence: 0), store: app.store, homeDirectory: tmp.url))
+        #expect(reopened.fields["Port"] == "22")
+        #expect(reopened.otherOptions == [DraftDirective(key: "Port", value: "2200")])
+        #expect(reopened.identityFiles == ["~/.ssh/a"])
+    }
+
+    @Test func fieldKeyInOtherOptionsWithEmptyFieldIsNotAWarning() throws {
+        let tmp = try TempDir()
+        let app = model(tmp, "Host web\n  User u\n")
+        let editor = try #require(HostEditorModel(item: .host(alias: "web", occurrence: 0), store: app.store, homeDirectory: tmp.url))
+        editor.otherOptions.append(DraftDirective(key: "Port", value: "2200"))
+        #expect(editor.commit())
+        #expect(editor.issues.isEmpty)
+        #expect(app.store.document.render() == "Host web\n  User u\n  Port 2200\n")
+    }
 }

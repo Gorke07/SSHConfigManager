@@ -13,8 +13,7 @@ public struct SSHCommandBuilder: Equatable, Sendable {
 
     public var usesDefaultConfig: Bool {
         let defaultConfig = homeDirectory.appending(path: ".ssh/config")
-        return configFile.resolvingSymlinksInPath().standardizedFileURL.path
-            == defaultConfig.resolvingSymlinksInPath().standardizedFileURL.path
+        return KeyUsage.sameFile(configFile, defaultConfig)
     }
 
     public var configArguments: [String] {

@@ -145,7 +145,7 @@ struct HostMemoryTests {
         #expect(HostMemory(defaults: tmp.defaults, key: "k").recents == ["MixedCase.Host"])
     }
 
-    @Test func caseDifferingAliasesAreSeparateHostsForFavoritesAndRecents() throws {
+    @Test func caseDifferingAliasesAreSeparateHostsForFavoritesAndRecents() async throws {
         let tmp = try TempDir()
         let model = makeTestModel(tmp, config: "Host Web\n  User upper\nHost web\n  User lower\n")
         #expect(model.savedConnectableHosts.map(\.entry.alias) == ["Web", "web"])
@@ -155,37 +155,37 @@ struct HostMemoryTests {
         model.toggleFavorite("web")
         #expect(model.favoriteAliases == ["web"])
         #expect(!model.memory.isFavorite("Web"))
-        model.connect(alias: "Web")
-        model.connect(alias: "web")
+        await model.connect(alias: "Web")
+        await model.connect(alias: "web")
         #expect(model.recentAliases == ["web", "Web"])
     }
 
-    @Test func appModelRecordsSuccessfulConnectsAndHidesUnsavedOrRemovedHosts() throws {
+    @Test func appModelRecordsSuccessfulConnectsAndHidesUnsavedOrRemovedHosts() async throws {
         let tmp = try TempDir()
         let model = makeTestModel(tmp, config: "Host web\nHost db\n")
-        model.connect(alias: "web")
+        await model.connect(alias: "web")
         model.toggleFavorite("db")
         model.memory.recordConnection("gone")           // e.g. removed from the file later
         #expect(model.recentAliases == ["web"])
         #expect(model.favoriteAliases == ["db"])
     }
 
-    @Test func fellBackConnectsAreRecordedAndKeyUploadsAreNot() throws {
+    @Test func fellBackConnectsAreRecordedAndKeyUploadsAreNot() async throws {
         let tmp = try TempDir()
         let model = makeTestModel(tmp, config: "Host web\nHost db\n", isTerminalInstalled: { $0 == .terminal })
         model.settings.setTerminal(.ghostty)
-        #expect(model.connect(alias: "web") == .fellBack(from: .ghostty))
+        #expect(await model.connect(alias: "web") == .fellBack(from: .ghostty))
         #expect(model.recentAliases == ["web"])
-        model.uploadKey(publicKey: tmp.url.appending(path: "k.pub"), alias: "db")
+        await model.uploadKey(publicKey: tmp.url.appending(path: "k.pub"), alias: "db")
         #expect(model.recentAliases == ["web"])
     }
 
-    @Test func failedConnectsAreNotRecorded() throws {
+    @Test func failedConnectsAreNotRecorded() async throws {
         let tmp = try TempDir()
         let launcher = RecordingLauncher()
         launcher.error = .failed("x")
         let model = makeTestModel(tmp, config: "Host web\n", launcher: launcher)
-        model.connect(alias: "web")
+        await model.connect(alias: "web")
         #expect(model.recentAliases.isEmpty)
     }
 
@@ -196,5 +196,29 @@ struct HostMemoryTests {
         try tmp.file("other/config", "Host web\n")
         #expect(model.switchConfig(to: tmp.url.appending(path: "other/config").path) == .switched)
         #expect(model.favoriteAliases.isEmpty)
+    }
+
+    @Test func legacyKeyIsMergedBehindTheNewOneAndRemoved() throws {
+        let tmp = try TempDir()
+        let defaults = tmp.defaults
+        defaults.set(["favorites": ["n1", "shared"], "recents": ["n1", "n2", "n3"]], forKey: "new")
+        defaults.set(["favorites": ["shared", "o1", ""], "recents": ["n2", "o1", "o2", "o3", "o4"]], forKey: "old")
+        AppModel.mergeLegacyMemory(defaults: defaults, key: "new", legacyKey: "old")
+        let memory = HostMemory(defaults: defaults, key: "new")
+        #expect(memory.favorites == ["n1", "shared", "o1"])
+        #expect(memory.recents == ["n1", "n2", "n3", "o1", "o2"])   // capped at 5
+        #expect(defaults.object(forKey: "old") == nil)
+    }
+
+    @Test func legacyKeyAloneIsCopiedAndRemoved() throws {
+        let tmp = try TempDir()
+        let defaults = tmp.defaults
+        defaults.set(["favorites": ["a"], "recents": ["b"]], forKey: "old")
+        AppModel.mergeLegacyMemory(defaults: defaults, key: "new", legacyKey: "old")
+        let memory = HostMemory(defaults: defaults, key: "new")
+        #expect(memory.favorites == ["a"] && memory.recents == ["b"])
+        #expect(defaults.object(forKey: "old") == nil)
+        AppModel.mergeLegacyMemory(defaults: defaults, key: "new", legacyKey: "none")   // no legacy: nothing changes
+        #expect(HostMemory(defaults: defaults, key: "new").favorites == ["a"])
     }
 }

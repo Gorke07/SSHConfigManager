@@ -121,3 +121,17 @@ Elle denemede gerçek anahtarlarınıza dokunmamak için yeni anahtarları `dene
 - [ ] Hızlı Bağlan paneli açıkken ⌘↩ (test), ⌥↩ (kopyala), ⌘S (favori) menüye takılmadan panelde çalışıyor; Anahtarlar penceresinde Host menüsü öğeleri pasif.
 - [ ] "Tümünü test et" sonrası araç çubuğunda ✓/⚠/✕ sayıları; birine tıklayınca liste süzülüyor, "Tümünü Göster" ile kalkıyor.
 - [ ] Boş config ile açılınca üç adımlı karşılama ekranı; "Anahtar oluştur" Anahtarlar penceresini Yeni Anahtar formuyla açıyor.
+
+## Plan 8 — Fark ve arayüz rötuşları
+
+- [ ] Çok uzun satırlı (200+ karakter) bir diff kaydırılırken tüm satırların eklenen/silinen arka planı aynı sağ kenarda bitiyor, satır genişlikleri aşağı kaydırınca zıplamıyor.
+- [ ] Yedekler penceresinde bir yedek seçiliyken pencere yeniden boyutlandırılınca / başka yedek seçilip dönülünce diff takılmadan görünüyor.
+- [ ] VoiceOver: bant (banner) simgeleri ayrıca okunmuyor, yalnızca mesaj ve düğmeler okunuyor.
+- [ ] Kenar çubuğunda desen / Match gibi bağlanamayan bir satıra sağ tık: menü ayırıcıyla başlamıyor.
+- [ ] Bağlantı çubuğundaki rozetin üstüne gelince çıkan ipucu yalnızca durumu gösteriyor (ayrıntı yanındaki metinde, tekrar yok); kenar çubuğundaki rozetin ipucu ayrıntıyı içermeye devam ediyor.
+- [ ] Ayarlar → Bağlantı: kısayol kaydedici, "Girişte aç" anahtarının onay/hata metinlerinin altında.
+- [ ] Ghostty seçiliyken Bağlan, Ghostty'yi paket kimliğiyle (`open -n -b com.mitchellh.ghostty --args …`) yeni örnek olarak açıyor ve ssh çalışıyor; "Anahtarı sunucuya yükle" da pencereyi tuş basışına kadar açık tutuyor.
+- [ ] Terminal/iTerm2 ile Bağlan'a arka arkaya iki kez hızlı basınca tek pencere açılıyor; ilk Otomasyon izni istemi sırasında uygulama arayüzü donmuyor; Bağlan düğmesi bu sırada pasif. İzni reddet, Sistem Ayarları'nda onayla, tekrar Bağlan: hem Terminal hem iTerm2 için çalışıyor (izin istemi uzun beklerse -1712 zaman aşımı: iTerm2 Terminal'e düşüyor).
+- [ ] ⌥⌘S paneli başka bir uygulamanın üstünde açılınca o uygulama ön planda kalıyor (ana pencere öne gelmiyor), arama alanına yazılabiliyor ve ↩ ile bağlanılabiliyor.
+- [ ] Girişte açılışta (menü çubuğu modu) ilk 3 saniye içinde menü çubuğundan 'Ana pencereyi aç' ya da Dock'tan açılan pencere kapanmıyor; SwiftUI'nin kendi açtığı pencere hâlâ kapanıyor.
+- [ ] Menü çubuğu penceresi ya da Hızlı Bağlan paneli açıkken Dock ikonu görünmüyor; yalnızca ana/Ayarlar/Yedekler penceresi açıkken görünüyor.

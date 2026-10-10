@@ -9,7 +9,7 @@ private struct MainWindowOpener: ViewModifier {
 
     func body(content: Content) -> some View {
         content.onAppear {
-            appDelegate.openMainWindow = {
+            appDelegate.windowOpener = {
                 NSApp.setActivationPolicy(.regular)
                 openWindow(id: "main")
                 NSApp.activate()

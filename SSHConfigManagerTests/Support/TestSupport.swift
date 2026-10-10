@@ -91,8 +91,11 @@ func makeTestModel(_ tmp: TempDir, config: String? = nil, runner: any ProcessRun
 final class RecordingLauncher: TerminalLaunching {
     private(set) var requests: [LaunchRequest] = []
     var error: LaunchError?
+    /// When set, `launch` suspends on it first (to hold a launch "in flight").
+    var gate: (() async -> Void)?
 
-    func launch(_ request: LaunchRequest) throws {
+    func launch(_ request: LaunchRequest) async throws {
+        await gate?()
         if let error { throw error }
         requests.append(request)
     }
@@ -104,10 +107,13 @@ final class RecordingKeyActions {
     private(set) var copied: [String] = []
     private(set) var recycled: [[URL]] = []
 
+    /// Replaces ssh-keygen/ssh-add for the manager when a test needs a scripted tool result.
+    var managerRunner: (any ProcessRunning)?
+
     func tools(_ tmp: TempDir) -> KeyTools {
         KeyTools(
             scanner: KeyScanner(),
-            manager: KeyManager(agentSocket: "/tmp/sshcm-none-\(UUID().uuidString.prefix(8))", askPassDirectory: tmp.url),
+            manager: KeyManager(runner: managerRunner ?? ProcessRunner(), agentSocket: "/tmp/sshcm-none-\(UUID().uuidString.prefix(8))", askPassDirectory: tmp.url),
             useKeychain: false,
             recycle: { [weak self] urls in self?.recycled.append(urls) },
             copyToPasteboard: { [weak self] text in self?.copied.append(text) })

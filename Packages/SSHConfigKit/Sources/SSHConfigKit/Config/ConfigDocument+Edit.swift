@@ -121,9 +121,15 @@ extension ConfigDocument {
         }
 
         let indent = entry.directives.compactMap { lines[$0.line].parts?.indent }.first ?? directiveIndent
-        block.insert(
-            contentsOf: insertions.map { makeDirectiveLine(indent: indent, key: $0.key, value: $0.value) },
-            at: insertAt)
+        var inserted = insertions.map { makeDirectiveLine(indent: indent, key: $0.key, value: $0.value) }
+        // Appending at EOF of a CRLF file with no final newline: the old last line must now carry its
+        // "\r", and the new last line must not (the file still ends without a terminator).
+        if usesCRLF, !hasTrailingNewline, end == lines.count, insertAt == block.count,
+           let previous = block.last, let last = inserted.last {
+            if !previous.raw.hasSuffix("\r") { block[block.count - 1] = ConfigLine(raw: previous.raw + "\r") }
+            if last.raw.hasSuffix("\r") { inserted[inserted.count - 1] = ConfigLine(raw: String(last.raw.dropLast())) }
+        }
+        block.insert(contentsOf: inserted, at: insertAt)
         lines.replaceSubrange(header..<end, with: block)
     }
 
@@ -153,6 +159,7 @@ extension ConfigDocument {
             return position + lead.count
         }
 
+        terminateLastLineForAppend()
         if let last = lines.last, last.kind != .blank { lines.append(blank) }
         let header = lines.count
         lines += hostLines
@@ -188,7 +195,15 @@ extension ConfigDocument {
 
         var copy = Array(lines[header..<end])
         copy[0] = ConfigLine(raw: LineTokenizer.replacingValue(in: parts, with: newAlias))
+        if end == lines.count { terminateLastLineForAppend() }
         lines.insert(contentsOf: [ConfigLine(raw: lineEndingSuffix)] + copy, at: end)
         return end + 1
+    }
+
+    /// A CRLF file whose last line has no terminator keeps the "\r" off that line; appending after
+    /// it would put a bare "\n" there. Add the "\r" (the only byte touched) so the file stays CRLF.
+    private mutating func terminateLastLineForAppend() {
+        guard usesCRLF, !hasTrailingNewline, let last = lines.last, !last.raw.hasSuffix("\r") else { return }
+        lines[lines.count - 1] = ConfigLine(raw: last.raw + "\r")
     }
 }

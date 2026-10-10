@@ -5,10 +5,17 @@ import os
 /// private; passphrases, key contents and process arguments/environment are never passed here.
 enum AppLog {
     enum Category: String {
-        case save, connect, knownHosts, keys, backups, settings
+        case save, connect, knownHosts, keys, backups, settings, edit
     }
 
     private static let subsystem = Bundle.main.bundleIdentifier ?? "tr.com.mess.SSHConfigManager"
+
+    /// True when the user dismissed a system panel (file importer): not a failure, nothing to log or show.
+    static func isUserCancel(_ error: any Error) -> Bool {
+        if let cocoa = error as? CocoaError { return cocoa.code == .userCancelled }
+        let ns = error as NSError
+        return ns.domain == NSCocoaErrorDomain && ns.code == NSUserCancelledError
+    }
 
     static func error(_ category: Category, _ error: any Error) {
         let (kind, detail) = describe(error)

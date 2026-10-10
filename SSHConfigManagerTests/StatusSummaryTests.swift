@@ -16,7 +16,7 @@ struct StatusSummaryTests {
 
     @Test func countsOnlyConnectableHostsAndTheFilterNarrowsTheSidebar() async throws {
         let tmp = try TempDir()
-        let model = makeTestModel(tmp, config: "Host a\nHost b\nHost *\n  User x\n", runner: FixedRunner.invalid("Connection refused"))
+        let model = makeTestModel(tmp, config: "Host a\nHost b\nHost *\n  User x\n", runner: FixedRunner.invalid("ssh: connect to host h port 22: Connection refused"))
         await model.connectionTests.test("a", using: model.commandBuilder)
         #expect(model.statusCounts == [.failed: 1])
         model.statusFilter = .failed

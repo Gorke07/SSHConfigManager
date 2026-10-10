@@ -33,7 +33,13 @@ struct SaveSheet: View {
             case .conflict:
                 Text(String(localized: "conflict.title")).font(.headline)
                 Text(String(localized: "conflict.message"))
-                DiffTextView(hunks: flow.conflictHunks()).frame(minWidth: 640, minHeight: 280)
+                if let unreadable = flow.conflictUnreadableMessage {
+                    Text(unreadable)
+                        .textSelection(.enabled)
+                        .frame(minWidth: 640, minHeight: 120, alignment: .topLeading)
+                } else {
+                    DiffTextView(hunks: flow.conflictHunks()).frame(minWidth: 640, minHeight: 280)
+                }
                 HStack {
                     Button(String(localized: "conflict.loadDisk"), role: .destructive) {
                         flow.loadDiskVersion()
@@ -43,6 +49,7 @@ struct SaveSheet: View {
                     Button(String(localized: "action.cancel")) { finish(false) }
                         .keyboardShortcut(.cancelAction)
                     Button(String(localized: "conflict.overwrite")) { Task { await flow.overwrite() } }
+                        .disabled(flow.conflictUnreadableMessage != nil)
                 }
             case .failed(let message):
                 Text(String(localized: "save.failed.title")).font(.headline)

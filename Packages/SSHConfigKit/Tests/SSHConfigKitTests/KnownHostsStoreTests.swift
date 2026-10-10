@@ -3,6 +3,7 @@ import Testing
 @testable import SSHConfigKit
 
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct KnownHostsStoreTests {
     static let ed = KnownHostsDocumentTests.ed
     static let text = "a.example.com ssh-ed25519 \(ed)\r\n# note\r\nb.example.com ssh-ed25519 \(ed)\r\nc.example.com ssh-ed25519 \(ed)"
@@ -28,6 +29,50 @@ struct KnownHostsStoreTests {
         let store = try makeStore(tmp, contents: nil)
         #expect(store.loadState == .missing)
         #expect(store.document.entries.isEmpty)
+    }
+
+    @Test func notUTF8IsNotReloadedOnEveryDirectoryEvent() throws {
+        let tmp = try TempDir()
+        try Data([0xFF, 0xFE, 0x00]).write(to: tmp.url.appending(path: "known_hosts"))
+        let store = try makeStore(tmp, contents: nil)
+        let revision = store.revision
+        store.fileDidChange()
+        store.fileDidChange()
+        #expect(store.revision == revision)
+        try tmp.file("known_hosts", Self.text, permissions: 0o644)
+        store.fileDidChange()
+        #expect(store.loadState == .loaded)
+    }
+
+    @Test(.timeLimit(.minutes(1))) func watcherFollowsSymlinkRetargetedToAnotherDirectory() async throws {
+        let tmp = try TempDir()
+        try tmp.file("a/known_hosts", Self.text, permissions: 0o644)
+        try tmp.file("b/known_hosts", Self.text, permissions: 0o644)
+        try FileManager.default.createDirectory(at: tmp.url.appending(path: "ssh"), withIntermediateDirectories: true)
+        let link = tmp.url.appending(path: "ssh/known_hosts")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: tmp.url.appending(path: "a/known_hosts"))
+        let store = KnownHostsStore(fileURL: link, writer: SafeFileWriter(backups: BackupManager(rootDirectory: tmp.url.appending(path: "Backups"))), watchForChanges: true)
+        #expect(store.isWatching)
+        try await Task.sleep(for: .milliseconds(300))
+
+        let newLink = tmp.url.appending(path: "ssh/known_hosts.new")
+        try FileManager.default.createSymbolicLink(at: newLink, withDestinationURL: tmp.url.appending(path: "b/known_hosts"))
+        #expect(rename(newLink.path, link.path) == 0)
+        let bDirectory = tmp.url.appending(path: "b").resolvingSymlinksInPath().path
+        var waited = 0
+        while !store.watchedDirectories.contains(bDirectory) && waited < 50 {
+            try await Task.sleep(for: .milliseconds(100))
+            waited += 1
+        }
+        #expect(store.watchedDirectories.contains(bDirectory))
+
+        try Data("z.example.com ssh-ed25519 \(Self.ed)\n".utf8).write(to: tmp.url.appending(path: "b/known_hosts"))
+        var attempts = 0
+        while store.document.entries.count != 1 && attempts < 50 {
+            try await Task.sleep(for: .milliseconds(100))
+            attempts += 1
+        }
+        #expect(store.document.entries.count == 1)
     }
 
     @Test func notUTF8IsNeverEditable() throws {
@@ -80,6 +125,42 @@ struct KnownHostsStoreTests {
         #expect(store.document.entries.count == 1)
         let mode = try FileManager.default.attributesOfItem(atPath: tmp.url.appending(path: "known_hosts").path)[.posixPermissions] as? Int
         #expect(mode == 0o600)
+    }
+
+    @Test func restoreOverAFileCreatedExternallyIsAConflict() throws {
+        let tmp = try TempDir()
+        let store = try makeStore(tmp, contents: nil)
+        #expect(store.loadState == .missing)
+        try tmp.file("known_hosts", "x.example.com ssh-ed25519 \(Self.ed)\n", permissions: 0o644)   // appears after the load
+        #expect(throws: KnownHostsStoreError.conflict) { try store.restore(text: "a.example.com ssh-ed25519 \(Self.ed)\n") }
+        #expect(try tmp.read("known_hosts") == "x.example.com ssh-ed25519 \(Self.ed)\n")   // nothing was overwritten
+        #expect(store.loadState == .loaded)   // the conflict reloaded what is on disk
+        #expect(store.document.entries.count == 1)
+    }
+
+    @Test func restoreIsRefusedForANotUTF8File() throws {
+        let tmp = try TempDir()
+        let bytes = Data([0xFF, 0xFE, 0x00])
+        try bytes.write(to: tmp.url.appending(path: "known_hosts"))
+        let store = try makeStore(tmp, contents: nil)
+        #expect(store.loadState == .notUTF8)
+        #expect(throws: KnownHostsStoreError.notEditable) { try store.restore(text: Self.text) }
+        #expect(try Data(contentsOf: tmp.url.appending(path: "known_hosts")) == bytes)
+    }
+
+    @Test func fileDidChangeReloadsOnlyWhenTheFileChanged() throws {
+        let tmp = try TempDir()
+        let store = try makeStore(tmp)
+        let revision = store.revision
+        store.fileDidChange()   // nothing changed on disk
+        #expect(store.revision == revision)
+        try tmp.file("known_hosts", "only.example.com ssh-ed25519 \(Self.ed)\n", permissions: 0o644)
+        store.fileDidChange()
+        #expect(store.revision == revision + 1)
+        #expect(store.document.entries.count == 1)
+        try FileManager.default.removeItem(at: tmp.url.appending(path: "known_hosts"))
+        store.fileDidChange()
+        #expect(store.loadState == .missing)
     }
 
     @Test func restoreBacksUpTheCurrentFile() throws {

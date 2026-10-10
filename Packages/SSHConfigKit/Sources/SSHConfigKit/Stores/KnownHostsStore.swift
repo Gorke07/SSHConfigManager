@@ -26,7 +26,7 @@ public final class KnownHostsStore {
 
     @ObservationIgnored private var writer: SafeFileWriter
     @ObservationIgnored private var diskFingerprint: FileFingerprint?
-    @ObservationIgnored private var watcher: FileWatcher?
+    @ObservationIgnored private var watcher: FileWatcherGroup?
 
     public init(
         fileURL: URL,
@@ -62,7 +62,7 @@ public final class KnownHostsStore {
             return
         }
         guard let text = String(validating: data, as: UTF8.self) else {
-            reset(.notUTF8)
+            reset(.notUTF8, fingerprint: FileFingerprint(data: data))
             return
         }
         document = KnownHostsDocument(parsing: text)
@@ -97,22 +97,27 @@ public final class KnownHostsStore {
         load()
     }
 
+    /// Directories currently watched (test visibility).
+    var watchedDirectories: [String] { watcher?.watchedDirectories ?? [] }
+
     func fileDidChange() {
+        watcher?.refresh()   // the symlink or its target directory may have moved
         let current = try? FileFingerprint.of(fileAt: fileURL)
         guard current != diskFingerprint else { return }
         load()
     }
 
-    private func reset(_ state: ConfigLoadState) {
+    /// `fingerprint` is kept for a file that exists but cannot be shown (not UTF-8), so the
+    /// directory watcher does not reload it on every unrelated event.
+    private func reset(_ state: ConfigLoadState, fingerprint: FileFingerprint? = nil) {
         document = .empty
-        diskFingerprint = nil
+        diskFingerprint = fingerprint
         loadState = state
     }
 
     private func startWatching() {
-        let directory = fileURL.resolvingSymlinksInPath().deletingLastPathComponent()
         let weakStore = WeakKnownHostsStore(self)
-        watcher = FileWatcher(directory: directory) {
+        watcher = FileWatcherGroup(file: fileURL) {
             Task { @MainActor in weakStore.value?.fileDidChange() }
         }
         isWatching = watcher != nil

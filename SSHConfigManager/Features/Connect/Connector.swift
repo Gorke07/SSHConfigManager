@@ -12,24 +12,24 @@ struct Connector {
     let isInstalled: (TerminalChoice) -> Bool
     let makeLauncher: (TerminalChoice) -> any TerminalLaunching
 
-    func connect(_ request: LaunchRequest) -> Outcome {
+    func connect(_ request: LaunchRequest) async -> Outcome {
         if choice != .terminal && !isInstalled(choice) {
-            return fallBack(request)
+            return await fallBack(request)
         }
         do {
-            try makeLauncher(choice).launch(request)
+            try await makeLauncher(choice).launch(request)
             return .launched(choice)
         } catch LaunchError.automationDenied {
             return .failed(.automationDenied)
         } catch {
             if choice == .terminal { return .failed(error as? LaunchError ?? .failed(error.localizedDescription)) }
-            return fallBack(request)
+            return await fallBack(request)
         }
     }
 
-    private func fallBack(_ request: LaunchRequest) -> Outcome {
+    private func fallBack(_ request: LaunchRequest) async -> Outcome {
         do {
-            try makeLauncher(.terminal).launch(request)
+            try await makeLauncher(.terminal).launch(request)
             return .fellBack(from: choice)
         } catch {
             return .failed(error as? LaunchError ?? .failed(error.localizedDescription))

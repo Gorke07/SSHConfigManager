@@ -11,12 +11,19 @@ public struct KnownHostAddress: Equatable, Sendable {
     public let port: Int
     /// Wildcards (`*`, `?`) or negation (`!`): never treated as a match for a single host name.
     public let isPattern: Bool
+    /// Written as `[host]:port`. ssh-keygen treats `[host]:22` and `host` as different names, so the
+    /// written form matters. Defaults to true for any port other than 22 (always written that way).
+    public let isBracketed: Bool
 
-    public init(host: String, port: Int, isPattern: Bool) {
+    public init(host: String, port: Int, isPattern: Bool, isBracketed: Bool? = nil) {
         self.host = host
         self.port = port
         self.isPattern = isPattern
+        self.isBracketed = isBracketed ?? (port != 22)
     }
+
+    /// The name as written in the file: `host` or `[host]:port`.
+    public var literal: String { isBracketed ? "[\(host)]:\(port)" : host }
 }
 
 public enum KnownHostName: Equatable, Sendable {

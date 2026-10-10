@@ -87,6 +87,7 @@ final class ConnectionTestsModel {
         guard currentRun == run else { return }
         results[alias] = result
         running.remove(alias)
+        runAliases.remove(alias)
     }
 
     private func finish() {

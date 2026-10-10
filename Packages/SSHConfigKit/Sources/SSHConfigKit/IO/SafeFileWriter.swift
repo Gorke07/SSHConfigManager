@@ -63,6 +63,12 @@ public struct SafeFileWriter: Sendable {
             guard rename(temp.path, target.path) == 0 else {
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
             }
+            // Best effort: persist the rename itself. Failure here must not fail a completed write.
+            let directoryFD = open(target.deletingLastPathComponent().path, O_RDONLY)
+            if directoryFD >= 0 {
+                _ = fsync(directoryFD)
+                close(directoryFD)
+            }
         } catch {
             try? fm.removeItem(at: temp)
             throw SafeFileWriterError.writeFailed(error.localizedDescription)

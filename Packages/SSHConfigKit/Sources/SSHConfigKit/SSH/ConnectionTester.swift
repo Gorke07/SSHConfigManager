@@ -30,25 +30,70 @@ public enum ConnectionClassifier {
         // ssh's own failures exit 255; any other code is the remote command's
         // (GitHub/GitLab exit 1 after successful authentication).
         if exitCode != 255 { return .reachable }
-        let rules: [(String, ConnectionStatus)] = [
-            ("REMOTE HOST IDENTIFICATION HAS CHANGED", .hostKeyChanged),
-            ("Host key verification failed", .unknownHostKey),
-            ("Could not resolve hostname", .dnsFailure),
-            ("Connection refused", .connectionRefused),
-            ("Operation timed out", .timeout),
-            ("Connection timed out", .timeout),
-            ("Permission denied", .authenticationRequired),
-            ("Too many authentication failures", .authenticationRequired),
-            ("keyboard-interactive", .authenticationRequired),
+        // Match only lines in ssh's own message forms, never a substring anywhere: a server
+        // banner (also on stderr) may say "Permission denied" or "Connection refused" in prose.
+        let lines = lines(of: stderr).filter(isDiagnostic)
+        func any(_ predicate: (String) -> Bool) -> Bool { lines.contains(where: predicate) }
+        func reason(_ needles: String...) -> (String) -> Bool { { line in needles.contains { line.contains($0) } } }
+        let dns = reason("Could not resolve hostname", "nodename nor servname provided", "Name or service not known",
+                         "Temporary failure in name resolution")
+        let refused = reason("Connection refused")
+        let timeout = reason("Operation timed out", "Connection timed out")
+        let rules: [((String) -> Bool, ConnectionStatus)] = [
+            ({ $0.hasPrefix("@") && $0.contains("REMOTE HOST IDENTIFICATION HAS CHANGED") }, .hostKeyChanged),
+            ({ $0.hasPrefix("Host key verification failed") }, .unknownHostKey),
+            (dns, .dnsFailure),
+            (refused, .connectionRefused),
+            (timeout, .timeout),
+            (isPermissionDenied, .authenticationRequired),
+            ({ $0.contains("Too many authentication failures") }, .authenticationRequired),
+            ({ $0.hasPrefix("ssh:") && $0.contains("keyboard-interactive") }, .authenticationRequired),
         ]
-        return rules.first { stderr.contains($0.0) }?.1 ?? .other
+        return rules.first { any($0.0) }?.1 ?? .other
     }
 
-    /// First non-blank line that is not a row of "@" banner characters.
-    public static func firstLine(_ text: String) -> String {
+    /// Lines in OpenSSH's own diagnostic forms (what the old substring match could find that is
+    /// not server prose): `ssh: ...`, `kex_exchange_identification: ...`, `ssh_dispatch_run_fatal: ...`,
+    /// ProxyJump's `channel N: open failed: connect failed: ...`, `Connection to/closed/timed out/reset ...`,
+    /// `Read from remote host ...`, `Received disconnect/Disconnected from ...`, `Host key verification failed`,
+    /// the "@ WARNING" box, and `user@host: ...` lines.
+    private static func isDiagnostic(_ line: String) -> Bool {
+        let prefixes = ["ssh:", "ssh_", "kex_", "Connection to ", "Connection closed", "Connection timed out",
+                        "Connection reset", "Read from remote host", "Received disconnect from", "Disconnected from",
+                        "Host key verification failed", "@", "Permission denied", "Timeout, "]
+        if prefixes.contains(where: line.hasPrefix) { return true }
+        if line.hasPrefix("channel "), line.contains("open failed: connect failed: ") { return true }
+        // user@host: message
+        if let colon = line.range(of: ": "), line[..<colon.lowerBound].contains("@"), !line[..<colon.lowerBound].contains(" ") {
+            return true
+        }
+        return false
+    }
+
+    /// OpenSSH's "[user@host: ]Permission denied (publickey,password)." or
+    /// "Permission denied, please try again.". The method list has no spaces, so prose does not match.
+    private static func isPermissionDenied(_ line: String) -> Bool {
+        var rest = Substring(line)
+        if let colon = rest.range(of: ": "), rest[..<colon.lowerBound].contains("@"), !rest[..<colon.lowerBound].contains(" ") {
+            rest = rest[colon.upperBound...]
+        }
+        if rest.hasPrefix("Permission denied, please try again") { return true }
+        guard rest.hasPrefix("Permission denied (") else { return false }
+        let methods = rest.dropFirst("Permission denied (".count).prefix { $0 != ")" }
+        return rest.contains(")") && !methods.isEmpty
+            && methods.allSatisfy { $0.isLetter || $0.isNumber || $0 == "," || $0 == "-" }
+    }
+
+    private static func lines(of text: String) -> [String] {
         text.split(whereSeparator: { $0 == "\n" || $0 == "\r" || $0 == "\r\n" })
             .map { $0.trimmingCharacters(in: .whitespaces) }
-            .first { !$0.isEmpty && !$0.allSatisfy { $0 == "@" } } ?? ""
+            .filter { !$0.isEmpty }
+    }
+
+    /// First non-blank line that is not a row of "@" banner characters or a "Warning:" notice
+    /// (e.g. "Warning: Permanently added ... to the list of known hosts.").
+    public static func firstLine(_ text: String) -> String {
+        lines(of: text).first { !$0.allSatisfy { $0 == "@" } && !$0.hasPrefix("Warning:") } ?? ""
     }
 }
 
