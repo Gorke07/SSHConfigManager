@@ -36,4 +36,45 @@ struct FuzzyMatcherTests {
         let bold = text.runs.filter { $0.inlinePresentationIntent == .stronglyEmphasized }.map { String(text[$0.range].characters) }
         #expect(bold == ["p", "d"])
     }
+
+    @Test func wordStartBacktracks() throws {
+        let match = try #require(FuzzyMatcher.match(query: "wea", alias: "web-eat", others: []))
+        #expect(match.score == 600)
+        #expect(match.aliasOffsets == [0, 4, 5])
+    }
+
+    @Test func eszettKeepsOffsetsInRange() throws {
+        let match = try #require(FuzzyMatcher.match(query: "s", alias: "straße", others: []))
+        #expect(match.aliasOffsets.allSatisfy { $0 < "straße".count })
+        let tail = try #require(FuzzyMatcher.match(query: "e", alias: "straße", others: []))
+        #expect(tail.aliasOffsets == [5])
+        #expect(FuzzyMatcher.match(query: "s", alias: "ß", others: []) != nil)
+    }
+
+    @Test func adjacentOffsetsFormOneBoldRun() {
+        let text = FuzzyMatcher.highlighted("web-01", offsets: [0, 1, 2])
+        let bold = text.runs.filter { $0.inlinePresentationIntent == .stronglyEmphasized }.map { String(text[$0.range].characters) }
+        #expect(bold == ["web"])
+    }
+
+    @Test func emojiInAlias() throws {
+        let match = try #require(FuzzyMatcher.match(query: "prod", alias: "🚀prod", others: []))
+        #expect(match.aliasOffsets == [1, 2, 3, 4])
+        let text = FuzzyMatcher.highlighted("🚀prod", offsets: match.aliasOffsets)
+        let bold = text.runs.filter { $0.inlinePresentationIntent == .stronglyEmphasized }.map { String(text[$0.range].characters) }
+        #expect(bold == ["prod"])
+    }
+
+    @Test func emptyQueryMatchesEverything() {
+        #expect(FuzzyMatcher.match(query: "  ", alias: "web", others: []) == FuzzyMatch(score: 0, aliasOffsets: []))
+    }
+
+    @Test func queryOverloadMatchesStringOverload() {
+        for query in ["prd web", "pw", "isik", "xyz", "10.0", ""] {
+            let prepared = FuzzyQuery(query)
+            for alias in ["prod-web-01", "ışık", "db"] {
+                #expect(FuzzyMatcher.match(prepared, alias: alias, others: ["10.0.0.5"]) == FuzzyMatcher.match(query: query, alias: alias, others: ["10.0.0.5"]))
+            }
+        }
+    }
 }

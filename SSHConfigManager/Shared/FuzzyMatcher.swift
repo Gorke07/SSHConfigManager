@@ -8,22 +8,44 @@ struct FuzzyMatch: Equatable {
 
 /// User-facing host search (spec v1.1 §3): every word must match the alias fuzzily or another
 /// field as a substring; case and diacritics are ignored.
+/// A query split into folded words once, to be reused across all hosts.
+struct FuzzyQuery {
+    let words: [String]
+
+    init(_ query: String) {
+        words = query.split(whereSeparator: \.isWhitespace).map { FuzzyMatcher.fold(String($0)).joined() }
+    }
+}
+
 enum FuzzyMatcher {
     /// Folds one character at a time so offsets stay aligned with the original alias.
+    /// ASCII characters take a fast path; only other characters go through locale-aware folding.
     static func fold(_ text: String) -> [String] {
         text.map { character -> String in
+            if character.isASCII { return character.lowercased() }
             switch character {
-            case "ı", "I", "İ": "i"
-            default: String(character).folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            case "ı", "İ": return "i"
+            default: return String(character).folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
             }
         }
     }
 
+    /// Folds a whole string (no offset alignment needed), mapping Turkish dotted/dotless i to "i" first.
+    static func foldWhole(_ text: String) -> String {
+        if text.allSatisfy(\.isASCII) { return text.lowercased() }
+        let mapped = String(text.map { "ıİI".contains($0) ? Character("i") : $0 })
+        return mapped.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+    }
+
     static func match(query: String, alias: String, others: [String]) -> FuzzyMatch? {
-        let words = query.split(whereSeparator: \.isWhitespace).map { fold(String($0)).joined() }
+        match(FuzzyQuery(query), alias: alias, others: others)
+    }
+
+    static func match(_ query: FuzzyQuery, alias: String, others: [String]) -> FuzzyMatch? {
+        let words = query.words
         guard !words.isEmpty else { return FuzzyMatch(score: 0, aliasOffsets: []) }
         let folded = fold(alias)
-        let foldedOthers = others.map { fold($0).joined() }
+        let foldedOthers = others.map(foldWhole)
         var score = 0
         var offsets = Set<Int>()
         for word in words {
@@ -54,23 +76,20 @@ enum FuzzyMatcher {
         if target.hasPrefix(String(word)), folded.count >= word.count, folded.allSatisfy({ $0.count == 1 }) {
             return (800, Array(0..<word.count))
         }
-        // Word starts: each character continues the previous match or jumps to the next word start.
+        // Word starts: each character continues the previous match or sits at a word start (backtracking).
+        func search(_ n: Int, _ position: Int) -> [Int]? {
+            if n == word.count { return [] }
+            guard position < characters.count else { return nil }
+            for index in position..<characters.count where characters[index] == word[n] {
+                guard (n > 0 && index == position) || isWordStart(index, in: folded) else { continue }
+                if let rest = search(n + 1, index + 1) { return [index] + rest }
+            }
+            return nil
+        }
+        if let found = search(0, 0) { return (600, found) }
         var offsets: [Int] = []
         var position = 0
-        var ok = true
-        for (n, character) in word.enumerated() {
-            if n > 0, let last = offsets.last, last + 1 < characters.count, characters[last + 1] == character {
-                offsets.append(last + 1); position = last + 2; continue
-            }
-            guard let index = (position..<characters.count).first(where: { characters[$0] == character && isWordStart($0, in: folded) }) else {
-                ok = false; break
-            }
-            offsets.append(index); position = index + 1
-        }
-        if ok { return (600, offsets) }
         // Scattered: plain subsequence.
-        offsets = []
-        position = 0
         for character in word {
             guard let index = (position..<characters.count).first(where: { characters[$0] == character }) else { return nil }
             offsets.append(index); position = index + 1
