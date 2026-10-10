@@ -78,16 +78,18 @@ public enum ConfigResolver {
         alias: String,
         document: ConfigDocument,
         targetHeader: Int?,
+        targetFile: URL? = nil,
         includes: (IncludeDirective) -> [(file: URL, document: ConfigDocument)]
     ) -> ResolvedConfig {
         var result = ResolvedConfig()
         walk(document, file: nil, depth: 0, alias: alias, targetHeader: targetHeader,
+             targetFile: targetFile?.standardizedFileURL,
              active: true, blockSource: .global, parentPatterns: [], stack: [], includes: includes, into: &result)
         return result
     }
 
     private static func walk(
-        _ document: ConfigDocument, file: URL?, depth: Int, alias: String, targetHeader: Int?,
+        _ document: ConfigDocument, file: URL?, depth: Int, alias: String, targetHeader: Int?, targetFile: URL?,
         active startActive: Bool, blockSource startSource: OptionSource,
         parentPatterns: [String], stack: Set<String>,
         includes: (IncludeDirective) -> [(file: URL, document: ConfigDocument)],
@@ -102,10 +104,14 @@ public enum ConfigResolver {
             case .hostStart(let patterns):
                 active = hostLineMatches(patterns, alias: alias)
                 blockPatterns = patterns
-                if let file {
+                // `targetFile == nil` means the target block is in the root document.
+                let isTarget = index == targetHeader && file?.standardizedFileURL == targetFile
+                if isTarget {
+                    source = .thisBlock
+                } else if let file {
                     source = .include(file: file, patterns: patterns)
                 } else {
-                    source = index == targetHeader ? .thisBlock : .otherHost(patterns: patterns)
+                    source = .otherHost(patterns: patterns)
                 }
             case .matchStart:
                 result.hasMatchBlocks = true
@@ -122,7 +128,7 @@ public enum ConfigResolver {
                     let standardized = includedFile.standardizedFileURL
                     let key = standardized.resolvingSymlinksInPath().path
                     guard !stack.contains(key) else { continue }
-                    walk(included, file: standardized, depth: depth + 1, alias: alias, targetHeader: nil,
+                    walk(included, file: standardized, depth: depth + 1, alias: alias, targetHeader: targetHeader, targetFile: targetFile,
                          active: true, blockSource: .include(file: standardized, patterns: current),
                          parentPatterns: current, stack: stack.union([key]),
                          includes: includes, into: &result)
@@ -130,11 +136,21 @@ public enum ConfigResolver {
             case .directive(let key, let rawValue):
                 guard active else { continue }
                 let lower = key.asciiLowercased
+                if lower == "sendenv" {
+                    // One value per whitespace-separated token; `-PATTERN` removes earlier entries that match
+                    // it as a wildcard (verified with OpenSSH `ssh -G`), later tokens/lines may add them again.
+                    for token in LineTokenizer.arguments(of: rawValue) {
+                        if token.hasPrefix("-") {
+                            let pattern = String(token.dropFirst())
+                            result.options[lower]?.removeAll { wildcardMatch(pattern, $0.value) }
+                        } else {
+                            result.options[lower, default: []].append(ResolvedValue(value: token, source: source))
+                        }
+                    }
+                    continue
+                }
                 let value = ResolvedValue(value: ValueFormatter.display(key: key, rawValue: rawValue), source: source)
-                if lower == "sendenv", value.value.hasPrefix("-") {
-                    let pattern = String(value.value.dropFirst())
-                    result.options[lower]?.removeAll { wildcardMatch(pattern, $0.value) }
-                } else if multiValueKeys.contains(lower) {
+                if multiValueKeys.contains(lower) {
                     let dedupes = lower == "identityfile" || lower == "certificatefile"
                     if !(dedupes && result.options[lower]?.contains { $0.value == value.value } == true) {
                         result.options[lower, default: []].append(value)

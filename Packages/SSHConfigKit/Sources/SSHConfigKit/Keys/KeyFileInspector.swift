@@ -32,6 +32,17 @@ public enum KeyFileInspector {
     public static let headLimit = 512
 
     public static func readHead(of url: URL) throws -> Data {
+        // Opening a FIFO or device for reading can block forever; only regular files (symlinks followed).
+        var info = stat()   // stat follows symlinks
+        guard stat(url.path, &info) == 0 else {
+            throw CocoaError(.fileReadNoSuchFile, userInfo: [NSFilePathErrorKey: url.path])
+        }
+        guard info.st_mode & S_IFMT == S_IFREG else {
+            throw CocoaError(.fileReadUnsupportedScheme, userInfo: [
+                NSFilePathErrorKey: url.path,
+                NSLocalizedDescriptionKey: "Not a regular file: \(url.path)",
+            ])
+        }
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
         return try handle.read(upToCount: headLimit) ?? Data()

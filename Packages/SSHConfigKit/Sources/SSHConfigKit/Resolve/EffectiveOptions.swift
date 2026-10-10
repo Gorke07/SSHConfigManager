@@ -37,6 +37,14 @@ public struct JumpHop: Equatable, Sendable {
         return trimmed.split(separator: ",").compactMap { parse(String($0).trimmingCharacters(in: .whitespaces)) }
     }
 
+    /// 1-5 ASCII digits, value 1...65535 (no sign, spaces or non-ASCII digits).
+    private static func parsePort(_ text: Substring) -> Int? {
+        let bytes = Array(text.utf8)
+        guard (1...5).contains(bytes.count), bytes.allSatisfy({ (0x30...0x39).contains($0) }),
+              let value = Int(text), (1...65535).contains(value) else { return nil }
+        return value
+    }
+
     static func parse(_ text: String) -> JumpHop? {
         var rest = Substring(text)
         if rest.hasPrefix("ssh://") { rest = rest.dropFirst(6) }
@@ -53,20 +61,19 @@ public struct JumpHop: Equatable, Sendable {
             host = String(rest[rest.index(after: rest.startIndex)..<close])
             let after = rest[rest.index(after: close)...]
             if after.hasPrefix(":") {
-                guard let parsed = Int(after.dropFirst()) else { return nil }
+                guard let parsed = parsePort(after.dropFirst()) else { return nil }
                 port = parsed
             } else if !after.isEmpty {
                 return nil
             }
         } else if let colon = rest.lastIndex(of: ":"), rest.filter({ $0 == ":" }).count == 1 {
             host = String(rest[..<colon])
-            guard let parsed = Int(rest[rest.index(after: colon)...]) else { return nil }
+            guard let parsed = parsePort(rest[rest.index(after: colon)...]) else { return nil }
             port = parsed
         } else {
             host = String(rest)
         }
         guard !host.isEmpty else { return nil }
-        if let port, !(1...65535).contains(port) { return nil }
         return JumpHop(user: user, host: host, port: port)
     }
 }
