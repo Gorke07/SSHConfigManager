@@ -28,8 +28,11 @@ final class KeysModel {
     var selection: String?
     /// Set by the onboarding screen: the Keys window opens its New Key form and clears it.
     var pendingNewKey = false
-    /// The last Create made the key but could not assign it (the sheet then suggests a fresh file name).
-    private(set) var createdButNotAssigned = false
+    /// Set when an agent add without a passphrase found the key encrypted: the window opens the passphrase sheet.
+    var passphraseRequestedFor: String?
+    /// The key menu in the host form refreshes at most this often.
+    @ObservationIgnored var staleAfter: Duration = .seconds(5)
+    @ObservationIgnored private var lastRefresh: ContinuousClock.Instant?
 
     @ObservationIgnored let tools: KeyTools
     @ObservationIgnored weak var app: AppModel?
@@ -59,6 +62,13 @@ final class KeysModel {
         return KeyManager.nextAvailableURL(fileName: type.defaultFileName, in: app.sshDirectory).lastPathComponent
     }
 
+    /// Refreshes unless a refresh is running or finished recently (each one runs ssh-keygen per key).
+    func refreshIfStale() async {
+        if isRefreshing { return }
+        if let lastRefresh, ContinuousClock.now - lastRefresh < staleAfter { return }
+        await refresh()
+    }
+
     func refresh() async {
         guard let app else { return }
         // Called after every key operation, successful or not: the lint reads key files.
@@ -73,10 +83,12 @@ final class KeysModel {
                                             extraPrivateKeys: KeyUsage.identityFiles(of: hosts, home: home))
         let agent = await tools.manager.agentFingerprints()
         guard generation == refreshGeneration else { return }
+        lastRefresh = .now
+        let labels = KeyUsage.hostLabelsByIdentity(in: hosts, home: home)
         rows = keys.map { key in
             KeyRow(
                 key: key,
-                usedBy: KeyUsage.hosts(using: key.fileURL, in: hosts, home: home),
+                usedBy: labels[KeyUsage.identity(key.fileURL)] ?? [],
                 inAgent: agent.flatMap { loaded in key.publicKey.map { loaded.contains($0.fingerprint) } },
                 displayPath: app.settings.displayPath(for: key.fileURL))
         }
@@ -86,7 +98,6 @@ final class KeysModel {
     /// Creates `~/.ssh/<fileName>`; optionally adds it to a host as an unsaved edit (saved by the Save flow).
     func generate(type: SSHKeyType, fileName: String, comment: String, passphrase: String, assignTo alias: String?) async -> Bool {
         guard let app else { return false }
-        createdButNotAssigned = false
         guard Self.isValidFileName(fileName) else {
             errorMessage = String(localized: "keys.error.invalidFileName")
             return false
@@ -111,7 +122,6 @@ final class KeysModel {
         }
         if let assignmentError {
             // The key exists now; the sheet closes and the window shows the message.
-            createdButNotAssigned = true
             let shownPath = app.settings.displayPath(for: url)
             notice = String(localized: "keys.error.createdNotAssigned \(shownPath)") + assignmentError
             noticeIsAutomationDenied = false
@@ -149,8 +159,14 @@ final class KeysModel {
 
     func addToAgent(_ row: KeyRow, passphrase: String?) async -> Bool {
         guard let url = row.key.privateURL else { return false }
+        passphraseRequestedFor = nil
         return await perform {
-            try await tools.manager.addToAgent(url, passphrase: passphrase, useKeychain: tools.useKeychain)
+            do {
+                try await tools.manager.addToAgent(url, passphrase: passphrase, useKeychain: tools.useKeychain)
+            } catch KeyManagerError.passphraseRequired {
+                // Not an error to show: the window asks for the passphrase instead.
+                passphraseRequestedFor = row.id
+            }
         }
     }
 

@@ -20,13 +20,39 @@ public enum KeyUsage {
         url.resolvingSymlinksInPath().standardizedFileURL.path
     }
 
+    /// A stable key for "the same file": `device:inode` (stat follows symlinks and `..`, and is exact on
+    /// case-insensitive volumes) when the file exists, else the canonical path.
+    public static func identity(_ url: URL) -> String {
+        var info = stat()
+        if stat(url.path, &info) == 0 { return "\(info.st_dev):\(info.st_ino)" }
+        return canonicalPath(url)
+    }
+
+    public static func sameFile(_ a: URL, _ b: URL) -> Bool {
+        identity(a) == identity(b)
+    }
+
+    /// Host labels by the identity of each resolvable IdentityFile they name.
+    public static func hostLabelsByIdentity(in hosts: [HostEntry], home: URL) -> [String: [String]] {
+        var result: [String: [String]] = [:]
+        for host in hosts {
+            let label = host.patterns.joined(separator: " ")
+            for value in host.values(for: "IdentityFile") {
+                guard let url = resolve(value, home: home) else { continue }
+                let key = identity(url)
+                if !(result[key]?.contains(label) ?? false) { result[key, default: []].append(label) }
+            }
+        }
+        return result
+    }
+
     /// Every resolvable IdentityFile of the given hosts, once.
     public static func identityFiles(of hosts: [HostEntry], home: URL) -> [URL] {
         var seen = Set<String>()
         var result: [URL] = []
         for host in hosts {
             for value in host.values(for: "IdentityFile") {
-                guard let url = resolve(value, home: home), seen.insert(canonicalPath(url)).inserted else { continue }
+                guard let url = resolve(value, home: home), seen.insert(identity(url)).inserted else { continue }
                 result.append(url)
             }
         }
@@ -35,15 +61,6 @@ public enum KeyUsage {
 
     /// Host labels (patterns joined by a space, file order) whose IdentityFile names `key`.
     public static func hosts(using key: URL, in hosts: [HostEntry], home: URL) -> [String] {
-        let target = canonicalPath(key)
-        var result: [String] = []
-        for host in hosts {
-            let uses = host.values(for: "IdentityFile").contains { value in
-                resolve(value, home: home).map { canonicalPath($0) == target } ?? false
-            }
-            let label = host.patterns.joined(separator: " ")
-            if uses && !result.contains(label) { result.append(label) }
-        }
-        return result
+        hostLabelsByIdentity(in: hosts, home: home)[identity(key)] ?? []
     }
 }

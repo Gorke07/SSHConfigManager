@@ -26,6 +26,8 @@ public enum KeyManagerError: Error, Equatable, Sendable {
     /// askpass hands the passphrase over as one line, so it is cut at the first line break.
     case invalidPassphrase
     case wrongPassphrase
+    /// The key is encrypted and no passphrase was given.
+    case passphraseRequired
     case noAgent
     case timedOut
     /// ssh's first stderr line (English, untranslated by design).
@@ -76,8 +78,30 @@ public struct KeyManager: Sendable {
         if !fm.fileExists(atPath: directory.path) {
             try fm.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         }
-        let result = try await run("ssh-keygen", ["-q"] + type.arguments + ["-C", comment, "-f", url.path, "-N", passphrase])
+        // ssh-keygen only asks before replacing the private key, so it never writes the final paths: it
+        // generates into a private temp directory beside them, and the files are then link(2)ed into place,
+        // which fails if either already exists (nothing is ever overwritten).
+        let temp = directory.appending(path: ".sshcm-keygen-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try fm.createDirectory(at: temp, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        defer { try? fm.removeItem(at: temp) }
+        let tempKey = temp.appending(path: "key")
+        let result = try await run("ssh-keygen", ["-q"] + type.arguments + ["-C", comment, "-f", tempKey.path, "-N", passphrase])
         try check(result)
+        try Self.linkNew(tempKey.path, to: url.path)
+        do {
+            try Self.linkNew(tempKey.path + ".pub", to: url.path + ".pub")
+        } catch {
+            unlink(url.path)   // our own link to the key just made
+            throw error
+        }
+    }
+
+    /// `link(2)`: fails with `fileExists` if `destination` exists (even as a dangling symlink).
+    static func linkNewForTesting(_ source: String, to destination: String) throws { try linkNew(source, to: destination) }
+    private static func linkNew(_ source: String, to destination: String) throws {
+        guard link(source, destination) != 0 else { return }
+        if errno == EEXIST { throw KeyManagerError.fileExists(destination) }
+        throw KeyManagerError.failed(String(cString: strerror(errno)))
     }
 
     public func changePassphrase(at url: URL, old: String, new: String) async throws {
@@ -98,7 +122,7 @@ public struct KeyManager: Sendable {
             || result.stderr.contains("Could not open a connection") {
             throw KeyManagerError.noAgent
         }
-        if askPass.wasAsked { throw KeyManagerError.wrongPassphrase }
+        if askPass.wasAsked { throw passphrase == nil ? KeyManagerError.passphraseRequired : KeyManagerError.wrongPassphrase }
         throw KeyManagerError.failed(ConnectionClassifier.firstLine(result.stderr))
     }
 

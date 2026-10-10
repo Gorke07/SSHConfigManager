@@ -742,7 +742,7 @@ final class AppModel {
     /// ~/.ssh and the active config file's directory (spec §8.1), each once.
     var keyDirectories: [URL] {
         let configDirectory = store.fileURL.deletingLastPathComponent()
-        return configDirectory.standardizedFileURL == sshDirectory.standardizedFileURL ? [sshDirectory] : [sshDirectory, configDirectory]
+        return KeyUsage.sameFile(configDirectory, sshDirectory) ? [sshDirectory] : [sshDirectory, configDirectory]
     }
 
     /// Host blocks of the saved file and its saved Include files: what ssh reads.
@@ -771,7 +771,11 @@ final class AppModel {
             throw KeyAssignmentError.hostNotFound(alias)
         }
         let path = settings.displayPath(for: url)
-        guard !entry.values(for: "IdentityFile").contains(path) else { return }
+        let home = settings.homeDirectory
+        // Already assigned, however it is spelled (~/…, absolute, through a symlink or `..`).
+        guard !entry.values(for: "IdentityFile").contains(where: { value in
+            value == path || KeyUsage.resolve(value, home: home).map { KeyUsage.sameFile($0, url) } ?? false
+        }) else { return }
         var draft = HostDraft(entry)
         draft.directives.append(DraftDirective(key: "IdentityFile", value: path))
         try store.apply { try $0.updateHost(at: entry.headerLine, to: draft) }

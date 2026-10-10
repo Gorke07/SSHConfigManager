@@ -295,6 +295,13 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu özel anahtarın parolası yok. Dosyayı kopyalayan herkes kullanabilir." } }
       }
     },
+    "keys.unreadable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The private key cannot be read (check its permissions)" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Özel anahtar okunamıyor (izinlerini kontrol edin)" } }
+      }
+    },
     "keys.noPrivateKey" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -566,6 +573,13 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "The passphrase is not correct." } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Parola doğru değil." } }
+      }
+    },
+    "keys.error.passphraseRequired" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This key is encrypted and needs a passphrase." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu anahtar şifreli; parola gerekiyor." } }
       }
     },
     "keys.error.noAgent" : {

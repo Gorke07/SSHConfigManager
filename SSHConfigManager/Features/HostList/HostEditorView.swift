@@ -48,7 +48,7 @@ struct HostEditorView: View {
                 HStack {
                     Button(String(localized: "editor.identityFiles.add")) { editor.identityFiles.append("") }
                     Menu(String(localized: "action.choose")) {
-                        let privateKeys = keys.rows.filter(\.key.hasPrivateKey)
+                        let privateKeys = keys.rows.filter { $0.key.hasPrivateKey && !$0.key.unreadable }
                         if privateKeys.isEmpty {
                             Text(String(localized: "editor.identityFiles.noKeys"))
                         }
@@ -63,7 +63,10 @@ struct HostEditorView: View {
                         Button(String(localized: "editor.identityFiles.otherFile")) { importingIdentity = true }
                     }
                     .fixedSize()
-                    .task { if keys.rows.isEmpty { await keys.refresh() } }
+                    .task { await keys.refreshIfStale() }
+                    .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                        Task { await keys.refreshIfStale() }
+                    }
                 }
             }
 

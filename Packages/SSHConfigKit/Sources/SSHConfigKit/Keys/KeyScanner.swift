@@ -5,15 +5,18 @@ public struct SSHKey: Identifiable, Equatable, Sendable {
     public let publicURL: URL?
     public let publicKey: PublicKeyInfo?
     public let encryption: KeyEncryption
+    /// The private key exists but could not be read (permissions, I/O): its encryption is unknown.
+    public let unreadable: Bool
     /// From `ssh-keygen -lf` on the public key.
     public var bits: Int?
     public var typeLabel: String?
 
-    public init(privateURL: URL?, publicURL: URL?, publicKey: PublicKeyInfo?, encryption: KeyEncryption, bits: Int? = nil, typeLabel: String? = nil) {
+    public init(privateURL: URL?, publicURL: URL?, publicKey: PublicKeyInfo?, encryption: KeyEncryption, unreadable: Bool = false, bits: Int? = nil, typeLabel: String? = nil) {
         self.privateURL = privateURL
         self.publicURL = publicURL
         self.publicKey = publicKey
         self.encryption = encryption
+        self.unreadable = unreadable
         self.bits = bits
         self.typeLabel = typeLabel
     }
@@ -31,14 +34,20 @@ public struct SSHKey: Identifiable, Equatable, Sendable {
 public struct KeyScanner: Sendable {
     private let runner: any ProcessRunning
     private let sshKeygen: URL
+    private let discovery: @Sendable ([URL], [URL]) -> [SSHKey]
 
-    public init(runner: any ProcessRunning = ProcessRunner(), sshKeygen: URL = URL(filePath: "/usr/bin/ssh-keygen")) {
+    /// `discovery` is a test seam; it always runs off the calling actor.
+    public init(runner: any ProcessRunning = ProcessRunner(), sshKeygen: URL = URL(filePath: "/usr/bin/ssh-keygen"),
+                discovery: @escaping @Sendable ([URL], [URL]) -> [SSHKey] = { KeyScanner.discover(directories: $0, extraPrivateKeys: $1) }) {
         self.runner = runner
         self.sshKeygen = sshKeygen
+        self.discovery = discovery
     }
 
     public func scan(directories: [URL], extraPrivateKeys: [URL] = []) async -> [SSHKey] {
-        var keys = Self.discover(directories: directories, extraPrivateKeys: extraPrivateKeys)
+        // File I/O must not run on the caller's (main) actor.
+        let discovery = discovery
+        var keys = await Task.detached(priority: .userInitiated) { discovery(directories, extraPrivateKeys) }.value
         for index in keys.indices {
             // Stop on cancellation: no more processes, return what we have.
             if Task.isCancelled { break }
@@ -74,10 +83,25 @@ public struct KeyScanner: Sendable {
             (try? String(contentsOf: url, encoding: .utf8)).flatMap(PublicKeyInfo.init(text:))
         }
         func addPrivate(_ url: URL) {
-            let canonical = KeyUsage.canonicalPath(url)
-            guard !seenFiles.contains(canonical), isFile(url),
-                  let head = try? KeyFileInspector.readHead(of: url), KeyFileInspector.isPrivateKeyHeader(head) else { return }
-            seenFiles.insert(canonical)
+            let identity = KeyUsage.identity(url)
+            guard !seenFiles.contains(identity), isFile(url) else { return }
+            let head: Data
+            do {
+                head = try KeyFileInspector.readHead(of: url)
+            } catch let error as POSIXError where ![.ENOENT, .ENOTDIR, .ELOOP].contains(error.code) {
+                // It exists and is a file but cannot be read: show it as an unreadable private key
+                // (never as a public-only key beside it).
+                seenFiles.insert(identity)
+                let pub = URL(filePath: url.path + ".pub")
+                let info = publicInfo(pub)
+                keys.append(SSHKey(privateURL: url, publicURL: info == nil ? nil : pub, publicKey: info,
+                                   encryption: .unknown, unreadable: true))
+                return
+            } catch {
+                return
+            }
+            guard KeyFileInspector.isPrivateKeyHeader(head) else { return }
+            seenFiles.insert(identity)
             let pub = URL(filePath: url.path + ".pub")
             let info = publicInfo(pub)
             keys.append(SSHKey(privateURL: url, publicURL: info == nil ? nil : pub, publicKey: info,
@@ -85,7 +109,7 @@ public struct KeyScanner: Sendable {
         }
 
         for directory in directories {
-            guard seenDirectories.insert(KeyUsage.canonicalPath(directory)).inserted,
+            guard seenDirectories.insert(KeyUsage.identity(directory)).inserted,
                   let names = try? fm.contentsOfDirectory(atPath: directory.path) else { continue }
             let visible = names.filter { !$0.hasPrefix(".") }.sorted()
             let visibleSet = Set(visible)
@@ -95,10 +119,10 @@ public struct KeyScanner: Sendable {
             for name in visible where name.hasSuffix(".pub") && !name.hasSuffix("-cert.pub") {
                 let pub = directory.appending(path: name)
                 let base = URL(filePath: String(pub.path.dropLast(4)))
-                let canonicalPub = KeyUsage.canonicalPath(pub)
-                guard !seenFiles.contains(KeyUsage.canonicalPath(base)), !seenFiles.contains(canonicalPub),
+                let pubIdentity = KeyUsage.identity(pub)
+                guard !seenFiles.contains(KeyUsage.identity(base)), !seenFiles.contains(pubIdentity),
                       isFile(pub), let info = publicInfo(pub) else { continue }
-                seenFiles.insert(canonicalPub)
+                seenFiles.insert(pubIdentity)
                 keys.append(SSHKey(privateURL: nil, publicURL: pub, publicKey: info, encryption: .unknown))
             }
         }

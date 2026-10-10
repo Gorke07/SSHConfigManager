@@ -204,7 +204,6 @@ struct KeysModelTests {
         editor.fields["Port"] = "abc"
         #expect(!editor.commit())
         #expect(await task.value == true)
-        #expect(keys.createdButNotAssigned)
         let prefix = String(localized: "keys.error.createdNotAssigned \("~/.ssh/deploy")")
         #expect(keys.notice == prefix + String(localized: "keys.error.pendingFormEdits"))
         #expect(FileManager.default.fileExists(atPath: privateKey))
@@ -266,5 +265,39 @@ struct KeysModelTests {
         #expect(model.errorMessage == "set while the upload runs")
         #expect(model.keys.errorMessage == String(localized: "connect.failed \("boom")"))
         #expect(!model.automationDenied && model.fallbackNotice == nil)
+    }
+
+    @Test func refreshIfStaleThrottlesTheHostFormMenu() async throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\n")
+        let keys = model.keys
+        _ = await keys.generate(type: .ed25519, fileName: "a", comment: "c", passphrase: "", assignTo: nil)
+        await keys.refreshIfStale()                       // first call always refreshes
+        #expect(keys.rows.map(\.key.name) == ["a"])
+        _ = try await TestSupportKeygen.make(tmp.url.appending(path: ".ssh/b"))
+        await keys.refreshIfStale()                       // within the window: no scan
+        #expect(keys.rows.map(\.key.name) == ["a"])
+        keys.staleAfter = .zero
+        await keys.refreshIfStale()
+        #expect(keys.rows.map(\.key.name) == ["a", "b"])
+    }
+
+    @Test func assignIdentityFileSkipsAnEquivalentSpelling() async throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\n  IdentityFile ~/.ssh/../.ssh/k\n")
+        _ = try await TestSupportKeygen.make(tmp.url.appending(path: ".ssh/k"))
+        try model.assignIdentityFile(tmp.url.appending(path: ".ssh/k"), toAlias: "web")
+        let entry = try #require(model.store.document.hosts.first { $0.alias == "web" })
+        #expect(entry.values(for: "IdentityFile") == ["~/.ssh/../.ssh/k"])
+    }
+}
+
+/// Real ssh-keygen on a temp file only.
+enum TestSupportKeygen {
+    static func make(_ url: URL) async throws -> ProcessResult {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        return try await ProcessRunner().run(URL(filePath: "/usr/bin/ssh-keygen"),
+                                             arguments: ["-q", "-t", "ed25519", "-N", "", "-f", url.path],
+                                             environment: [:], timeout: .seconds(30))
     }
 }

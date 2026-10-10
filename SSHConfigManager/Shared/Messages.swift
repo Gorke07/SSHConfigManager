@@ -106,6 +106,7 @@ enum Messages {
         case .passphraseTooShort: String(localized: "keys.error.passphraseTooShort")
         case .invalidPassphrase: String(localized: "keys.error.invalidPassphrase")
         case .wrongPassphrase: String(localized: "keys.error.wrongPassphrase")
+        case .passphraseRequired: String(localized: "keys.error.passphraseRequired")
         case .noAgent: String(localized: "keys.error.noAgent")
         case .timedOut: String(localized: "keys.error.timedOut")
         case .failed(let detail): String(localized: "keys.error.failed \(detail)")

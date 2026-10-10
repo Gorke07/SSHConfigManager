@@ -128,4 +128,59 @@ struct KeyManagerTests {
         #expect(KeyManager.parseAgentList(output) == ["SHA256:aaa", "SHA256:bbb"])
         #expect(KeyManager.parseAgentList("") == [])
     }
+
+    @Test func generateNeverOverwritesALateAppearingPublicFile() throws {
+        // The final paths are only ever created by link(2), which fails if either exists.
+        let tmp = try TempDir()
+        let existing = try tmp.file("k.pub", "mine\n")
+        let source = try tmp.file("src", "new\n")
+        #expect(throws: KeyManagerError.fileExists(existing.path)) {
+            try KeyManager.linkNewForTesting(source.path, to: existing.path)
+        }
+        #expect(try tmp.read("k.pub") == "mine\n")
+    }
+
+    @Test func generateLeavesNoTempDirectoryAndKeepsModes() async throws {
+        let tmp = try TempDir()
+        try await manager(tmp).generate(type: .ed25519, at: tmp.url.appending(path: "k"), comment: "c", passphrase: "")
+        let names = try FileManager.default.contentsOfDirectory(atPath: tmp.url.path).sorted()
+        #expect(names == ["k", "k.pub"])
+        let mode = try FileManager.default.attributesOfItem(atPath: tmp.url.appending(path: "k").path)[.posixPermissions] as? Int
+        #expect(mode == 0o600)
+    }
+
+    @Test func generateRefusesWhenOnlyThePublicFileAppearedMeanwhile() async throws {
+        let tmp = try TempDir()
+        let danglingPub = tmp.url.appending(path: "k.pub")
+        try FileManager.default.createSymbolicLink(at: danglingPub, withDestinationURL: tmp.url.appending(path: "nowhere"))
+        // fileExists follows the dangling link, so the pre-check passes; link(2) must still refuse.
+        await #expect(throws: KeyManagerError.fileExists(danglingPub.path)) {
+            try await manager(tmp).generate(type: .ed25519, at: tmp.url.appending(path: "k"), comment: "c", passphrase: "")
+        }
+        #expect(!FileManager.default.fileExists(atPath: tmp.url.appending(path: "k").path))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: tmp.url.path).sorted() == ["k.pub"])
+    }
+
+    @Test func askPassIsRemovedWhenSetupFails() throws {
+        let tmp = try TempDir()
+        // A parent that is a file makes createDirectory fail before anything exists; nothing may be left.
+        let file = try tmp.file("parent", "x")
+        #expect(throws: (any Error).self) { try AskPass.make(in: file) }
+        #expect(try FileManager.default.contentsOfDirectory(atPath: tmp.url.path) == ["parent"])
+    }
+
+    @Test func anEncryptedKeyWithNoPassphraseAsksForOne() async throws {
+        let tmp = try TempDir()
+        let agent = try TestAgent()
+        let keys = manager(tmp, agent: agent)
+        let url = tmp.url.appending(path: "k")
+        try await keys.generate(type: .ed25519, at: url, comment: "c", passphrase: "dogru1234")
+        await #expect(throws: KeyManagerError.passphraseRequired) {
+            try await keys.addToAgent(url, passphrase: nil, useKeychain: false)
+        }
+        await #expect(throws: KeyManagerError.wrongPassphrase) {
+            try await keys.addToAgent(url, passphrase: "yanlis123", useKeychain: false)
+        }
+        #expect(try askPassLeftovers(tmp).isEmpty)
+    }
 }

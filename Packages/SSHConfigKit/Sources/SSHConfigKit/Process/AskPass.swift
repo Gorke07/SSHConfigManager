@@ -25,7 +25,12 @@ struct AskPass {
             askPass.remove()
             throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: askPass.helper.path])
         }
-        try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: askPass.helper.path)   // umask may have narrowed it
+        do {
+            try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: askPass.helper.path)   // umask may have narrowed it
+        } catch {
+            askPass.remove()
+            throw error
+        }
         return askPass
     }
 

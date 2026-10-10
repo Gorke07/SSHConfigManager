@@ -25,7 +25,11 @@ struct KeysWindow: View {
         Table(keys.rows, selection: $keys.selection) {
             TableColumn(String(localized: "keys.column.name")) { row in
                 HStack(spacing: 4) {
-                    if !row.key.hasPrivateKey {
+                    if row.key.unreadable {
+                        Image(systemName: "lock.slash").foregroundStyle(.orange)
+                            .help(String(localized: "keys.unreadable"))
+                            .accessibilityLabel(String(localized: "keys.unreadable"))
+                    } else if !row.key.hasPrivateKey {
                         Image(systemName: "key.slash").foregroundStyle(.secondary)
                             .help(String(localized: "keys.noPrivateKey"))
                             .accessibilityLabel(String(localized: "keys.noPrivateKey"))
@@ -77,6 +81,10 @@ struct KeysWindow: View {
                 }
                 .disabled(selectedRow == nil)
             }
+        }
+        .onChange(of: keys.passphraseRequestedFor) {
+            if let id = keys.passphraseRequestedFor, let row = keys.rows.first(where: { $0.id == id }) { sheet = .addToAgent(row) }
+            keys.passphraseRequestedFor = nil
         }
         .onChange(of: keys.pendingNewKey, initial: true) {
             if keys.pendingNewKey { sheet = .new; keys.pendingNewKey = false }
@@ -151,13 +159,13 @@ struct KeysWindow: View {
                 sheet = .addToAgent(row)
             }
         }
-        .disabled(!row.key.hasPrivateKey)
+        .disabled(!row.key.hasPrivateKey || row.key.unreadable)
         Button(String(localized: "keys.upload")) { sheet = .upload(row) }
             .disabled(row.key.publicURL == nil || !row.key.hasPrivateKey)
             .help(row.key.publicURL == nil ? String(localized: "keys.upload.noPublicKey")
                   : row.key.hasPrivateKey ? "" : String(localized: "keys.upload.needsPrivateKey"))
         Button(String(localized: "keys.changePassphrase")) { sheet = .changePassphrase(row) }
-            .disabled(!row.key.hasPrivateKey)
+            .disabled(!row.key.hasPrivateKey || row.key.unreadable)
         Divider()
         Button(String(localized: "keys.trash"), role: .destructive) { trashing = row }
     }
@@ -171,6 +179,10 @@ struct KeysWindow: View {
             Label(String(localized: "keys.passphrase.no"), systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
                 .help(String(localized: "keys.passphrase.noHelp"))
+        case .unknown where row.key.unreadable:
+            Image(systemName: "lock.slash").foregroundStyle(.orange)
+                .help(String(localized: "keys.unreadable"))
+                .accessibilityLabel(String(localized: "keys.unreadable"))
         case .unknown:
             Text(verbatim: "—").foregroundStyle(.secondary)
         }
