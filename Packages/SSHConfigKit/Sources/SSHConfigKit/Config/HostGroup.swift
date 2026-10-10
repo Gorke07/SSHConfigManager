@@ -16,32 +16,36 @@ extension ConfigDocument {
         return text.dropFirst().trimmingCharacters(in: .whitespaces)
     }
 
-    /// Index of the group line in the comment block directly above `header`, if any.
-    func groupLineIndex(above header: Int) -> Int? {
+    /// Indices (descending, nearest first) of every group line in the comment block directly above `header`.
+    func groupLineIndices(above header: Int) -> [Int] {
+        var result: [Int] = []
         var index = header - 1
         while index >= 0, lines[index].kind == .comment {
-            if Self.groupName(inCommentLine: lines[index].raw) != nil { return index }
+            if Self.groupName(inCommentLine: lines[index].raw) != nil { result.append(index) }
             index -= 1
         }
-        return nil
+        return result
     }
 
     public func group(ofHostAt header: Int) -> String? {
-        guard hostEntry(at: header) != nil, let index = groupLineIndex(above: header),
+        guard hostEntry(at: header) != nil, let index = groupLineIndices(above: header).first,
               let name = Self.groupName(inCommentLine: lines[index].raw), !name.isEmpty else { return nil }
         return name
     }
 
-    /// Adds, replaces or (nil / empty name) removes the Host's group line; no other line changes.
+    /// Removes every group line in the Host's glued comment block, then (for a non-empty name) writes
+    /// exactly one, where the nearest one was or directly above the Host. Other lines are untouched.
     public mutating func setGroup(ofHostAt header: Int, to name: String?) throws {
         guard hostEntry(at: header) != nil else { throw ConfigEditError.hostNotFound(header) }
         let trimmed = (name ?? "").trimmingCharacters(in: .whitespaces)
         guard !trimmed.containsControlCharacter else { throw ConfigEditError.controlCharacter }
         let line = ConfigLine(raw: "# group: " + trimmed + lineEndingSuffix)
-        if let index = groupLineIndex(above: header) {
-            if trimmed.isEmpty { lines.remove(at: index) } else { lines[index] = line }
-        } else if !trimmed.isEmpty {
-            lines.insert(line, at: header)
+        let found = groupLineIndices(above: header)
+        guard let nearest = found.first else {
+            if !trimmed.isEmpty { lines.insert(line, at: header) }
+            return
         }
+        if trimmed.isEmpty { lines.remove(at: nearest) } else { lines[nearest] = line }
+        for index in found.dropFirst() { lines.remove(at: index) }
     }
 }

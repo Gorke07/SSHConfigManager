@@ -9,12 +9,15 @@ struct HostGroupTests {
         ("   # GROUP :  Prod  ", "Prod"),
         ("# Group: Staging Servers\r", "Staging Servers"),
         ("# group:", ""),
+        ("\t# group: x", "x"),
+        ("# group: a # b", "a # b"),
+        ("# group: Üretim Sunucuları", "Üretim Sunucuları"),
     ])
     func parsesGroupComments(_ line: String, _ expected: String) {
         #expect(ConfigDocument.groupName(inCommentLine: line) == expected)
     }
 
-    @Test(arguments: ["# groups: x", "# my group: x", "Host x", "# group x", ""])
+    @Test(arguments: ["# groups: x", "# my group: x", "Host x", "# group x", "", "# groupie: x"])
     func ignoresOtherLines(_ line: String) {
         #expect(ConfigDocument.groupName(inCommentLine: line) == nil)
     }
@@ -73,5 +76,31 @@ struct HostGroupTests {
         var doc = ConfigDocument(parsing: "# group: g\nHost a\n\nHost b\n")
         try doc.removeHost(at: 1)
         #expect(doc.render() == "Host b\n")
+    }
+
+    @Test func removingWithTwoGroupLinesLeavesNone() throws {
+        var doc = ConfigDocument(parsing: "# group: Old\n# group: New\nHost a\n")
+        try doc.setGroup(ofHostAt: 2, to: nil)
+        #expect(doc.render() == "Host a\n")
+        #expect(doc.group(ofHostAt: 0) == nil)
+    }
+
+    @Test func settingWithTwoGroupLinesLeavesExactlyOne() throws {
+        var doc = ConfigDocument(parsing: "# group: Old\n# note\n# group: New\n# tail\nHost a\n")
+        try doc.setGroup(ofHostAt: 4, to: "Fresh")
+        #expect(doc.render() == "# note\n# group: Fresh\n# tail\nHost a\n")
+        #expect(doc.group(ofHostAt: 3) == "Fresh")
+    }
+
+    @Test func removingKeepsNonGroupCommentsBetweenGroupLines() throws {
+        var doc = ConfigDocument(parsing: "# group: Old\n# keep 1\n# group: New\n# keep 2\nHost a\n")
+        try doc.setGroup(ofHostAt: 4, to: nil)
+        #expect(doc.render() == "# keep 1\n# keep 2\nHost a\n")
+    }
+
+    @Test func groupGluedToNextHostSurvivesRemovingThePreviousHost() throws {
+        var doc = ConfigDocument(parsing: "Host a\n# group: g\nHost b\n")
+        try doc.removeHost(at: 0)
+        #expect(doc.render() == "# group: g\nHost b\n")
     }
 }
