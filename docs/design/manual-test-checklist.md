@@ -114,3 +114,6 @@ Elle denemede gerçek anahtarlarınıza dokunmamak için yeni anahtarları `dene
 - [ ] Seçili host'un altında `kullanıcı@adres:port · … üzerinden` önizlemesi kısa sürede beliriyor.
 - [ ] Bir host'un detayında "Etkin Ayarlar" ssh -G değerlerini ve her birinin kaynağını (Bu host / Host * / Dosyanın başı / Dahil edilen / Varsayılan) gösteriyor; "Tümünü Göster" kalan ayarları açıyor.
 - [ ] ProxyJump kullanan host'ta `Bu Mac → bastion → host` zinciri görünüyor; "Zinciri Test Et" sırayla test ediyor, başarısız halkadan sonrakiler "Atlandı".
+- [ ] Grup atanan hostlar kenar çubuğunda grup başlıkları altında; grupsuzlar en altta "Diğer Hostlar". Dosyadaki değişiklik yalnızca `# group:` satırı (Kaydet farkında kontrol).
+- [ ] Favori hostlarda yıldız; sağ tık ve detaydaki yıldızla ekleme/çıkarma.
+- [ ] Var olmayan IdentityFile, yinelenen alias ya da parolasız anahtar kullanan hostta ⚠ ve açıklaması görünüyor; düzeltince hemen kayboluyor.

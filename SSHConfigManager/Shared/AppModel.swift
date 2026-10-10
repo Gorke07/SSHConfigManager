@@ -305,6 +305,54 @@ final class AppModel {
         return created
     }
 
+    /// Sets or (nil/blank) removes the host's `# group:` line as an unsaved edit. The open editor
+    /// keeps its fields: it finds its block by alias and occurrence and compares only directives.
+    func setGroup(_ item: SidebarItem, to name: String?) {
+        guard let entry = SidebarBuilder.hostEntry(for: item, in: store.document) else { return }
+        let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            try store.apply { try $0.setGroup(ofHostAt: entry.headerLine, to: trimmed?.isEmpty == false ? trimmed : nil) }
+        } catch {
+            errorMessage = Messages.text(for: error)
+        }
+    }
+
+    /// Group names used in the document, for suggestions.
+    var existingGroups: [String] {
+        let document = store.document
+        let names = Set(document.hosts.compactMap { document.group(ofHostAt: $0.headerLine) })
+        return names.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
+    /// Lint of every root-file Host block in the document being edited (so fixes show at once),
+    /// keyed by sidebar item. One pass: duplicates and first blocks are computed once, and each
+    /// key file is read at most once. Patterns are not linted.
+    func lintIssueMap() -> [SidebarItem: [HostIssue]] {
+        let document = store.document
+        let reads = KeyReadMemo()
+        let lint = HostLint(
+            home: settings.homeDirectory,
+            fileExists: { FileManager.default.fileExists(atPath: $0.path) },
+            encryption: { reads.encryption(of: $0) })
+        let duplicates = HostLint.duplicateCounts(document: document, included: store.includedHosts)
+        let firstBlocks = HostLint.firstBlocks(document: document)
+        var seen: [String: Int] = [:]
+        var map: [SidebarItem: [HostIssue]] = [:]
+        for entry in document.hosts {
+            let occurrence = seen[entry.alias, default: 0]
+            seen[entry.alias] = occurrence + 1
+            guard !entry.isPattern else { continue }
+            let issues = lint.issues(for: entry, duplicates: duplicates, firstBlocks: firstBlocks)
+            if !issues.isEmpty { map[.host(alias: entry.alias, occurrence: occurrence)] = issues }
+        }
+        return map
+    }
+
+    func lintIssues(for item: SidebarItem) -> [HostIssue] {
+        guard case .host = item else { return [] }
+        return lintIssueMap()[item] ?? []
+    }
+
     var hasPendingFormEdits: Bool { activeEditor?.hasPendingChanges ?? false }
 
     /// Selects `item`, unless the form holds edits that were never applied; then asks first.
@@ -411,4 +459,19 @@ final class AppModel {
 enum KeyAssignmentError: Error, Equatable {
     case hostNotFound(String)
     case pendingFormEdits
+}
+
+/// Reads each private key's head at most once per lint pass.
+private final class KeyReadMemo: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cache: [URL: KeyEncryption] = [:]
+
+    func encryption(of url: URL) -> KeyEncryption {
+        lock.lock()
+        defer { lock.unlock() }
+        if let known = cache[url] { return known }
+        let value = (try? KeyFileInspector.readHead(of: url)).map(KeyFileInspector.encryption(ofPrivateKeyHead:)) ?? .unknown
+        cache[url] = value
+        return value
+    }
 }

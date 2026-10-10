@@ -352,4 +352,35 @@ struct AppModelTests {
         #expect(model.store.externalChangePending)
         #expect(!model.isUnsavedHost(added))
     }
+
+    @Test func settingAGroupIsAnUnsavedEditOfOneLine() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\n  User u\nHost db\n")
+        model.setGroup(.host(alias: "web", occurrence: 0), to: "Prod")
+        #expect(model.store.document.render() == "# group: Prod\nHost web\n  User u\nHost db\n")
+        #expect(model.existingGroups == ["Prod"])
+        #expect(try tmp.read(".ssh/config") == "Host web\n  User u\nHost db\n")
+    }
+
+    @Test func blankGroupNameRemovesTheGroup() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "# group: Prod\nHost web\n")
+        model.setGroup(.host(alias: "web", occurrence: 0), to: "   ")
+        #expect(model.store.document.render() == "Host web\n")
+    }
+
+    @Test func lintIssuesAreReportedForTheDocumentBeingEdited() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\n  IdentityFile ~/.ssh/missing\nHost web\n")
+        #expect(model.lintIssues(for: .host(alias: "web", occurrence: 0)).contains(.missingIdentityFile("~/.ssh/missing")))
+        #expect(model.lintIssues(for: .host(alias: "web", occurrence: 1)) == [.duplicateAlias(alias: "web", isFirst: false)])
+        #expect(model.lintIssueMap().count == 2)
+    }
+
+    @Test func lintIgnoresPatternsAndUnknownItems() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host *\n  IdentityFile ~/.ssh/missing\n")
+        #expect(model.lintIssues(for: .host(alias: "*", occurrence: 0)).isEmpty)
+        #expect(model.lintIssues(for: .match(index: 0)).isEmpty)
+    }
 }

@@ -17,6 +17,15 @@ enum Messages {
         }
     }
 
+    static func text(for issue: HostIssue) -> String {
+        switch issue {
+        case .missingIdentityFile(let path): String(localized: "issue.lint.missingIdentityFile \(path)")
+        case .duplicateAlias(let alias, let isFirst):
+            isFirst ? String(localized: "issue.lint.duplicateFirst \(alias)") : String(localized: "issue.lint.duplicateLater \(alias)")
+        case .unencryptedKey(let path): String(localized: "issue.lint.unencryptedKey \(path)")
+        }
+    }
+
     static func text(for error: ConfigEditError) -> String {
         switch error {
         case .hostNotFound: String(localized: "edit.hostNotFound")

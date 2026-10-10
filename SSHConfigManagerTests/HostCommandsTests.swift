@@ -38,4 +38,13 @@ struct HostCommandsTests {
         #expect(HostCommands.sshCommand(for: .host(alias: "web", occurrence: 0), document: app.store.document, builder: app.commandBuilder) == "ssh -- web")
         #expect(HostCommands.sshCommand(for: .match(index: 0), document: app.store.document, builder: app.commandBuilder) == nil)
     }
+
+    @Test func duplicatingKeepsTheGroup() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "# group: Prod\nHost web\n  User u\n")
+        let item = try #require(try HostCommands.duplicate(.host(alias: "web", occurrence: 0), in: model.store))
+        #expect(item == .host(alias: "web-copy", occurrence: 0))
+        let entry = try #require(SidebarBuilder.hostEntry(for: item, in: model.store.document))
+        #expect(model.store.document.group(ofHostAt: entry.headerLine) == "Prod")
+    }
 }

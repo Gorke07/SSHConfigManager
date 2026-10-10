@@ -65,6 +65,16 @@ struct ConnectionBar: View {
                 }
             }
             Spacer()
+            if let alias {
+                let isFavorite = model.memory.isFavorite(alias)
+                let title = isFavorite ? String(localized: "favorite.remove") : String(localized: "favorite.add")
+                Button { model.toggleFavorite(alias) } label: {
+                    Image(systemName: isFavorite ? "star.fill" : "star").foregroundStyle(isFavorite ? .yellow : .secondary)
+                }
+                .buttonStyle(.borderless)
+                .help(title)
+                .accessibilityLabel(title)
+            }
             Button(String(localized: "action.test")) {
                 guard let alias else { return }
                 Task { await model.connectionTests.test(alias, using: model.commandBuilder) }

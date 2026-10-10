@@ -9,14 +9,19 @@ struct SidebarView: View {
     var body: some View {
         let sections = SidebarBuilder.sections(
             document: model.store.document, included: model.store.includedHosts, search: model.searchText)
+        // One lint pass per render, not one per row.
+        let lint = model.lintIssueMap()
+        let onlyUnnamed = sections.hostGroups.allSatisfy { $0.name == nil }
         List(selection: Binding(get: { model.selection }, set: { new in
             guard let new, new != model.selection else { return }
             model.requestSelect(new)
         })) {
-            section(String(localized: "sidebar.section.hosts"), rows: sections.hosts, icon: "server.rack", editable: true)
-            section(String(localized: "sidebar.section.patterns"), rows: sections.patterns, icon: "asterisk", editable: true)
-            section(String(localized: "sidebar.section.included"), rows: sections.included, icon: "lock", editable: false)
-            section(String(localized: "sidebar.section.match"), rows: sections.matches, icon: "lock", editable: false)
+            ForEach(sections.hostGroups) { group in
+                section(groupTitle(group, onlyUnnamed: onlyUnnamed), rows: group.rows, icon: "server.rack", editable: true, lint: lint)
+            }
+            section(String(localized: "sidebar.section.patterns"), rows: sections.patterns, icon: "asterisk", editable: true, lint: [:])
+            section(String(localized: "sidebar.section.included"), rows: sections.included, icon: "lock", editable: false, lint: [:])
+            section(String(localized: "sidebar.section.match"), rows: sections.matches, icon: "lock", editable: false, lint: [:])
         }
         .confirmationDialog(
             deleteTitle,
@@ -42,16 +47,34 @@ struct SidebarView: View {
         return String(localized: "delete.confirm.title \(alias)")
     }
 
+    private func groupTitle(_ group: SidebarGroup, onlyUnnamed: Bool) -> String {
+        if let name = group.name { return name }
+        return onlyUnnamed ? String(localized: "sidebar.section.hosts") : String(localized: "sidebar.section.ungrouped")
+    }
+
     @ViewBuilder
-    private func section(_ title: String, rows: [SidebarRow], icon: String, editable: Bool) -> some View {
+    private func section(_ title: String, rows: [SidebarRow], icon: String, editable: Bool,
+                         lint: [SidebarItem: [HostIssue]]) -> some View {
         if !rows.isEmpty {
-            Section(title) {
+            // Group names are user text; section titles of fixed sections are already localized strings.
+            Section {
                 ForEach(rows) { row in
                     VStack(alignment: .leading, spacing: 2) {
                         HStack {
                             Label(row.title, systemImage: icon)
+                            Spacer()
+                            if let issues = lint[row.item], !issues.isEmpty {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(.orange)
+                                    .help(issues.map(Messages.text(for:)).joined(separator: "\n"))
+                                    .accessibilityLabel(issues.map(Messages.text(for:)).joined(separator: ". "))
+                            }
                             if let alias = model.connectableAlias(for: row.item) {
-                                Spacer()
+                                if model.memory.isFavorite(alias) {
+                                    Image(systemName: "star.fill")
+                                        .foregroundStyle(.yellow)
+                                        .accessibilityLabel(String(localized: "favorite.remove"))
+                                }
                                 ConnectionStatusBadge(model: model.connectionTests, alias: alias, showsTitle: false)
                             }
                         }
@@ -71,6 +94,8 @@ struct SidebarView: View {
                         }
                     }
                 }
+            } header: {
+                Text(verbatim: title)
             }
         }
     }
@@ -79,6 +104,9 @@ struct SidebarView: View {
     private func connectItems(for item: SidebarItem) -> some View {
         if let alias = model.connectableAlias(for: item) {
             Button(String(localized: "action.connect")) { model.connect(alias: alias) }
+            Button(model.memory.isFavorite(alias) ? String(localized: "favorite.remove") : String(localized: "favorite.add")) {
+                model.toggleFavorite(alias)
+            }
             Button(String(localized: "action.test")) {
                 Task { await model.connectionTests.test(alias, using: model.commandBuilder) }
             }

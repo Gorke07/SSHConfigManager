@@ -23,7 +23,14 @@ enum HostCommands {
         guard let entry = SidebarBuilder.hostEntry(for: item, in: store.document) else { return nil }
         let alias = uniqueAlias(entry.alias + "-copy", in: store.document)
         var header = 0
-        try store.apply { header = try $0.duplicateHost(at: entry.headerLine, newAlias: alias) }
+        try store.apply {
+            header = try $0.duplicateHost(at: entry.headerLine, newAlias: alias)
+            if let group = $0.group(ofHostAt: entry.headerLine) {
+                // The group line goes directly above the new Host and shifts it down by one.
+                try $0.setGroup(ofHostAt: header, to: group)
+                header += 1
+            }
+        }
         return SidebarBuilder.item(forHeader: header, in: store.document)
     }
 

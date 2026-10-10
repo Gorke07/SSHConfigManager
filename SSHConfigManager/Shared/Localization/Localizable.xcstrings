@@ -820,6 +820,83 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Host ara" } }
       }
     },
+    "editor.group" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Group" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Grup" } }
+      }
+    },
+    "editor.group.apply" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Apply" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Uygula" } }
+      }
+    },
+    "editor.group.placeholder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No group" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Grup yok" } }
+      }
+    },
+    "editor.group.suggestions" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Existing Groups" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Mevcut Gruplar" } }
+      }
+    },
+    "favorite.add" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Add to Favorites" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Favorilere Ekle" } }
+      }
+    },
+    "favorite.remove" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Remove from Favorites" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Favorilerden Çıkar" } }
+      }
+    },
+    "issue.lint.missingIdentityFile %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "IdentityFile not found: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "IdentityFile bulunamadı: %@" } }
+      }
+    },
+    "issue.lint.duplicateFirst %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "“%@” also appears in later Host blocks; they only add settings this block does not set." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "“%@” sonraki Host bloklarında da var; onlar yalnızca bu blokta olmayan ayarları ekler." } }
+      }
+    },
+    "issue.lint.duplicateLater %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "An earlier Host block already defines “%@”; its values take precedence over this block." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "“%@” daha önceki bir Host bloğunda zaten tanımlı; oradaki değerler bu bloğun önüne geçer." } }
+      }
+    },
+    "issue.lint.unencryptedKey %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Private key without a passphrase: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Parolasız özel anahtar: %@" } }
+      }
+    },
+    "sidebar.section.ungrouped" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Other Hosts" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Diğer Hostlar" } }
+      }
+    },
     "sidebar.section.hosts" : {
       "extractionState" : "manual",
       "localizations" : {

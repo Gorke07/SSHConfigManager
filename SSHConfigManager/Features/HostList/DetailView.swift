@@ -67,7 +67,14 @@ private struct HostEditorContainer: View {
     var body: some View {
         Group {
             if let editor {
-                HostEditorView(editor: editor, homeDirectory: model.settings.homeDirectory, keys: model.keys) { model.resetEditor() }
+                VStack(spacing: 0) {
+                    if isRootHost(editor.item) {
+                        HostGroupRow(model: model, item: editor.item)
+                        LintIssuesList(issues: model.lintIssues(for: editor.item))
+                        Divider()
+                    }
+                    HostEditorView(editor: editor, homeDirectory: model.settings.homeDirectory, keys: model.keys) { model.resetEditor() }
+                }
             } else {
                 ContentUnavailableView(String(localized: "edit.hostNotFound"), systemImage: "questionmark")
             }
@@ -76,6 +83,70 @@ private struct HostEditorContainer: View {
             if editor == nil, let item = model.selection {
                 editor = model.editor(for: item)
             }
+        }
+    }
+}
+
+/// Root-file, non-pattern hosts only (included hosts and patterns have no group field or lint).
+private extension HostEditorContainer {
+    func isRootHost(_ item: SidebarItem) -> Bool {
+        guard let entry = SidebarBuilder.hostEntry(for: item, in: model.store.document) else { return false }
+        return !entry.isPattern
+    }
+}
+
+private struct HostGroupRow: View {
+    let model: AppModel
+    let item: SidebarItem
+    @State private var groupText = ""
+
+    var body: some View {
+        HStack {
+            TextField(String(localized: "editor.group"), text: $groupText,
+                      prompt: Text(String(localized: "editor.group.placeholder")))
+                .onSubmit(apply)
+            let groups = model.existingGroups
+            if !groups.isEmpty {
+                Menu(String(localized: "editor.group.suggestions")) {
+                    ForEach(groups, id: \.self) { name in
+                        Button { groupText = name; apply() } label: { Text(verbatim: name) }
+                    }
+                }
+                .fixedSize()
+            }
+            Button(String(localized: "editor.group.apply"), action: apply)
+                .disabled(groupText.trimmingCharacters(in: .whitespacesAndNewlines) == savedGroup)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .onAppear { groupText = savedGroup }
+    }
+
+    private var savedGroup: String {
+        guard let entry = SidebarBuilder.hostEntry(for: item, in: model.store.document) else { return "" }
+        return model.store.document.group(ofHostAt: entry.headerLine) ?? ""
+    }
+
+    private func apply() {
+        model.setGroup(item, to: groupText)
+    }
+}
+
+private struct LintIssuesList: View {
+    let issues: [HostIssue]
+
+    var body: some View {
+        if !issues.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(Array(issues.enumerated()), id: \.offset) { _, issue in
+                    Label(Messages.text(for: issue), systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .font(.callout)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
         }
     }
 }
