@@ -106,6 +106,11 @@ final class HostEditorModel {
         }
     }
 
+    /// The block moved to another occurrence index (an earlier block of the same alias was deleted); its content is unchanged.
+    func follow(to newItem: SidebarItem) {
+        item = newItem
+    }
+
     /// `~/…` and absolute paths are checked; relative paths and `%` tokens are not.
     nonisolated static func identityFileExists(_ value: String, home: URL) -> Bool {
         let path: String

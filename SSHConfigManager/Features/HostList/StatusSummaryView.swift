@@ -52,22 +52,25 @@ struct StatusSummaryView: View {
 
     var body: some View {
         let counts = model.statusCounts
-        HStack(spacing: 8) {
-            ForEach(StatusCategory.allCases, id: \.self) { category in
-                if let count = counts[category], count > 0 {
-                    let text = String(count)
-                    let help = category.summary(count: text)
-                    Button {
-                        model.statusFilter = model.statusFilter == category ? nil : category
-                    } label: {
-                        Label { Text(verbatim: text) } icon: { Image(systemName: category.symbol).foregroundStyle(category.tint) }
-                            .labelStyle(.titleAndIcon)
-                            .font(.callout)
+        // Nothing to show before a test ran: no empty stack in the toolbar.
+        if counts.values.contains(where: { $0 > 0 }) {
+            HStack(spacing: 8) {
+                ForEach(StatusCategory.allCases, id: \.self) { category in
+                    if let count = counts[category], count > 0 {
+                        let text = String(count)
+                        let help = category.summary(count: text)
+                        Button {
+                            model.statusFilter = model.statusFilter == category ? nil : category
+                        } label: {
+                            Label { Text(verbatim: text) } icon: { Image(systemName: category.symbol).foregroundStyle(category.tint) }
+                                .labelStyle(.titleAndIcon)
+                                .font(.callout)
+                        }
+                        .buttonStyle(.borderless)
+                        .help(help)
+                        .accessibilityLabel(help)
+                        .accessibilityAddTraits(model.statusFilter == category ? .isSelected : [])
                     }
-                    .buttonStyle(.borderless)
-                    .help(help)
-                    .accessibilityLabel(help)
-                    .accessibilityAddTraits(model.statusFilter == category ? .isSelected : [])
                 }
             }
         }

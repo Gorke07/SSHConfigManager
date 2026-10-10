@@ -39,6 +39,14 @@ final class AppModel {
     @ObservationIgnored private var activeEditorToken: UUID?
     /// A selection waiting for the user to confirm discarding blocked form edits.
     var pendingSelection: SidebarItem?
+    /// The group field's text while it differs from what the selected host has (nil: not edited).
+    /// Lives here, not in the view, so an unapplied draft counts as a pending edit.
+    var groupDraft: String?
+    /// Reads a private key's head for the lint; tests count calls through it.
+    @ObservationIgnored var keyEncryptionReader: @Sendable (URL) -> KeyEncryption = { url in
+        (try? KeyFileInspector.readHead(of: url)).map(KeyFileInspector.encryption(ofPrivateKeyHead:)) ?? .unknown
+    }
+    @ObservationIgnored private var lintCache: LintCache?
     /// Effective Settings disclosure state; lives for the session, across host switches and editor rebuilds.
     var effectiveSettingsExpanded = false
     var effectiveSettingsShowAll = false
@@ -50,13 +58,13 @@ final class AppModel {
     @ObservationIgnored private let terminalInstalled: @MainActor (TerminalChoice) -> Bool
     /// Set when macOS denied Automation access; the main window explains how to allow it.
     var automationDenied = false
-    /// Session-only connection test results; cleared when the saved file changes or another one is opened.
     private(set) var memory: HostMemory
 
     static func memoryKey(for url: URL, home: URL) -> String {
         "hostMemory." + backupKind(for: url, home: home)
     }
 
+    /// Session-only connection test results; cleared when the saved file changes or another one is opened.
     let connectionTests: ConnectionTestsModel
     /// `ssh -G` results per alias; cleared with the connection tests.
     let effectiveConfig: EffectiveConfigCache
@@ -101,6 +109,8 @@ final class AppModel {
         effectiveConfig.clear()
         statusFilter = nil
         pendingDelete = nil
+        groupDraft = nil
+        lintCache = nil
     }
 
     static func liveStore(url: URL, backups: BackupManager, backupKind: String) -> ConfigStore {
@@ -220,6 +230,7 @@ final class AppModel {
     /// tests stay: they are per alias, and every other host is unaffected.
     func refreshIncludes() {
         if store.refreshIncludes() {
+            lintCache = nil
             savedHostsCache = nil
             effectiveConfig.clear()
         }
@@ -298,7 +309,15 @@ final class AppModel {
         pendingDelete = nil
         do {
             try HostCommands.delete(item, in: store)
-            if selection == item { select(nil) }
+            if selection == item {
+                select(nil)
+            } else if case .host(let alias, let removed) = item,
+                      case .host(let selectedAlias, let m)? = selection, selectedAlias == alias, m > removed {
+                // Later blocks of the same alias moved up by one; the selection follows its block.
+                let moved = SidebarItem.host(alias: alias, occurrence: m - 1)
+                selection = moved
+                activeEditor?.follow(to: moved)
+            }
         } catch {
             errorMessage = Messages.text(for: error)
         }
@@ -358,6 +377,7 @@ final class AppModel {
 
     func select(_ item: SidebarItem?) {
         selection = item
+        groupDraft = nil
         editorToken = UUID()
         activeEditor = nil
         activeEditorToken = nil
@@ -382,6 +402,7 @@ final class AppModel {
         let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
             try store.apply { try $0.setGroup(ofHostAt: entry.headerLine, to: trimmed?.isEmpty == false ? trimmed : nil) }
+            groupDraft = nil
         } catch {
             errorMessage = Messages.text(for: error)
         }
@@ -394,28 +415,37 @@ final class AppModel {
         return names.sorted(by: SidebarBuilder.groupNameOrder)
     }
 
+    private struct LintCache {
+        let store: ObjectIdentifier
+        let document: ConfigDocument
+        let included: [IncludedHost]
+        let map: [SidebarItem: [HostIssue]]
+    }
+
     /// Lint of every root-file Host block in the document being edited (so fixes show at once),
-    /// keyed by sidebar item. One pass: duplicates and first blocks are computed once, and each
-    /// key file is read at most once. Pattern blocks get the IdentityFile checks only.
+    /// keyed by sidebar item. Computed once and reused while the document and the included hosts
+    /// are unchanged (the detail pane and the sidebar share it). One pass: duplicates and first
+    /// blocks are computed once, and each key file is read at most once. Pattern blocks get the
+    /// IdentityFile checks only.
     func lintIssueMap() -> [SidebarItem: [HostIssue]] {
         let document = store.document
-        let reads = KeyReadMemo()
+        let included = store.includedHosts
+        let id = ObjectIdentifier(store)
+        if let cache = lintCache, cache.store == id, cache.document == document, cache.included == included { return cache.map }
+        let map = computeLintIssueMap(document: document, included: included)
+        lintCache = LintCache(store: id, document: document, included: included, map: map)
+        return map
+    }
+
+    private func computeLintIssueMap(document: ConfigDocument, included: [IncludedHost]) -> [SidebarItem: [HostIssue]] {
+        let reads = KeyReadMemo(reader: keyEncryptionReader)
         let lint = HostLint(
             home: settings.homeDirectory,
             fileExists: { FileManager.default.fileExists(atPath: $0.path) },
             encryption: { reads.encryption(of: $0) })
-        let duplicates = HostLint.duplicateCounts(document: document, included: store.includedHosts)
+        let duplicates = HostLint.duplicateCounts(document: document, included: included)
         var firstBlocks = HostLint.firstBlocks(document: document)
-        // ssh reads an Include where it stands: a root block after one is not the first for aliases
-        // the included files define too.
-        if let firstInclude = document.includes.map(\.line).min() {
-            for host in store.includedHosts {
-                let plain = host.entry.patterns.filter { !$0.hasPrefix("!") && !$0.contains("*") && !$0.contains("?") }
-                for name in plain.map(\.asciiLowercased) {
-                    if let header = firstBlocks[name], header > firstInclude { firstBlocks[name] = -1 }
-                }
-            }
-        }
+        applyIncludeOrder(to: &firstBlocks, document: document)
         var seen: [String: Int] = [:]
         var map: [SidebarItem: [HostIssue]] = [:]
         for entry in document.hosts {
@@ -430,12 +460,71 @@ final class AppModel {
         return map
     }
 
+    /// ssh reads an Include where it stands. A root block is no longer the first for a name when an
+    /// Include above it that ssh applies to that name (top-level, or inside a Host block whose
+    /// patterns match it) resolves to a file defining the name. Names compare ASCII-folded, like the lint.
+    private func applyIncludeOrder(to firstBlocks: inout [String: Int], document: ConfigDocument) {
+        let directives = document.includes
+        guard !directives.isEmpty, let lastHeader = firstBlocks.values.max() else { return }
+        let resolver = store.includeResolver
+        let hostHeaders = Dictionary(uniqueKeysWithValues: document.hosts.map { ($0.headerLine, $0) })
+        let matchHeaders = Set(document.matches.map(\.headerLine))
+        // The block an Include line sits in: the nearest header above it.
+        func scope(of line: Int) -> HostEntry?? {
+            let nearest = (Array(hostHeaders.keys) + Array(matchHeaders)).filter { $0 < line }.max()
+            guard let nearest else { return .some(nil) }       // top level
+            if let host = hostHeaders[nearest] { return .some(host) }
+            return nil                                          // inside a Match block: condition unknown, ignored
+        }
+        var originals: [String: String] = [:]
+        for entry in document.hosts {
+            for name in entry.patterns where !name.hasPrefix("!") && !name.contains("*") && !name.contains("?") {
+                if originals[name.asciiLowercased] == nil { originals[name.asciiLowercased] = name }
+            }
+        }
+        for directive in directives where directive.line < lastHeader {
+            guard let blockScope = scope(of: directive.line) else { continue }
+            var defined: Set<String> = []
+            collectNames(of: directive, resolver: resolver, depth: 0, into: &defined)
+            for key in defined {
+                guard let header = firstBlocks[key], header > directive.line, header != -1 else { continue }
+                if let host = blockScope {
+                    guard let original = originals[key], ConfigResolver.hostLineMatches(host.patterns, alias: original) else { continue }
+                }
+                firstBlocks[key] = -1
+            }
+        }
+    }
+
+    private func collectNames(of directive: IncludeDirective, resolver: IncludeResolver, depth: Int, into names: inout Set<String>) {
+        guard depth < 16 else { return }
+        for (_, included) in resolver.includedDocuments(for: directive) {
+            for entry in included.hosts {
+                for name in entry.patterns where !name.hasPrefix("!") && !name.contains("*") && !name.contains("?") {
+                    names.insert(name.asciiLowercased)
+                }
+            }
+            for nested in included.includes { collectNames(of: nested, resolver: resolver, depth: depth + 1, into: &names) }
+        }
+    }
+
     func lintIssues(for item: SidebarItem) -> [HostIssue] {
         guard case .host = item else { return [] }
         return lintIssueMap()[item] ?? []
     }
 
-    var hasPendingFormEdits: Bool { activeEditor?.hasPendingChanges ?? false }
+    /// The group the selected host's block has in the document.
+    func savedGroup(for item: SidebarItem) -> String {
+        guard let entry = SidebarBuilder.hostEntry(for: item, in: store.document) else { return "" }
+        return store.document.group(ofHostAt: entry.headerLine) ?? ""
+    }
+
+    private var hasPendingGroupDraft: Bool {
+        guard let draft = groupDraft, let item = selection else { return false }
+        return draft.trimmingCharacters(in: .whitespacesAndNewlines) != savedGroup(for: item)
+    }
+
+    var hasPendingFormEdits: Bool { (activeEditor?.hasPendingChanges ?? false) || hasPendingGroupDraft }
 
     /// Selects `item`, unless the form holds edits that were never applied; then asks first.
     func requestSelect(_ item: SidebarItem?) {
@@ -549,12 +638,15 @@ enum KeyAssignmentError: Error, Equatable {
 private final class KeyReadMemo: @unchecked Sendable {
     private let lock = NSLock()
     private var cache: [URL: KeyEncryption] = [:]
+    private let reader: @Sendable (URL) -> KeyEncryption
+
+    init(reader: @escaping @Sendable (URL) -> KeyEncryption) { self.reader = reader }
 
     func encryption(of url: URL) -> KeyEncryption {
         lock.lock()
         defer { lock.unlock() }
         if let known = cache[url] { return known }
-        let value = (try? KeyFileInspector.readHead(of: url)).map(KeyFileInspector.encryption(ofPrivateKeyHead:)) ?? .unknown
+        let value = reader(url)
         cache[url] = value
         return value
     }

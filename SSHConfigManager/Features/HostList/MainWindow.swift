@@ -39,8 +39,10 @@ struct MainWindow: View {
                 }
                 .disabled(model.store.loadState != .loaded)
             }
-            ToolbarItem(placement: .status) {
-                StatusSummaryView(model: model)
+            if !model.statusCounts.isEmpty {
+                ToolbarItem(placement: .status) {
+                    StatusSummaryView(model: model)
+                }
             }
             ToolbarItem(placement: .status) {
                 if model.store.hasUnsavedChanges {
