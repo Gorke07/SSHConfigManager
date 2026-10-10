@@ -388,9 +388,23 @@ struct AppModelTests {
 
     @Test func anIncludeBeforeTheRootBlockMakesItALaterDuplicate() throws {
         let tmp = try TempDir()
-        _ = try tmp.file(".ssh/extra.conf", "Host Web\n  User x\n")
+        _ = try tmp.file(".ssh/extra.conf", "Host web\n  User x\n")
         let model = makeTestModel(tmp, config: "Include extra.conf\nHost web\n  User me\n")
         #expect(model.lintIssues(for: .host(alias: "web", occurrence: 0)) == [.duplicateAlias(alias: "web", isFirst: false)])
+    }
+
+    @Test func anIncludeDefiningOnlyACaseVariantIsCaseOnlyNotLater() throws {
+        let tmp = try TempDir()
+        _ = try tmp.file(".ssh/extra.conf", "Host Web\n  User x\n")
+        let model = makeTestModel(tmp, config: "Include extra.conf\nHost web\n  User me\n")
+        #expect(model.lintIssues(for: .host(alias: "web", occurrence: 0)) == [.duplicateAliasCaseOnly(alias: "web")])
+    }
+
+    @Test func caseVariantRootBlocksAreCaseOnlyForBoth() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\nHost Web\n")
+        #expect(model.lintIssues(for: .host(alias: "web", occurrence: 0)) == [.duplicateAliasCaseOnly(alias: "web")])
+        #expect(model.lintIssues(for: .host(alias: "Web", occurrence: 0)) == [.duplicateAliasCaseOnly(alias: "Web")])
     }
 
     @Test func anIncludeAfterTheRootBlockKeepsItFirst() throws {
@@ -556,8 +570,38 @@ struct AppModelTests {
         #expect(model.lintRevision != revision)
         #expect(model.lintIssues(for: a) == [.unencryptedKey("~/.ssh/id_a")])
         #expect(reads.count == 1)
+        // The key file did not change since the last lint pass: activation leaves the lint alone.
+        model.refreshIncludes()
+        #expect(model.lintRevision == revision + 1)
+    }
+
+    @Test func activationInvalidatesTheLintOnlyWhenAKeyFileOrAnIncludeChanged() throws {
+        let tmp = try TempDir()
+        let key = try tmp.file(".ssh/id_a", "x")
+        let model = makeTestModel(tmp, config: "Host a\n  IdentityFile ~/.ssh/id_a\n  IdentityFile ~/.ssh/id_later\n")
+        model.keyEncryptionReader = { _ in .unknown }
+        _ = model.lintIssueMap()
+        let revision = model.lintRevision
+
+        model.refreshIncludes()
+        #expect(model.lintRevision == revision)
+
+        try "xyz".write(to: key, atomically: false, encoding: .utf8)   // size changes
+        model.refreshIncludes()
+        #expect(model.lintRevision == revision + 1)
+
+        _ = model.lintIssueMap()
+        model.refreshIncludes()
+        #expect(model.lintRevision == revision + 1)
+
+        _ = try tmp.file(".ssh/id_later", "y")                          // a missing key appears
         model.refreshIncludes()
         #expect(model.lintRevision == revision + 2)
+
+        _ = model.lintIssueMap()
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -3600)], ofItemAtPath: key.path)
+        model.refreshIncludes()
+        #expect(model.lintRevision == revision + 3)                       // mtime alone changes
     }
 
     @Test func includesNamingEachOtherTerminateWithTheRightWording() throws {

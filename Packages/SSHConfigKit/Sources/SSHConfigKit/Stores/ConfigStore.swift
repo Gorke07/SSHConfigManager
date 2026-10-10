@@ -159,14 +159,16 @@ public final class ConfigStore {
     /// Returns true when any file the saved document includes changed (what ssh reads).
     @discardableResult
     public func refreshIncludes() -> Bool {
-        let working = includeResolver.includedHosts(of: document, rootFile: fileURL)
+        let savedWalk = includeResolver.traverse(savedDocument, rootFile: fileURL)
+        // Same Include paths: the working document's chain is the saved one, so one walk serves both.
+        let working = document.includes.map(\.paths) == savedDocument.includes.map(\.paths)
+            ? savedWalk.hosts
+            : includeResolver.includedHosts(of: document, rootFile: fileURL)
         if working != includedHosts { includedHosts = working }
-        let saved = includeResolver.includedHosts(of: savedDocument, rootFile: fileURL)
-        if saved != savedIncludedHosts { savedIncludedHosts = saved }
+        if savedWalk.hosts != savedIncludedHosts { savedIncludedHosts = savedWalk.hosts }
         // Global lines or Match blocks in an Include file change what ssh resolves without changing the hosts.
-        let states = includeResolver.includeFileStates(of: savedDocument, rootFile: fileURL)
-        guard states != savedIncludeStates else { return false }
-        savedIncludeStates = states
+        guard savedWalk.states != savedIncludeStates else { return false }
+        savedIncludeStates = savedWalk.states
         return true
     }
 

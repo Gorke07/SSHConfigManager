@@ -869,6 +869,13 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "IdentityFile bulunamadı: %@" } }
       }
     },
+    "issue.lint.duplicateCaseOnly %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "“%@” differs only in letter case from another Host block; ssh treats them as different hosts." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "“%@” başka bir Host bloğundan yalnızca büyük/küçük harfle ayrılıyor; ssh bunları farklı hostlar sayar." } }
+      }
+    },
     "issue.lint.duplicateFirst %@" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -23,34 +23,47 @@ struct HostLintTests {
         #expect(issues == [.unencryptedKey("~/.ssh/plain")])
     }
 
-    @Test func duplicateAliasesAcrossFileAndIncludesCaseInsensitively() {
-        let doc = ConfigDocument(parsing: "Host web\n  User a\nHost WEB other\n  User b\nHost *\n")
-        let included = [IncludedHost(file: URL(filePath: "/h/.ssh/inc"), entry: ConfigDocument(parsing: "Host web\n").hosts[0])]
+    private func lintIssues(_ text: String, included: [IncludedHost] = []) -> [[HostIssue]] {
+        let doc = ConfigDocument(parsing: text)
         let counts = HostLint.duplicateCounts(document: doc, included: included)
-        #expect(counts["web"] == 3)
-        #expect(counts["other"] == nil)
-        #expect(counts["*"] == nil)
+        let exact = HostLint.exactDuplicateCounts(document: doc, included: included)
         let firsts = HostLint.firstBlocks(document: doc)
-        let first = lint().issues(for: doc.hosts[0], duplicates: counts, firstBlocks: firsts)
-        #expect(first == [.duplicateAlias(alias: "web", isFirst: true)])
-        let second = lint().issues(for: doc.hosts[1], duplicates: counts, firstBlocks: firsts)
-        #expect(second == [.duplicateAlias(alias: "WEB", isFirst: false)])
+        return doc.hosts.map { lint().issues(for: $0, duplicates: counts, exactDuplicates: exact, firstBlocks: firsts) }
+    }
+
+    @Test func exactDuplicatesAreFirstAndLaterEvenAcrossIncludes() {
+        let included = [IncludedHost(file: URL(filePath: "/h/.ssh/inc"), entry: ConfigDocument(parsing: "Host web\n").hosts[0])]
+        let result = lintIssues("Host web\n  User a\nHost web other\n  User b\nHost *\n", included: included)
+        #expect(result[0] == [.duplicateAlias(alias: "web", isFirst: true)])
+        #expect(result[1] == [.duplicateAlias(alias: "web", isFirst: false)])
+        #expect(result[2].isEmpty)
+    }
+
+    @Test func caseOnlyVariantsGetTheCaseOnlyIssueForBoth() {
+        let result = lintIssues("Host web\nHost Web\n")
+        #expect(result[0] == [.duplicateAliasCaseOnly(alias: "web")])
+        #expect(result[1] == [.duplicateAliasCaseOnly(alias: "Web")])
+    }
+
+    @Test func includedCaseVariantIsCaseOnly() {
+        let included = [IncludedHost(file: URL(filePath: "/h/.ssh/inc"), entry: ConfigDocument(parsing: "Host Web\n").hosts[0])]
+        #expect(lintIssues("Host web\n", included: included) == [[.duplicateAliasCaseOnly(alias: "web")]])
     }
 
     @Test func everyDuplicatedNameOnTheHostLineIsFlagged() {
         let doc = ConfigDocument(parsing: "Host web\nHost other web\nHost web *\n")
         let counts = HostLint.duplicateCounts(document: doc, included: [])
-        let firsts = HostLint.firstBlocks(document: doc)
         #expect(counts == ["web": 3])
-        #expect(lint().issues(for: doc.hosts[1], duplicates: counts, firstBlocks: firsts) == [.duplicateAlias(alias: "web", isFirst: false)])
-        #expect(lint().issues(for: doc.hosts[2], duplicates: counts, firstBlocks: firsts) == [.duplicateAlias(alias: "web", isFirst: false)])
-        #expect(lint().issues(for: doc.hosts[0], duplicates: counts, firstBlocks: firsts) == [.duplicateAlias(alias: "web", isFirst: true)])
+        let result = lintIssues("Host web\nHost other web\nHost web *\n")
+        #expect(result[0] == [.duplicateAlias(alias: "web", isFirst: true)])
+        #expect(result[1] == [.duplicateAlias(alias: "web", isFirst: false)])
+        #expect(result[2] == [.duplicateAlias(alias: "web", isFirst: false)])
     }
 
-    @Test func firstBlocksMapsLowercasedNamesToFirstHeaderLine() {
+    @Test func firstBlocksMapsExactNamesToFirstHeaderLine() {
         let doc = ConfigDocument(parsing: "Host A b\nHost a *\nHost !x\n")
         let firsts = HostLint.firstBlocks(document: doc)
-        #expect(firsts == ["a": doc.hosts[0].headerLine, "b": doc.hosts[0].headerLine])
+        #expect(firsts == ["A": doc.hosts[0].headerLine, "b": doc.hosts[0].headerLine, "a": doc.hosts[1].headerLine])
     }
 
     @Test func patternBlocksStillReportMissingIdentityFiles() {

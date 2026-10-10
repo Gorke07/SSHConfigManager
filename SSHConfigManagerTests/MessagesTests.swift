@@ -6,7 +6,7 @@ import Testing
 /// Tests run in the development language (English); Turkish completeness is covered by LocalizationTests.
 struct MessagesTests {
     static let issues: [DraftIssue] = [
-        .controlCharacter("User"), .emptyAlias, .aliasHasWhitespace, .duplicateAlias("web"),
+        .controlCharacter("User"), .emptyAlias, .aliasHasWhitespace, .duplicateAlias("web"), .duplicateAliasCaseOnly("Web"),
         .invalidPort("99999"), .invalidDirectiveKey("Bad Key"), .forbiddenDirectiveKey("Host"),
         .emptyDirectiveValue("User"), .identityFileMissing("~/.ssh/x"),
     ]

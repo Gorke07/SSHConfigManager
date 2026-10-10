@@ -244,12 +244,38 @@ final class AppModel {
     /// view's included hosts changed, the effective settings are dropped and reloaded. Connection
     /// tests stay: they are per alias, and every other host is unaffected.
     func refreshIncludes() {
-        // Key files can change while the app is in the background, so the lint is always refreshed.
-        invalidateLint()
-        if store.refreshIncludes() {
+        let includesChanged = store.refreshIncludes()
+        if includesChanged {
             savedHostsCache = nil
             effectiveConfig.clear()
         }
+        // Key files can change while the app is in the background: compare the stamps of the files the last lint
+        // pass looked at, so an activation with nothing changed leaves the memoized lint alone.
+        if includesChanged || keyFilesChangedSinceLint() { invalidateLint() }
+    }
+
+    /// (inode, size, mtime) of a key file the lint looked at; nil when it does not exist.
+    private struct KeyStamp: Equatable {
+        let inode: UInt64
+        let size: Int64
+        let mtimeSeconds: Int
+        let mtimeNanos: Int
+
+        init?(path: String) {
+            var info = stat()
+            guard stat(path, &info) == 0 else { return nil }
+            inode = UInt64(info.st_ino)
+            size = Int64(info.st_size)
+            mtimeSeconds = Int(info.st_mtimespec.tv_sec)
+            mtimeNanos = Int(info.st_mtimespec.tv_nsec)
+        }
+    }
+
+    @ObservationIgnored private var lintKeyStamps: [String: KeyStamp?]?
+
+    private func keyFilesChangedSinceLint() -> Bool {
+        guard let stamps = lintKeyStamps else { return false }
+        return stamps.contains { KeyStamp(path: $0.key) != $0.value }
     }
 
     /// The alias to connect to for a sidebar item: nil for patterns, Match blocks, missing hosts
@@ -460,11 +486,13 @@ final class AppModel {
 
     private func computeLintIssueMap(document: ConfigDocument, included: [IncludedHost]) -> [SidebarItem: [HostIssue]] {
         let reads = KeyReadMemo(reader: keyEncryptionReader)
+        defer { lintKeyStamps = Dictionary(uniqueKeysWithValues: reads.touchedPaths.map { ($0, KeyStamp(path: $0)) }) }
         let lint = HostLint(
             home: settings.homeDirectory,
-            fileExists: { FileManager.default.fileExists(atPath: $0.path) },
+            fileExists: { reads.exists($0) },
             encryption: { reads.encryption(of: $0) })
         let duplicates = HostLint.duplicateCounts(document: document, included: included)
+        let exactDuplicates = HostLint.exactDuplicateCounts(document: document, included: included)
         var firstBlocks = HostLint.firstBlocks(document: document)
         applyIncludeOrder(to: &firstBlocks, document: document)
         var seen: [String: Int] = [:]
@@ -472,9 +500,14 @@ final class AppModel {
         for entry in document.hosts {
             let occurrence = seen[entry.alias, default: 0]
             seen[entry.alias] = occurrence + 1
-            var issues = lint.issues(for: entry, duplicates: duplicates, firstBlocks: firstBlocks)
+            var issues = lint.issues(for: entry, duplicates: duplicates, exactDuplicates: exactDuplicates, firstBlocks: firstBlocks)
             if entry.isPattern {
-                issues.removeAll { if case .duplicateAlias = $0 { true } else { false } }
+                issues.removeAll {
+                    switch $0 {
+                    case .duplicateAlias, .duplicateAliasCaseOnly: true
+                    default: false
+                    }
+                }
             }
             if !issues.isEmpty { map[.host(alias: entry.alias, occurrence: occurrence)] = issues }
         }
@@ -483,7 +516,8 @@ final class AppModel {
 
     /// ssh reads an Include where it stands. A root block is no longer the first for a name when an
     /// Include above it that ssh applies to that name (top-level, or inside a Host block whose
-    /// patterns match it) resolves to a file defining the name. Names compare ASCII-folded, like the lint.
+    /// patterns match it) resolves to a file defining the name. Names compare exactly: ssh matches Host patterns
+    /// case-sensitively, so a file defining only a case variant does not come first.
     private func applyIncludeOrder(to firstBlocks: inout [String: Int], document: ConfigDocument) {
         let directives = document.includes
         guard !directives.isEmpty, let lastHeader = firstBlocks.values.max() else { return }
@@ -503,12 +537,6 @@ final class AppModel {
             if matchAll.contains(nearest) { return .some(nil) }
             return nil                                          // inside a Match block: condition unknown, ignored
         }
-        var originals: [String: String] = [:]
-        for entry in document.hosts {
-            for name in entry.patterns where !name.hasPrefix("!") && !name.contains("*") && !name.contains("?") {
-                if originals[name.asciiLowercased] == nil { originals[name.asciiLowercased] = name }
-            }
-        }
         for directive in directives where directive.line < lastHeader {
             guard let blockScope = scope(of: directive.line) else { continue }
             var defined: Set<String> = []
@@ -517,7 +545,7 @@ final class AppModel {
             for key in defined {
                 guard let header = firstBlocks[key], header > directive.line, header != -1 else { continue }
                 if let host = blockScope {
-                    guard let original = originals[key], ConfigResolver.hostLineMatches(host.patterns, alias: original) else { continue }
+                    guard ConfigResolver.hostLineMatches(host.patterns, alias: key) else { continue }
                 }
                 firstBlocks[key] = -1
             }
@@ -532,7 +560,7 @@ final class AppModel {
             guard visited.insert(file.resolvingSymlinksInPath().path).inserted else { continue }
             for entry in included.hosts {
                 for name in entry.patterns where !name.hasPrefix("!") && !name.contains("*") && !name.contains("?") {
-                    names.insert(name.asciiLowercased)
+                    names.insert(name)
                 }
             }
             for nested in included.includes { collectNames(of: nested, resolver: resolver, depth: depth + 1, visited: &visited, into: &names) }
@@ -679,17 +707,32 @@ enum KeyAssignmentError: Error, Equatable {
     case pendingFormEdits
 }
 
-/// Reads each private key's head at most once per lint pass.
+/// Reads each private key's head at most once per lint pass, and remembers every path the pass looked at.
 private final class KeyReadMemo: @unchecked Sendable {
     private let lock = NSLock()
     private var cache: [URL: KeyEncryption] = [:]
+    private var touched: Set<String> = []
     private let reader: @Sendable (URL) -> KeyEncryption
 
     init(reader: @escaping @Sendable (URL) -> KeyEncryption) { self.reader = reader }
 
+    var touchedPaths: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return Array(touched)
+    }
+
+    func exists(_ url: URL) -> Bool {
+        lock.lock()
+        touched.insert(url.path)
+        lock.unlock()
+        return FileManager.default.fileExists(atPath: url.path)
+    }
+
     func encryption(of url: URL) -> KeyEncryption {
         lock.lock()
         defer { lock.unlock() }
+        touched.insert(url.path)
         if let known = cache[url] { return known }
         let value = reader(url)
         cache[url] = value

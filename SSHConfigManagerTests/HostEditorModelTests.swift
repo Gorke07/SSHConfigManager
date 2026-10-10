@@ -48,14 +48,16 @@ struct HostEditorModelTests {
         let editor = try #require(HostEditorModel(item: .host(alias: "web", occurrence: 1), store: app.store, homeDirectory: tmp.url))
         #expect(editor.fields["HostName"] == "two")
 
-        // While the alias is still duplicated, edits are blocked and nothing is written.
+        // An exact duplicate that already exists never blocks editing the block.
         editor.fields["HostName"] = "three"
-        #expect(!editor.commit())
-        #expect(editor.issues.contains(.duplicateAlias("web")))
-        #expect(app.store.document.render() == original)
+        #expect(editor.commit())
+        #expect(app.store.document.render() == "Host web\n  HostName one\nHost web\n  HostName three\n")
+        editor.fields["HostName"] = "two"
+        #expect(editor.commit())
 
         // Renaming resolves it; only the second block changes.
         editor.aliasText = "web-2"
+        editor.fields["HostName"] = "three"
         #expect(editor.commit())
         #expect(app.store.document.render() == "Host web\n  HostName one\nHost web-2\n  HostName three\n")
         #expect(editor.item == .host(alias: "web-2", occurrence: 0))

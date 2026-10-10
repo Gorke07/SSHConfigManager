@@ -26,8 +26,6 @@ public struct PublicKeyInfo: Equatable, Sendable {
     }
 }
 
-/// Looks only at the first bytes of a private key file (header and first base64 line); the key
-/// material is never parsed or kept (spec §8.1).
 public enum KeyFileError: Error, Equatable, LocalizedError {
     case notARegularFile(String)
     public var errorDescription: String? {
@@ -35,25 +33,13 @@ public enum KeyFileError: Error, Equatable, LocalizedError {
     }
 }
 
+/// Looks only at the first bytes of a private key file (header and first base64 line); the key
+/// material is never parsed or kept (spec §8.1).
 public enum KeyFileInspector {
     public static let headLimit = 512
 
     public static func readHead(of url: URL) throws -> Data {
-        // O_NONBLOCK: opening a FIFO or device can never block; fstat on the descriptor (no check/use race).
-        let fd = open(url.path, O_RDONLY | O_NONBLOCK)
-        guard fd >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
-        var info = stat()
-        guard fstat(fd, &info) == 0 else {
-            let code = POSIXErrorCode(rawValue: errno) ?? .EIO
-            close(fd)
-            throw POSIXError(code)
-        }
-        guard info.st_mode & S_IFMT == S_IFREG else {
-            close(fd)
-            throw KeyFileError.notARegularFile(url.path)
-        }
-        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
-        return try handle.read(upToCount: headLimit) ?? Data()
+        try RegularFile.read(url, limit: headLimit)
     }
 
     /// Lines split on LF bytes, a trailing CR removed.

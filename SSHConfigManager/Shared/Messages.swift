@@ -13,6 +13,7 @@ enum Messages {
         case .invalidDirectiveKey(let key): String(localized: "issue.invalidDirectiveKey \(key)")
         case .forbiddenDirectiveKey(let key): String(localized: "issue.forbiddenDirectiveKey \(key)")
         case .emptyDirectiveValue(let key): String(localized: "issue.emptyDirectiveValue \(key)")
+        case .duplicateAliasCaseOnly(let alias): String(localized: "issue.lint.duplicateCaseOnly \(alias)")
         case .identityFileMissing(let path): String(localized: "issue.identityFileMissing \(path)")
         }
     }
@@ -22,6 +23,7 @@ enum Messages {
         case .missingIdentityFile(let path): String(localized: "issue.lint.missingIdentityFile \(path)")
         case .duplicateAlias(let alias, let isFirst):
             isFirst ? String(localized: "issue.lint.duplicateFirst \(alias)") : String(localized: "issue.lint.duplicateLater \(alias)")
+        case .duplicateAliasCaseOnly(let alias): String(localized: "issue.lint.duplicateCaseOnly \(alias)")
         case .unencryptedKey(let path): String(localized: "issue.lint.unencryptedKey \(path)")
         }
     }
