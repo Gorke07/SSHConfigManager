@@ -34,9 +34,11 @@ public struct ResolvedHost: Equatable, Sendable {
     }
 
     /// The name ssh looks up in known_hosts, in its `host` / `[host]:port` form. With a HostKeyAlias ssh
-    /// uses the alias INSTEAD of the host name (same port bracketing), never both.
+    /// uses the alias INSTEAD of the host name, as written and without port brackets (verified with
+    /// OpenSSH 10.3 against a local sshd on a non-default port: `[alias]:port` entries are not found).
     public var lookupNames: [String] {
-        [HostMatcher.lookupName(host: hostKeyAlias ?? hostname, port: port)]
+        if let hostKeyAlias { return [HostMatcher.lookupName(host: hostKeyAlias, port: 22)] }
+        return [HostMatcher.lookupName(host: hostname, port: port)]
     }
 }
 
