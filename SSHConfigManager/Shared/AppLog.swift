@@ -5,7 +5,7 @@ import os
 /// private; passphrases, key contents and process arguments/environment are never passed here.
 enum AppLog {
     enum Category: String {
-        case save, connect, knownHosts, keys, backups, settings
+        case save, connect, knownHosts, keys, backups, settings, edit
     }
 
     private static let subsystem = Bundle.main.bundleIdentifier ?? "tr.com.mess.SSHConfigManager"

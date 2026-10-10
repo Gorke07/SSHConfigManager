@@ -32,8 +32,7 @@ struct MainWindow: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    do { model.requestSelect(try HostCommands.addHost(to: model.store)) }
-                    catch { model.errorMessage = Messages.text(for: error) }
+                    model.addHost()
                 } label: {
                     Label(String(localized: "toolbar.addHost"), systemImage: "plus")
                 }

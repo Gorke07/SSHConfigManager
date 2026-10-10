@@ -76,6 +76,52 @@ class CheckLocalizationTests(unittest.TestCase):
         result = self.run_check('let a = String(localized: "k \\(a.b)")', {"k %@": ("K %@", "K %@")})
         self.assertNotEqual(result.returncode, 0)
 
+    def test_literals_in_comments_are_ignored_but_line_numbers_hold(self):
+        swift = "\n".join([
+            '// Text("a")',
+            '/* Button("b")',
+            '   .help("c") */',
+            'let u = "https://example.com" ; Text("d")',
+            'let k = String(localized: "k") // Text("e")',
+        ])
+        result = self.run_check(swift, {"k": ("K", "K")})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("View.swift:4", result.stderr)
+        for line in (1, 2, 3, 5):
+            self.assertNotIn(f"View.swift:{line}:", result.stderr)
+
+    def test_localized_key_inside_string_with_slashes_survives(self):
+        result = self.run_check('let a = String(localized: "see // here")', {"see // here": ("S", "S")})
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_accessibility_label_link_and_nsmenuitem_are_reported(self):
+        swift = "\n".join([
+            '.accessibilityLabel("a")',
+            'Link("b", destination: u)',
+            'NSMenuItem(title: "c", action: nil, keyEquivalent: "")',
+            '.accessibilityLabel(String(localized: "k"))',
+        ])
+        result = self.run_check(swift, {"k": ("K", "K")})
+        self.assertNotEqual(result.returncode, 0)
+        for line in (1, 2, 3):
+            self.assertIn(f"View.swift:{line}:", result.stderr)
+        self.assertNotIn("View.swift:4:", result.stderr)
+
+    def test_duplicate_catalog_keys_fail(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            sources = Path(tmp) / "src"
+            sources.mkdir()
+            (sources / "View.swift").write_text('let a = String(localized: "k")', encoding="utf-8")
+            unit = '{"stringUnit": {"state": "translated", "value": "V"}}'
+            body = '{"sourceLanguage": "en", "strings": {"k": {"localizations": {"en": %s, "tr": %s}}, "k": {"localizations": {"en": %s, "tr": %s}}}}' % (unit, unit, unit, unit)
+            catalog_path = Path(tmp) / "Localizable.xcstrings"
+            catalog_path.write_text(body, encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--sources", str(sources), "--catalog", str(catalog_path)],
+                capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("yinelenen", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

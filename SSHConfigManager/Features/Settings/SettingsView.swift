@@ -111,7 +111,19 @@ struct SettingsView: View {
             isPresented: $importing,
             allowedContentTypes: [.data]
         ) { result in
-            guard case .success(let url) = result, let target = lastImportTarget else { return }
+            let url: URL
+            switch result {
+            case .success(let picked): url = picked
+            case .failure(let error):
+                AppLog.error(.settings, error)
+                switch lastImportTarget {
+                case .config: invalidMessage = String(localized: "settings.configFile.invalid")
+                case .knownHosts: knownHostsInvalid = true
+                case nil: break
+                }
+                return
+            }
+            guard let target = lastImportTarget else { return }
             let path = model.settings.displayPath(for: url)
             switch target {
             case .config: requestSwitch(path)

@@ -109,11 +109,7 @@ struct SidebarView: View {
     @ViewBuilder
     private func menu(for item: SidebarItem) -> some View {
         Button(String(localized: "action.duplicate")) {
-            do {
-                if let copy = try HostCommands.duplicate(item, in: model.store) { model.requestSelect(copy) }
-            } catch {
-                model.errorMessage = Messages.text(for: error)
-            }
+            model.duplicateHost(item)
         }
         if HostCommands.sshCommand(for: item, document: model.store.document, builder: model.commandBuilder) != nil {
             Button(String(localized: "action.copySSHCommand")) {

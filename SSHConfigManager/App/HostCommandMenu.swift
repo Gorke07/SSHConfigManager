@@ -13,15 +13,14 @@ struct HostCommandMenu: Commands {
         CommandMenu(String(localized: "menu.host")) {
             Button(String(localized: "menu.host.new")) {
                 openMainWindow()
-                do { model.requestSelect(try HostCommands.addHost(to: model.store)) } catch { model.errorMessage = Messages.text(for: error) }
+                model.addHost()
             }
             .keyboardShortcut("n")
             .disabled(model.store.loadState != .loaded)
 
             Button(String(localized: "menu.host.duplicate")) {
                 guard model.mainWindowIsKey, let item = model.selection else { return }
-                do { if let copy = try HostCommands.duplicate(item, in: model.store) { model.requestSelect(copy) } }
-                catch { model.errorMessage = Messages.text(for: error) }
+                model.duplicateHost(item)
             }
             .keyboardShortcut("d")
             .disabled(!model.mainWindowIsKey || !isEditableHost)

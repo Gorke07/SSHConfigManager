@@ -599,6 +599,24 @@ final class AppModel {
 
     var hasPendingFormEdits: Bool { hasBlockedFormEdits || hasPendingGroupDraft }
 
+    /// Adds a new host and selects it; a failure is logged and shown.
+    func addHost() {
+        do { requestSelect(try HostCommands.addHost(to: store)) }
+        catch {
+            AppLog.error(.edit, error)
+            errorMessage = Messages.text(for: error)
+        }
+    }
+
+    /// Duplicates `item` and selects the copy; a failure is logged and shown.
+    func duplicateHost(_ item: SidebarItem) {
+        do { if let copy = try HostCommands.duplicate(item, in: store) { requestSelect(copy) } }
+        catch {
+            AppLog.error(.edit, error)
+            errorMessage = Messages.text(for: error)
+        }
+    }
+
     /// Selects `item`, unless the form holds edits that were never applied; then asks first.
     func requestSelect(_ item: SidebarItem?) {
         if hasPendingFormEdits, item != nil {

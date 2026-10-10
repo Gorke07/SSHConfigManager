@@ -9,8 +9,7 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text(String(localized: "onboarding.title")).font(.title2.bold())
             step(1, title: String(localized: "onboarding.addHost")) {
-                do { model.requestSelect(try HostCommands.addHost(to: model.store)) }
-                catch { model.errorMessage = Messages.text(for: error) }
+                model.addHost()
             }
             step(2, title: String(localized: "onboarding.createKey")) {
                 model.keys.pendingNewKey = true

@@ -9,5 +9,5 @@ xcodegen generate --spec project.yml --quiet
 xcodebuild test \
   -project SSHConfigManager.xcodeproj \
   -scheme SSHConfigManager \
-  -destination 'platform=macOS,arch=arm64' \
+  -destination "platform=macOS,arch=$(uname -m)" \
   -quiet "$@"
