@@ -267,19 +267,33 @@ struct KeysModelTests {
         #expect(!model.automationDenied && model.fallbackNotice == nil)
     }
 
-    @Test func refreshIfStaleThrottlesTheHostFormMenu() async throws {
+    @Test func refreshIfStaleRefreshesWhenNeverRefreshedAndWhenOld() async throws {
         let tmp = try TempDir()
         let model = makeTestModel(tmp, config: "Host web\n")
         let keys = model.keys
-        _ = await keys.generate(type: .ed25519, fileName: "a", comment: "c", passphrase: "", assignTo: nil)
-        await keys.refreshIfStale()                       // first call always refreshes
+        _ = try await TestSupportKeygen.make(tmp.url.appending(path: ".ssh/a"))   // nothing has refreshed yet
+        await keys.refreshIfStale()                       // lastRefresh is nil: refreshes
         #expect(keys.rows.map(\.key.name) == ["a"])
         _ = try await TestSupportKeygen.make(tmp.url.appending(path: ".ssh/b"))
-        await keys.refreshIfStale()                       // within the window: no scan
+        await keys.refreshIfStale()                       // within the 5 s window: no scan
         #expect(keys.rows.map(\.key.name) == ["a"])
-        keys.staleAfter = .zero
+        keys.staleAfter = .milliseconds(1)                // the last refresh is now older than the window
+        try await Task.sleep(for: .milliseconds(30))
         await keys.refreshIfStale()
         #expect(keys.rows.map(\.key.name) == ["a", "b"])
+    }
+
+    @Test func aMissingPassphraseAsksForOneInsteadOfShowingAnError() async throws {
+        let tmp = try TempDir()
+        let actions = RecordingKeyActions()
+        actions.managerRunner = AskedRunner()
+        let model = makeTestModel(tmp, config: "Host web\n", keyActions: actions)
+        _ = try await TestSupportKeygen.make(tmp.url.appending(path: ".ssh/k"))
+        await model.keys.refresh()
+        let row = try #require(model.keys.rows.first)
+        #expect(await model.keys.addToAgent(row, passphrase: nil))
+        #expect(model.keys.passphraseRequestedFor == row.id)
+        #expect(model.keys.errorMessage == nil)
     }
 
     @Test func assignIdentityFileSkipsAnEquivalentSpelling() async throws {
@@ -299,5 +313,16 @@ enum TestSupportKeygen {
         return try await ProcessRunner().run(URL(filePath: "/usr/bin/ssh-keygen"),
                                              arguments: ["-q", "-t", "ed25519", "-N", "", "-f", url.path],
                                              environment: [:], timeout: .seconds(30))
+    }
+}
+
+/// Stands in for ssh-add: asks for the passphrase once (as askpass would), then fails.
+private struct AskedRunner: ProcessRunning {
+    func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
+        if executable.lastPathComponent == "ssh-add", let state = environment["SSHCM_ASKPASS_STATE"] {
+            FileManager.default.createFile(atPath: state, contents: Data())
+            return ProcessResult(exitCode: 1, stdout: "", stderr: "Bad passphrase, try again", timedOut: false)
+        }
+        return ProcessResult(exitCode: 1, stdout: "", stderr: "", timedOut: false)
     }
 }

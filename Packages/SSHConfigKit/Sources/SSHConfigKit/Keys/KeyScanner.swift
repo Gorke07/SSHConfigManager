@@ -88,16 +88,19 @@ public struct KeyScanner: Sendable {
             let head: Data
             do {
                 head = try KeyFileInspector.readHead(of: url)
-            } catch let error as POSIXError where ![.ENOENT, .ENOTDIR, .ELOOP].contains(error.code) {
-                // It exists and is a file but cannot be read: show it as an unreadable private key
-                // (never as a public-only key beside it).
+            } catch let error as KeyFileError {
+                _ = error   // not a regular file: not a key
+                return
+            } catch let error as POSIXError where [.ENOENT, .ENOTDIR, .ELOOP].contains(error.code) {
+                return
+            } catch {
+                // It exists and is a file but cannot be read (any other failure): show it as an unreadable
+                // private key (never as a public-only key beside it).
                 seenFiles.insert(identity)
                 let pub = URL(filePath: url.path + ".pub")
                 let info = publicInfo(pub)
                 keys.append(SSHKey(privateURL: url, publicURL: info == nil ? nil : pub, publicKey: info,
                                    encryption: .unknown, unreadable: true))
-                return
-            } catch {
                 return
             }
             guard KeyFileInspector.isPrivateKeyHeader(head) else { return }

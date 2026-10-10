@@ -204,7 +204,9 @@ struct KeyScannerTests {
         #expect(found.encryption == .unknown && found.publicKey != nil)
     }
 
-    @Test func scanDiscoversOffTheCallingThread() async throws {
+    /// Future guard only: it pins the Task.detached hop so a later refactor cannot silently move discovery back
+    /// onto the caller's actor. It is not proof that the original blocking was observed.
+    @Test func scanDiscoveryRunsOffTheCallingThreadFutureGuard() async throws {
         let tmp = try TempDir()
         let ssh = try await makeDirectory(tmp)
         let onMain = Mutex(Bool?.none)

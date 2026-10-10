@@ -43,6 +43,8 @@ public struct KeyManager: Sendable {
     private let toolsDirectory: URL
     private let agentSocket: String?
     private let askPassDirectory: URL
+    /// The hard-link step; tests replace it to force the no-hard-link fallback.
+    var linker: @Sendable (String, String) -> Int32 = { link($0, $1) }
 
     /// `agentSocket` nil means the user's agent (inherited `SSH_AUTH_SOCK`); tests pass their own.
     public init(runner: any ProcessRunning = ProcessRunner(),
@@ -81,27 +83,55 @@ public struct KeyManager: Sendable {
         // ssh-keygen only asks before replacing the private key, so it never writes the final paths: it
         // generates into a private temp directory beside them, and the files are then link(2)ed into place,
         // which fails if either already exists (nothing is ever overwritten).
+        Self.removeStaleTempDirectories(in: directory, olderThan: .seconds(300))
         let temp = directory.appending(path: ".sshcm-keygen-\(UUID().uuidString)", directoryHint: .isDirectory)
         try fm.createDirectory(at: temp, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
         defer { try? fm.removeItem(at: temp) }
         let tempKey = temp.appending(path: "key")
         let result = try await run("ssh-keygen", ["-q"] + type.arguments + ["-C", comment, "-f", tempKey.path, "-N", passphrase])
         try check(result)
-        try Self.linkNew(tempKey.path, to: url.path)
+        try Self.linkNew(tempKey.path, to: url.path, linker: linker)
         do {
-            try Self.linkNew(tempKey.path + ".pub", to: url.path + ".pub")
+            try Self.linkNew(tempKey.path + ".pub", to: url.path + ".pub", linker: linker)
         } catch {
             unlink(url.path)   // our own link to the key just made
             throw error
         }
     }
 
-    /// `link(2)`: fails with `fileExists` if `destination` exists (even as a dangling symlink).
-    static func linkNewForTesting(_ source: String, to destination: String) throws { try linkNew(source, to: destination) }
-    private static func linkNew(_ source: String, to destination: String) throws {
-        guard link(source, destination) != 0 else { return }
-        if errno == EEXIST { throw KeyManagerError.fileExists(destination) }
-        throw KeyManagerError.failed(String(cString: strerror(errno)))
+    /// Leftovers of a crashed generate: `.sshcm-keygen-*` directories (this app's pattern) owned by the
+    /// current user and older than `olderThan` (so a running generate is never touched). Only `key` and
+    /// `key.pub` inside are deleted, then the directory itself if it is empty.
+    static func removeStaleTempDirectories(in directory: URL, olderThan age: Duration) {
+        let fm = FileManager.default
+        guard let names = try? fm.contentsOfDirectory(atPath: directory.path) else { return }
+        let cutoff = Date().addingTimeInterval(-Double(age.components.seconds))
+        for name in names where name.hasPrefix(".sshcm-keygen-") {
+            let path = directory.appending(path: name).path
+            var info = stat()
+            guard lstat(path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR, info.st_uid == getuid(),
+                  Date(timeIntervalSince1970: TimeInterval(info.st_mtimespec.tv_sec)) <= cutoff else { continue }
+            for file in ["key", "key.pub"] {
+                let filePath = path + "/" + file
+                var fileInfo = stat()
+                if lstat(filePath, &fileInfo) == 0, fileInfo.st_mode & S_IFMT == S_IFREG { unlink(filePath) }
+            }
+            rmdir(path)   // fails (harmlessly) if anything else is inside
+        }
+    }
+
+    /// Puts `source` at `destination` without ever overwriting: `link(2)` (the source stays), or, on volumes
+    /// without hard links, `renamex_np(RENAME_EXCL)` (the source moves). EEXIST becomes `fileExists`.
+    static func linkNew(_ source: String, to destination: String,
+                        linker: @Sendable (String, String) -> Int32 = { link($0, $1) }) throws {
+        if linker(source, destination) == 0 { return }
+        var code = errno
+        if [ENOTSUP, EPERM, EXDEV, ENOSYS, EOPNOTSUPP].contains(code) {
+            if renamex_np(source, destination, UInt32(RENAME_EXCL)) == 0 { return }
+            code = errno
+        }
+        if code == EEXIST { throw KeyManagerError.fileExists(destination) }
+        throw KeyManagerError.failed(String(cString: strerror(code)))
     }
 
     public func changePassphrase(at url: URL, old: String, new: String) async throws {

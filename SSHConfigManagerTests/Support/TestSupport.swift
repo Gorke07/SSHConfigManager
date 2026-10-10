@@ -107,10 +107,13 @@ final class RecordingKeyActions {
     private(set) var copied: [String] = []
     private(set) var recycled: [[URL]] = []
 
+    /// Replaces ssh-keygen/ssh-add for the manager when a test needs a scripted tool result.
+    var managerRunner: (any ProcessRunning)?
+
     func tools(_ tmp: TempDir) -> KeyTools {
         KeyTools(
             scanner: KeyScanner(),
-            manager: KeyManager(agentSocket: "/tmp/sshcm-none-\(UUID().uuidString.prefix(8))", askPassDirectory: tmp.url),
+            manager: KeyManager(runner: managerRunner ?? ProcessRunner(), agentSocket: "/tmp/sshcm-none-\(UUID().uuidString.prefix(8))", askPassDirectory: tmp.url),
             useKeychain: false,
             recycle: { [weak self] urls in self?.recycled.append(urls) },
             copyToPasteboard: { [weak self] text in self?.copied.append(text) })
