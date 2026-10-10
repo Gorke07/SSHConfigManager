@@ -99,7 +99,11 @@ public struct ProcessRunner: ProcessRunning {
             close(outPipe[0]); close(outPipe[1])
             throw POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO)
         }
-        // Parent ends: close-on-exec and non-blocking (read through dispatch sources).
+        // Darwin has no pipe2(O_CLOEXEC), so FD_CLOEXEC is set right after pipe(). The window is
+        // harmless: every child this runner spawns uses POSIX_SPAWN_CLOEXEC_DEFAULT (only the three
+        // fds named in the file actions are inherited, whatever their flags), and this runner is the
+        // only code in the package that spawns processes.
+        // Parent ends: non-blocking (read through dispatch sources).
         for fd in [outPipe[0], errPipe[0], outPipe[1], errPipe[1]] {
             _ = fcntl(fd, F_SETFD, FD_CLOEXEC)
         }

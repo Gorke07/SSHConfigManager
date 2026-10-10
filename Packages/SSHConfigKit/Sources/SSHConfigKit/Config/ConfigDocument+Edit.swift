@@ -121,9 +121,15 @@ extension ConfigDocument {
         }
 
         let indent = entry.directives.compactMap { lines[$0.line].parts?.indent }.first ?? directiveIndent
-        block.insert(
-            contentsOf: insertions.map { makeDirectiveLine(indent: indent, key: $0.key, value: $0.value) },
-            at: insertAt)
+        var inserted = insertions.map { makeDirectiveLine(indent: indent, key: $0.key, value: $0.value) }
+        // Appending at EOF of a CRLF file with no final newline: the old last line must now carry its
+        // "\r", and the new last line must not (the file still ends without a terminator).
+        if usesCRLF, !hasTrailingNewline, end == lines.count, insertAt == block.count,
+           let previous = block.last, let last = inserted.last {
+            if !previous.raw.hasSuffix("\r") { block[block.count - 1] = ConfigLine(raw: previous.raw + "\r") }
+            if last.raw.hasSuffix("\r") { inserted[inserted.count - 1] = ConfigLine(raw: String(last.raw.dropLast())) }
+        }
+        block.insert(contentsOf: inserted, at: insertAt)
         lines.replaceSubrange(header..<end, with: block)
     }
 

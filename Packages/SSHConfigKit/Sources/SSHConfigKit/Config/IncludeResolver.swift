@@ -84,7 +84,12 @@ public struct IncludeResolver: Sendable {
     static func expandUserTilde(_ pattern: String) -> String? {
         let body = pattern.dropFirst()
         let name = body.prefix { $0 != "/" }
-        guard !name.isEmpty, let entry = getpwnam(String(name)), let dir = entry.pointee.pw_dir else { return nil }
+        guard !name.isEmpty else { return nil }
+        var entry = passwd()
+        var result: UnsafeMutablePointer<passwd>?
+        var buffer = [CChar](repeating: 0, count: 4096)
+        let rc = getpwnam_r(String(name), &entry, &buffer, buffer.count, &result)
+        guard rc == 0, result != nil, let dir = entry.pw_dir else { return nil }
         return String(cString: dir) + body.dropFirst(name.count)
     }
 

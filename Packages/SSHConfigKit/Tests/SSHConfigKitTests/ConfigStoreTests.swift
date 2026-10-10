@@ -135,8 +135,14 @@ struct ConfigStoreTests {
         let newLink = tmp.url.appending(path: "ssh/config.new")
         try FileManager.default.createSymbolicLink(at: newLink, withDestinationURL: tmp.url.appending(path: "b/config"))
         #expect(rename(newLink.path, link.path) == 0)
-        try await Task.sleep(for: .milliseconds(600))   // the link directory event restarts the watcher
-        store.fileDidChange()
+        // The link directory's own event restarts the watcher on the new target directory.
+        let bDirectory = tmp.url.appending(path: "b").resolvingSymlinksInPath().path
+        var waited = 0
+        while !store.watchedDirectories.contains(bDirectory) && waited < 50 {
+            try await Task.sleep(for: .milliseconds(100))
+            waited += 1
+        }
+        #expect(store.watchedDirectories.contains(bDirectory))
 
         try Data("Host z\n".utf8).write(to: tmp.url.appending(path: "b/config"))
         var attempts = 0

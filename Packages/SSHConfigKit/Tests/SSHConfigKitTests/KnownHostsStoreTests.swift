@@ -43,6 +43,37 @@ struct KnownHostsStoreTests {
         #expect(store.loadState == .loaded)
     }
 
+    @Test func watcherFollowsSymlinkRetargetedToAnotherDirectory() async throws {
+        let tmp = try TempDir()
+        try tmp.file("a/known_hosts", Self.text, permissions: 0o644)
+        try tmp.file("b/known_hosts", Self.text, permissions: 0o644)
+        try FileManager.default.createDirectory(at: tmp.url.appending(path: "ssh"), withIntermediateDirectories: true)
+        let link = tmp.url.appending(path: "ssh/known_hosts")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: tmp.url.appending(path: "a/known_hosts"))
+        let store = KnownHostsStore(fileURL: link, writer: SafeFileWriter(backups: BackupManager(rootDirectory: tmp.url.appending(path: "Backups"))), watchForChanges: true)
+        #expect(store.isWatching)
+        try await Task.sleep(for: .milliseconds(300))
+
+        let newLink = tmp.url.appending(path: "ssh/known_hosts.new")
+        try FileManager.default.createSymbolicLink(at: newLink, withDestinationURL: tmp.url.appending(path: "b/known_hosts"))
+        #expect(rename(newLink.path, link.path) == 0)
+        let bDirectory = tmp.url.appending(path: "b").resolvingSymlinksInPath().path
+        var waited = 0
+        while !store.watchedDirectories.contains(bDirectory) && waited < 50 {
+            try await Task.sleep(for: .milliseconds(100))
+            waited += 1
+        }
+        #expect(store.watchedDirectories.contains(bDirectory))
+
+        try Data("z.example.com ssh-ed25519 \(Self.ed)\n".utf8).write(to: tmp.url.appending(path: "b/known_hosts"))
+        var attempts = 0
+        while store.document.entries.count != 1 && attempts < 50 {
+            try await Task.sleep(for: .milliseconds(100))
+            attempts += 1
+        }
+        #expect(store.document.entries.count == 1)
+    }
+
     @Test func notUTF8IsNeverEditable() throws {
         let tmp = try TempDir()
         try Data([0xFF, 0xFE, 0x00]).write(to: tmp.url.appending(path: "known_hosts"))

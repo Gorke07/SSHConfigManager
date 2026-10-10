@@ -32,19 +32,42 @@ public enum ConnectionClassifier {
         if exitCode != 255 { return .reachable }
         // Match only lines in ssh's own message forms, never a substring anywhere: a server
         // banner (also on stderr) may say "Permission denied" or "Connection refused" in prose.
-        let lines = lines(of: stderr)
+        let lines = lines(of: stderr).filter(isDiagnostic)
+        func any(_ predicate: (String) -> Bool) -> Bool { lines.contains(where: predicate) }
+        func reason(_ needles: String...) -> (String) -> Bool { { line in needles.contains { line.contains($0) } } }
+        let dns = reason("Could not resolve hostname", "nodename nor servname provided", "Name or service not known",
+                         "Temporary failure in name resolution")
+        let refused = reason("Connection refused")
+        let timeout = reason("Operation timed out", "Connection timed out")
         let rules: [((String) -> Bool, ConnectionStatus)] = [
             ({ $0.hasPrefix("@") && $0.contains("REMOTE HOST IDENTIFICATION HAS CHANGED") }, .hostKeyChanged),
             ({ $0.hasPrefix("Host key verification failed") }, .unknownHostKey),
-            ({ $0.hasPrefix("ssh: Could not resolve hostname") }, .dnsFailure),
-            ({ $0.hasPrefix("ssh: connect to host") && $0.contains("Connection refused") }, .connectionRefused),
-            ({ ($0.hasPrefix("ssh: connect to host") && ($0.contains("Operation timed out") || $0.contains("Connection timed out")))
-                || $0.hasPrefix("Connection timed out during") }, .timeout),
+            (dns, .dnsFailure),
+            (refused, .connectionRefused),
+            (timeout, .timeout),
             (isPermissionDenied, .authenticationRequired),
-            ({ $0.hasPrefix("Received disconnect from") && $0.contains("Too many authentication failures") }, .authenticationRequired),
+            ({ $0.contains("Too many authentication failures") }, .authenticationRequired),
             ({ $0.hasPrefix("ssh:") && $0.contains("keyboard-interactive") }, .authenticationRequired),
         ]
-        return rules.first { rule in lines.contains(where: rule.0) }?.1 ?? .other
+        return rules.first { any($0.0) }?.1 ?? .other
+    }
+
+    /// Lines in OpenSSH's own diagnostic forms (what the old substring match could find that is
+    /// not server prose): `ssh: ...`, `kex_exchange_identification: ...`, `ssh_dispatch_run_fatal: ...`,
+    /// ProxyJump's `channel N: open failed: connect failed: ...`, `Connection to/closed/timed out/reset ...`,
+    /// `Read from remote host ...`, `Received disconnect/Disconnected from ...`, `Host key verification failed`,
+    /// the "@ WARNING" box, and `user@host: ...` lines.
+    private static func isDiagnostic(_ line: String) -> Bool {
+        let prefixes = ["ssh:", "ssh_", "kex_", "Connection to ", "Connection closed", "Connection timed out",
+                        "Connection reset", "Read from remote host", "Received disconnect from", "Disconnected from",
+                        "Host key verification failed", "@", "Permission denied", "Timeout, "]
+        if prefixes.contains(where: line.hasPrefix) { return true }
+        if line.hasPrefix("channel "), line.contains("open failed: connect failed: ") { return true }
+        // user@host: message
+        if let colon = line.range(of: ": "), line[..<colon.lowerBound].contains("@"), !line[..<colon.lowerBound].contains(" ") {
+            return true
+        }
+        return false
     }
 
     /// OpenSSH's "[user@host: ]Permission denied (publickey,password)." or

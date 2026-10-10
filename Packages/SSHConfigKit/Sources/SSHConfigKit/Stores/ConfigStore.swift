@@ -226,6 +226,9 @@ public final class ConfigStore {
         onDiskStateChange?()
     }
 
+    /// Directories currently watched (test visibility).
+    var watchedDirectories: [String] { watcher?.watchedDirectories ?? [] }
+
     func fileDidChange() {
         watcher?.refresh()   // the symlink or its target directory may have moved
         let current = try? FileFingerprint.of(fileAt: fileURL)

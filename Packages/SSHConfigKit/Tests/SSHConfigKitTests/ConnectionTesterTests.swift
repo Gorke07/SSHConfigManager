@@ -29,6 +29,19 @@ struct ConnectionTesterTests {
         (255, "Permission denied (this is a private system)\r\nConnection closed by 1.2.3.4 port 22\r\n", false, .other),
         (255, "Warning: Permanently added 'x' (ED25519) to the list of known hosts.\r\nweb@x: Permission denied (publickey,keyboard-interactive).\r\n", false, .authenticationRequired),
         (255, "Welcome. Permission denied (publickey) is what you get if you are not staff.\r\n", false, .other),
+        // OpenSSH 10.x ProxyJump output.
+        (255, "channel 0: open failed: connect failed: Connection refused\r\nstdio forwarding failed\r\nConnection closed by UNKNOWN port 65535\r\n", false, .connectionRefused),
+        (255, "channel 0: open failed: connect failed: Operation timed out\r\nstdio forwarding failed\r\nConnection closed by UNKNOWN port 65535\r\n", false, .timeout),
+        (255, "channel 0: open failed: connect failed: nodename nor servname provided, or not known\r\nstdio forwarding failed\r\n", false, .dnsFailure),
+        (255, "channel 0: open failed: connect failed: Name or service not known\r\nstdio forwarding failed\r\n", false, .dnsFailure),
+        (255, "ssh_dispatch_run_fatal: Connection to 10.0.0.1 port 22: Operation timed out\r\n", false, .timeout),
+        (255, "kex_exchange_identification: read: Operation timed out\r\n", false, .timeout),
+        (255, "kex_exchange_identification: read: Connection refused\r\n", false, .connectionRefused),
+        (255, "Read from remote host 10.0.0.1: Connection timed out\r\n", false, .timeout),
+        (255, "Connection timed out during banner exchange\r\nConnection to UNKNOWN port 65535 timed out\r\n", false, .timeout),
+        (255, "ssh: Could not resolve hostname jump: Name or service not known\r\n", false, .dnsFailure),
+        (255, "Disconnected from invalid user x 1.2.3.4 port 22: Too many authentication failures\r\n", false, .authenticationRequired),
+        (255, "channel 0: open failed: administratively prohibited: open failed\r\n", false, .other),
         (255, "web@x: Permission denied, please try again.\r\n", false, .authenticationRequired),
     ])
     func classification(exitCode: Int32, stderr: String, timedOut: Bool, expected: ConnectionStatus) {
