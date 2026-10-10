@@ -388,9 +388,23 @@ struct AppModelTests {
 
     @Test func anIncludeBeforeTheRootBlockMakesItALaterDuplicate() throws {
         let tmp = try TempDir()
-        _ = try tmp.file(".ssh/extra.conf", "Host Web\n  User x\n")
+        _ = try tmp.file(".ssh/extra.conf", "Host web\n  User x\n")
         let model = makeTestModel(tmp, config: "Include extra.conf\nHost web\n  User me\n")
         #expect(model.lintIssues(for: .host(alias: "web", occurrence: 0)) == [.duplicateAlias(alias: "web", isFirst: false)])
+    }
+
+    @Test func anIncludeDefiningOnlyACaseVariantIsCaseOnlyNotLater() throws {
+        let tmp = try TempDir()
+        _ = try tmp.file(".ssh/extra.conf", "Host Web\n  User x\n")
+        let model = makeTestModel(tmp, config: "Include extra.conf\nHost web\n  User me\n")
+        #expect(model.lintIssues(for: .host(alias: "web", occurrence: 0)) == [.duplicateAliasCaseOnly(alias: "web")])
+    }
+
+    @Test func caseVariantRootBlocksAreCaseOnlyForBoth() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\nHost Web\n")
+        #expect(model.lintIssues(for: .host(alias: "web", occurrence: 0)) == [.duplicateAliasCaseOnly(alias: "web")])
+        #expect(model.lintIssues(for: .host(alias: "Web", occurrence: 0)) == [.duplicateAliasCaseOnly(alias: "Web")])
     }
 
     @Test func anIncludeAfterTheRootBlockKeepsItFirst() throws {
@@ -416,4 +430,260 @@ struct AppModelTests {
         model.select(.host(alias: "a", occurrence: 0))
         #expect(model.effectiveSettingsExpanded)
     }
+
+    // MARK: Task 6
+
+    @Test func anUnappliedGroupDraftIsAPendingEdit() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "# group: prod\nHost a\nHost b\n")
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        let b = SidebarItem.host(alias: "b", occurrence: 0)
+        model.select(a)
+        #expect(!model.hasPendingFormEdits)
+        model.groupDraft = "  prod "
+        #expect(!model.hasPendingFormEdits)
+        model.groupDraft = "staging"
+        #expect(model.hasPendingFormEdits)
+
+        model.requestSelect(b)
+        #expect(model.pendingSelection == b)
+        #expect(model.selection == a)
+
+        model.confirmPendingSelection()
+        #expect(model.selection == b)
+        #expect(model.groupDraft == nil)
+        #expect(!model.hasPendingFormEdits)
+        #expect(model.savedGroup(for: a) == "prod")
+    }
+
+    @Test func applyingOrReloadingResetsTheGroupDraft() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n")
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        model.select(a)
+        model.groupDraft = "x"
+        model.setGroup(a, to: "x")
+        #expect(model.groupDraft == nil)
+        #expect(model.savedGroup(for: a) == "x")
+        #expect(!model.hasPendingFormEdits)
+
+        model.groupDraft = "y"
+        #expect(model.hasPendingFormEdits)
+        model.store.load()
+        #expect(model.groupDraft == nil)
+        #expect(!model.hasPendingFormEdits)
+    }
+
+    @Test func lintMapIsReusedUntilTheDocumentChanges() throws {
+        let tmp = try TempDir()
+        _ = try tmp.file(".ssh/id_a", "x")
+        let model = makeTestModel(tmp, config: "Host a\n  IdentityFile ~/.ssh/id_a\nHost b\n")
+        let reads = ReadCounter()
+        model.keyEncryptionReader = { _ in reads.hit(); return .unknown }
+        _ = model.lintIssueMap()
+        _ = model.lintIssues(for: .host(alias: "a", occurrence: 0))
+        _ = model.lintIssueMap()
+        #expect(reads.count == 1)
+        model.setGroup(.host(alias: "b", occurrence: 0), to: "g")
+        _ = model.lintIssueMap()
+        #expect(reads.count == 2)
+    }
+
+    @Test func deletingAnEarlierOccurrenceMovesALaterSelection() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\n  User a\nHost web\n  User b\nHost web\n  User c\nHost other\n")
+        let w = { SidebarItem.host(alias: "web", occurrence: $0) }
+        model.select(w(2))
+        let editor = try #require(model.editor(for: w(2)))
+        model.requestDelete(w(0))
+        model.confirmPendingDelete()
+        #expect(model.selection == w(1))
+        #expect(editor.item == w(1))
+        #expect(model.activeEditor === editor)
+
+        // An earlier occurrence than the selection is unaffected by a later delete; other aliases too.
+        model.requestDelete(SidebarItem.host(alias: "other", occurrence: 0))
+        model.confirmPendingDelete()
+        #expect(model.selection == w(1))
+
+        model.requestDelete(w(1))
+        model.confirmPendingDelete()
+        #expect(model.selection == nil)
+    }
+
+    @Test func deletingALaterOccurrenceKeepsTheSelection() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\nHost web\nHost web\n")
+        let w = { SidebarItem.host(alias: "web", occurrence: $0) }
+        model.select(w(0))
+        model.requestDelete(w(2))
+        model.confirmPendingDelete()
+        #expect(model.selection == w(0))
+    }
+
+    @Test func aTopLevelIncludeDefiningTheAliasMakesTheRootBlockLater() throws {
+        let tmp = try TempDir()
+        _ = try tmp.file(".ssh/one.conf", "Host other\n")
+        _ = try tmp.file(".ssh/two.conf", "Host web\n")
+        let model = makeTestModel(tmp, config: "Include one.conf\nHost web\nInclude two.conf\n")
+        // one.conf does not define web, two.conf comes after the block: the root block is first.
+        #expect(model.lintIssues(for: .host(alias: "web", occurrence: 0)) == [.duplicateAlias(alias: "web", isFirst: true)])
+
+        let later = makeTestModel(tmp, config: "Include one.conf\nInclude two.conf\nHost web\n")
+        #expect(later.lintIssues(for: .host(alias: "web", occurrence: 0)) == [.duplicateAlias(alias: "web", isFirst: false)])
+    }
+
+    @Test func anIncludeInANonMatchingHostBlockIsIgnored() throws {
+        let tmp = try TempDir()
+        _ = try tmp.file(".ssh/two.conf", "Host web\n")
+        let ignored = makeTestModel(tmp, config: "Host other\n  Include two.conf\nHost web\n")
+        #expect(ignored.lintIssues(for: .host(alias: "web", occurrence: 0)) == [.duplicateAlias(alias: "web", isFirst: true)])
+
+        let matching = makeTestModel(tmp, config: "Host w*\n  Include two.conf\nHost web\n")
+        #expect(matching.lintIssues(for: .host(alias: "web", occurrence: 0)) == [.duplicateAlias(alias: "web", isFirst: false)])
+    }
+    @Test func deletingAnEarlierPatternOrGroupedBlockMovesTheSelection() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host *\n  User a\n# group: g\nHost *\n  User b\nHost *\n  User c\n")
+        let star = { SidebarItem.host(alias: "*", occurrence: $0) }
+        model.select(star(2))
+        model.requestDelete(star(1))   // block with a "# group:" line above it
+        model.confirmPendingDelete()
+        #expect(model.selection == star(1))
+        model.requestDelete(star(0))
+        model.confirmPendingDelete()
+        #expect(model.selection == star(0))
+        #expect(model.store.document.hosts.count == 1)
+    }
+
+    @Test func invalidateLintForcesAFreshRead() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n  IdentityFile ~/.ssh/id_a\n")
+        let reads = ReadCounter()
+        model.keyEncryptionReader = { _ in reads.hit(); return .unencrypted }
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        #expect(model.lintIssues(for: a) == [.missingIdentityFile("~/.ssh/id_a")])
+        _ = try tmp.file(".ssh/id_a", "x")
+        #expect(model.lintIssues(for: a) == [.missingIdentityFile("~/.ssh/id_a")])   // memoized
+        let revision = model.lintRevision
+        model.invalidateLint()
+        #expect(model.lintRevision != revision)
+        #expect(model.lintIssues(for: a) == [.unencryptedKey("~/.ssh/id_a")])
+        #expect(reads.count == 1)
+        // The key file did not change since the last lint pass: activation leaves the lint alone.
+        model.refreshIncludes()
+        #expect(model.lintRevision == revision + 1)
+    }
+
+    @Test func activationInvalidatesTheLintOnlyWhenAKeyFileOrAnIncludeChanged() throws {
+        let tmp = try TempDir()
+        let key = try tmp.file(".ssh/id_a", "x")
+        let model = makeTestModel(tmp, config: "Host a\n  IdentityFile ~/.ssh/id_a\n  IdentityFile ~/.ssh/id_later\n")
+        model.keyEncryptionReader = { _ in .unknown }
+        _ = model.lintIssueMap()
+        let revision = model.lintRevision
+
+        model.refreshIncludes()
+        #expect(model.lintRevision == revision)
+
+        try "xyz".write(to: key, atomically: false, encoding: .utf8)   // size changes
+        model.refreshIncludes()
+        #expect(model.lintRevision == revision + 1)
+
+        _ = model.lintIssueMap()
+        model.refreshIncludes()
+        #expect(model.lintRevision == revision + 1)
+
+        _ = try tmp.file(".ssh/id_later", "y")                          // a missing key appears
+        model.refreshIncludes()
+        #expect(model.lintRevision == revision + 2)
+
+        _ = model.lintIssueMap()
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -3600)], ofItemAtPath: key.path)
+        model.refreshIncludes()
+        #expect(model.lintRevision == revision + 3)                       // mtime alone changes
+    }
+
+    @Test func includesNamingEachOtherTerminateWithTheRightWording() throws {
+        let tmp = try TempDir()
+        _ = try tmp.file(".ssh/a.conf", "Include ~/.ssh/*.conf\nHost web\n")
+        _ = try tmp.file(".ssh/b.conf", "Include ~/.ssh/*.conf\n")
+        _ = try tmp.file(".ssh/c.conf", "Include ~/.ssh/*.conf\n")
+        let model = makeTestModel(tmp, config: "Include a.conf b.conf c.conf\nHost web\n")
+        let start = Date()
+        #expect(model.lintIssues(for: .host(alias: "web", occurrence: 0)) == [.duplicateAlias(alias: "web", isFirst: false)])
+        #expect(Date().timeIntervalSince(start) < 5)
+    }
+
+    @Test func anIncludeInMatchAllCountsButOtherMatchCriteriaAreIgnored() throws {
+        let tmp = try TempDir()
+        _ = try tmp.file(".ssh/two.conf", "Host web\n")
+        let all = makeTestModel(tmp, config: "Match all\n  Include two.conf\nHost web\n")
+        #expect(all.lintIssues(for: .host(alias: "web", occurrence: 0)) == [.duplicateAlias(alias: "web", isFirst: false)])
+        let other = makeTestModel(tmp, config: "Match host nomatch\n  Include two.conf\nHost web\n")
+        #expect(other.lintIssues(for: .host(alias: "web", occurrence: 0)) == [.duplicateAlias(alias: "web", isFirst: true)])
+    }
+
+    @Test func aGroupDraftIsAppliedBeforeSavingAndIsNotABlockedFormEdit() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n")
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        model.select(a)
+        model.groupDraft = "prod"
+        #expect(model.hasPendingFormEdits)
+        #expect(model.hasPendingGroupDraft)
+        #expect(!model.hasBlockedFormEdits)
+        model.applyPendingGroupDraft()
+        #expect(model.savedGroup(for: a) == "prod")
+        #expect(model.store.hasUnsavedChanges)
+        #expect(model.groupDraft == nil)
+        #expect(!model.hasPendingFormEdits)
+    }
+
+    @Test func aGroupDraftSurvivesSaveNoticesButNotAReload() async throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\nHost b\n")
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        model.select(a)
+        model.setGroup(.host(alias: "b", occurrence: 0), to: "x")
+        model.groupDraft = "draft"
+        try await model.store.save()   // a save notice, not a reload
+        #expect(model.groupDraft == "draft")
+        model.store.load()
+        #expect(model.groupDraft == nil)
+    }
+
+    @Test func aGroupDraftThatCannotBeAppliedStaysPendingWithAnError() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n")
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        model.select(a)
+        model.groupDraft = "bad\u{1B}group"
+        model.applyPendingGroupDraft()
+        #expect(model.errorMessage != nil)
+        #expect(model.hasPendingGroupDraft)
+        #expect(!model.hasBlockedFormEdits)
+        #expect(!model.store.hasUnsavedChanges)
+    }
+
+    @Test func aGroupDraftForAHostThatIsGoneIsDropped() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\nHost b\n")
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        model.select(a)
+        model.groupDraft = "x"
+        try model.store.apply { try $0.removeHost(at: SidebarBuilder.hostEntry(for: a, in: $0)!.headerLine) }
+        #expect(!model.hasPendingGroupDraft)
+        #expect(!model.hasPendingFormEdits)
+        model.applyPendingGroupDraft()
+        #expect(model.groupDraft == nil)
+    }
+
+}
+
+private final class ReadCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = 0
+    func hit() { lock.lock(); value += 1; lock.unlock() }
+    var count: Int { lock.lock(); defer { lock.unlock() }; return value }
 }

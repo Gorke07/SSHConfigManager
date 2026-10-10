@@ -102,39 +102,41 @@ private struct HostEditorContainer: View {
 private struct HostGroupRow: View {
     let model: AppModel
     let item: SidebarItem
-    @State private var groupText = ""
 
     var body: some View {
+        let saved = model.savedGroup(for: item)
+        let text = Binding(get: { model.groupDraft ?? saved }, set: { model.groupDraft = $0 })
         HStack {
-            TextField(String(localized: "editor.group"), text: $groupText,
+            TextField(String(localized: "editor.group"), text: text,
                       prompt: Text(String(localized: "editor.group.placeholder")))
                 .onSubmit(apply)
             let groups = model.existingGroups
             if !groups.isEmpty {
                 Menu(String(localized: "editor.group.suggestions")) {
                     ForEach(groups, id: \.self) { name in
-                        Button { groupText = name; if name != savedGroup { model.setGroup(item, to: name) } } label: { Text(verbatim: name) }
+                        Button {
+                            model.groupDraft = name
+                            apply()
+                        } label: { Text(verbatim: name) }
                     }
                 }
                 .fixedSize()
             }
             Button(String(localized: "editor.group.apply"), action: apply)
-                .disabled(groupText.trimmingCharacters(in: .whitespacesAndNewlines) == savedGroup)
+                .disabled(text.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines) == saved)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .onAppear { groupText = savedGroup }
-    }
-
-    private var savedGroup: String {
-        guard let entry = SidebarBuilder.hostEntry(for: item, in: model.store.document) else { return "" }
-        return model.store.document.group(ofHostAt: entry.headerLine) ?? ""
     }
 
     private func apply() {
         // Leave the document alone when nothing changed (Return must not rewrite or dirty it).
-        guard groupText.trimmingCharacters(in: .whitespacesAndNewlines) != savedGroup else { return }
-        model.setGroup(item, to: groupText)
+        let saved = model.savedGroup(for: item)
+        guard let draft = model.groupDraft, draft.trimmingCharacters(in: .whitespacesAndNewlines) != saved else {
+            model.groupDraft = nil
+            return
+        }
+        model.setGroup(item, to: draft)
     }
 }
 

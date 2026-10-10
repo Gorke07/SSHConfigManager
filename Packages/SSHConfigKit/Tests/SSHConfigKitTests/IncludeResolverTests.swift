@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import Testing
 @testable import SSHConfigKit
 
@@ -12,6 +13,20 @@ struct IncludeResolverTests {
         #expect(hosts.map(\.entry.alias) == ["a", "b"])
         #expect(hosts.first?.entry.value(for: "User") == "u")
         #expect(hosts.first?.file.lastPathComponent == "a.conf")
+    }
+
+    @Test func fifoInAnIncludeGlobIsSkippedWithoutBlocking() throws {
+        let home = try TempDir()
+        try home.file(".ssh/config.d/a.conf", "Host a\n")
+        #expect(Darwin.mkfifo(home.url.appending(path: ".ssh/config.d/b.conf").path, 0o600) == 0)
+        try home.file(".ssh/config.d/c.conf", "Host c\n")
+        let resolver = IncludeResolver(homeDirectory: home.url)
+        let doc = ConfigDocument(parsing: "Include config.d/*.conf\n")
+        #expect(resolver.includedHosts(of: doc, rootFile: nil).map(\.entry.alias) == ["a", "c"])
+        #expect(resolver.includedDocuments(for: doc.includes[0]).count == 2)
+        let states = resolver.includeFileStates(of: doc, rootFile: nil)
+        #expect(states.count == 3)
+        #expect(states.filter { $0.text == nil }.count == 1)
     }
 
     @Test func tildeAndAbsolutePaths() throws {

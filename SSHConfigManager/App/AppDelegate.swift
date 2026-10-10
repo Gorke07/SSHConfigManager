@@ -43,6 +43,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 NSApp.setActivationPolicy(.regular)
             }
         })
+        // Include files can be edited outside the app without the root file changing.
+        observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.model.refreshIncludes() }
+        })
         // The Host menu acts only while a main window is key (its shortcuts must not shadow other windows).
         for (name, isKey) in [(NSWindow.didBecomeKeyNotification, true), (NSWindow.didResignKeyNotification, false)] {
             observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
@@ -113,11 +117,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate()
         switch alert.runModal() {
         case .alertFirstButtonReturn:
-            if model.hasPendingFormEdits {
-                // Saving would silently drop the fields that have problems.
+            model.applyPendingGroupDraft()
+            if model.hasBlockedFormEdits || model.hasPendingGroupDraft {
+                // Saving would silently drop the fields that have problems (or a group that could not be applied;
+                // its own error message is already showing).
                 openMainWindow?()
                 NSApp.activate()
-                model.errorMessage = String(localized: "quit.pendingForm")
+                if model.hasBlockedFormEdits { model.errorMessage = String(localized: "quit.pendingForm") }
                 return .terminateCancel
             }
             Task { @MainActor in

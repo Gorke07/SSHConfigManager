@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import SSHConfigKit
 
-/// `ssh -G` results per alias (spec v1.1 §5–6): at most two at once, one run per alias,
+/// `ssh -G` results per exact alias (spec v1.1 §5–6): at most two at once, one run per alias,
 /// cleared whenever the saved file changes.
 @MainActor
 @Observable
@@ -22,15 +22,11 @@ final class EffectiveConfigCache {
         self.runner = runner
     }
 
-    nonisolated static func key(_ alias: String) -> String {
-        String(String.UnicodeScalarView(alias.unicodeScalars.map { (65...90).contains($0.value) ? Unicode.Scalar($0.value + 32)! : $0 }))
-    }
-
-    func options(for alias: String) -> EffectiveOptions? { results[Self.key(alias)] }
-    func failure(for alias: String) -> String? { failures[Self.key(alias)] }
+    func options(for alias: String) -> EffectiveOptions? { results[alias] }
+    func failure(for alias: String) -> String? { failures[alias] }
 
     func load(_ alias: String, using builder: SSHCommandBuilder) async {
-        let key = Self.key(alias)
+        let key = alias
         if results[key] != nil || failures[key] != nil { return }
         if let task = inFlight[key] { await task.value; return }
         let currentGeneration = generation

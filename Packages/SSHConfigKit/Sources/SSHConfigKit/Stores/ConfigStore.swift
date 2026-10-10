@@ -49,6 +49,8 @@ public final class ConfigStore {
     /// True iff the FileWatcher was created.
     public private(set) var isWatching = false
 
+    /// Files and texts the saved document's Includes read, to tell whether `refreshIncludes()` saw a change.
+    @ObservationIgnored private var savedIncludeStates: [IncludeFileState] = []
     @ObservationIgnored private var diskFingerprint: FileFingerprint?
     /// The text `savedDocument` was built from (nil: no file); lets refreshes skip no-op notifications.
     @ObservationIgnored private var savedViewText: String?
@@ -59,6 +61,8 @@ public final class ConfigStore {
     @ObservationIgnored public let includeResolver: IncludeResolver
     @ObservationIgnored private var watcher: FileWatcher?
     @ObservationIgnored private var loadGeneration = 0
+    /// Counts loads from disk (initial, reload, discard, external change without unsaved edits); saves and change notices do not count.
+    public var loadRevision: Int { loadGeneration }
     /// Called after the file was (re)loaded from disk or saved, i.e. whenever the saved state may have changed.
     @ObservationIgnored public var onDiskStateChange: (@MainActor () -> Void)?
 
@@ -118,6 +122,7 @@ public final class ConfigStore {
         loadState = .loaded
         includedHosts = includeResolver.includedHosts(of: document, rootFile: fileURL)
         savedIncludedHosts = includedHosts
+        savedIncludeStates = includeResolver.includeFileStates(of: savedDocument, rootFile: fileURL)
         onDiskStateChange?()
     }
 
@@ -146,6 +151,25 @@ public final class ConfigStore {
         if includesChanged {
             includedHosts = includeResolver.includedHosts(of: document, rootFile: fileURL)
         }
+    }
+
+    /// Re-reads the Include files of the working and the saved document, for edits made to an Include
+    /// file alone (the root file, its text and its dirty state stay untouched). Assigns a property only
+    /// when its value changed, so observers and equality-based caches see real changes only.
+    /// Returns true when any file the saved document includes changed (what ssh reads).
+    @discardableResult
+    public func refreshIncludes() -> Bool {
+        let savedWalk = includeResolver.traverse(savedDocument, rootFile: fileURL)
+        // Same Include paths: the working document's chain is the saved one, so one walk serves both.
+        let working = document.includes.map(\.paths) == savedDocument.includes.map(\.paths)
+            ? savedWalk.hosts
+            : includeResolver.includedHosts(of: document, rootFile: fileURL)
+        if working != includedHosts { includedHosts = working }
+        if savedWalk.hosts != savedIncludedHosts { savedIncludedHosts = savedWalk.hosts }
+        // Global lines or Match blocks in an Include file change what ssh resolves without changing the hosts.
+        guard savedWalk.states != savedIncludeStates else { return false }
+        savedIncludeStates = savedWalk.states
+        return true
     }
 
     /// Reloads from disk (also clears `externalChangePending`).
@@ -198,6 +222,7 @@ public final class ConfigStore {
         externalChangePending = false
         includedHosts = includeResolver.includedHosts(of: savedDocument, rootFile: fileURL)
         savedIncludedHosts = includedHosts
+        savedIncludeStates = includeResolver.includeFileStates(of: savedDocument, rootFile: fileURL)
         onDiskStateChange?()
     }
 
@@ -241,9 +266,11 @@ public final class ConfigStore {
         if let text {
             savedDocument = ConfigDocument(parsing: text)
             savedIncludedHosts = includeResolver.includedHosts(of: savedDocument, rootFile: fileURL)
+            savedIncludeStates = includeResolver.includeFileStates(of: savedDocument, rootFile: fileURL)
         } else {
             savedDocument = .empty
             savedIncludedHosts = []
+            savedIncludeStates = []
         }
         onDiskStateChange?()
     }
@@ -265,6 +292,7 @@ public final class ConfigStore {
         diskFingerprint = nil
         includedHosts = []
         savedIncludedHosts = []
+        savedIncludeStates = []
         loadState = state
         onDiskStateChange?()
     }

@@ -39,6 +39,14 @@ final class AppModel {
     @ObservationIgnored private var activeEditorToken: UUID?
     /// A selection waiting for the user to confirm discarding blocked form edits.
     var pendingSelection: SidebarItem?
+    /// The group field's text while it differs from what the selected host has (nil: not edited).
+    /// Lives here, not in the view, so an unapplied draft counts as a pending edit.
+    var groupDraft: String?
+    /// Reads a private key's head for the lint; tests count calls through it.
+    @ObservationIgnored var keyEncryptionReader: @Sendable (URL) -> KeyEncryption = { url in
+        (try? KeyFileInspector.readHead(of: url)).map(KeyFileInspector.encryption(ofPrivateKeyHead:)) ?? .unknown
+    }
+    @ObservationIgnored private var lintCache: LintCache?
     /// Effective Settings disclosure state; lives for the session, across host switches and editor rebuilds.
     var effectiveSettingsExpanded = false
     var effectiveSettingsShowAll = false
@@ -50,13 +58,13 @@ final class AppModel {
     @ObservationIgnored private let terminalInstalled: @MainActor (TerminalChoice) -> Bool
     /// Set when macOS denied Automation access; the main window explains how to allow it.
     var automationDenied = false
-    /// Session-only connection test results; cleared when the saved file changes or another one is opened.
     private(set) var memory: HostMemory
 
     static func memoryKey(for url: URL, home: URL) -> String {
         "hostMemory." + backupKind(for: url, home: home)
     }
 
+    /// Session-only connection test results; cleared when the saved file changes or another one is opened.
     let connectionTests: ConnectionTestsModel
     /// `ssh -G` results per alias; cleared with the connection tests.
     let effectiveConfig: EffectiveConfigCache
@@ -92,6 +100,7 @@ final class AppModel {
     /// The saved file changed (save, reload, external change): results measured against the old
     /// file are stale and the connectable hosts must be rebuilt.
     private func observeSavedState() {
+        lastLoadRevision = store.loadRevision
         store.onDiskStateChange = { [weak self] in self?.savedStateDidChange() }
     }
 
@@ -101,6 +110,22 @@ final class AppModel {
         effectiveConfig.clear()
         statusFilter = nil
         pendingDelete = nil
+        // Only an actual reload from disk resets the draft; a save applied it already and change notices keep it.
+        if store.loadRevision != lastLoadRevision {
+            lastLoadRevision = store.loadRevision
+            groupDraft = nil
+        }
+        invalidateLint()
+    }
+
+    @ObservationIgnored private var lastLoadRevision = 0
+    /// Bumped by `invalidateLint()`; read by `lintIssueMap()` so views re-render after key files changed.
+    private(set) var lintRevision = 0
+
+    /// Drops the memoized lint (key files can change without the document changing).
+    func invalidateLint() {
+        lintCache = nil
+        lintRevision += 1
     }
 
     static func liveStore(url: URL, backups: BackupManager, backupKind: String) -> ConfigStore {
@@ -154,7 +179,7 @@ final class AppModel {
     private struct SavedHosts {
         let store: ObjectIdentifier
         let hosts: [SavedHost]
-        /// Lowercased alias → alias as written in the saved file (ssh matches aliases case-insensitively).
+        /// Exact alias → alias as written in the saved file (ssh matches Host patterns case-sensitively).
         let aliases: [String: String]
     }
     @ObservationIgnored private var savedHostsCache: SavedHosts?
@@ -171,7 +196,7 @@ final class AppModel {
         let candidates = store.savedDocument.hosts.map { SavedHost(entry: $0, isIncluded: false) }
             + store.savedIncludedHosts.map { SavedHost(entry: $0.entry, isIncluded: true) }
         for host in candidates where !host.entry.isPattern {
-            let key = host.entry.alias.lowercased()
+            let key = host.entry.alias
             guard aliases[key] == nil else { continue }
             aliases[key] = host.entry.alias
             hosts.append(host)
@@ -181,7 +206,7 @@ final class AppModel {
         return built
     }
 
-    /// Every connectable host of the saved file once (case-insensitive, like ssh), file hosts first.
+    /// Every connectable host of the saved file once (exact, case-sensitive like ssh; the first block of a repeated alias wins), file hosts first.
     var savedConnectableHosts: [SavedHost] { savedHosts.hosts }
 
     /// An editable, non-pattern host that is not in the saved file yet (new or renamed):
@@ -195,17 +220,62 @@ final class AppModel {
 
     /// `alias` as written in the saved file, or nil when the saved file has no such (non-pattern) host.
     func savedAlias(_ alias: String) -> String? {
-        savedHosts.aliases[alias.lowercased()]
+        savedHosts.aliases[alias]
     }
 
     /// Resolver result for a host of the saved file (Includes followed in place, with the store's own resolver).
     func resolvedConfig(forSavedAlias alias: String) -> ResolvedConfig? {
         guard let saved = savedAlias(alias) else { return nil }
         let document = store.savedDocument
-        let header = document.hosts.first { !$0.isPattern && $0.alias == saved }?.headerLine
         let resolver = store.includeResolver
-        return ConfigResolver.resolve(alias: saved, document: document, targetHeader: header,
-                                      includes: { resolver.includedDocuments(for: $0) })
+        let includes: (IncludeDirective) -> [(file: URL, document: ConfigDocument)] = { resolver.includedDocuments(for: $0) }
+        // The root block is the target even when an earlier Include defines the same alias: it is the block the
+        // sidebar shows and the user edits; the included block's rows still show `.include(...)`.
+        if let header = document.hosts.first(where: { !$0.isPattern && $0.alias == saved })?.headerLine {
+            return ConfigResolver.resolve(alias: saved, document: document, targetHeader: header, includes: includes)
+        }
+        // The first block of this alias lives in an Include file: that block is "this block".
+        let included = store.savedIncludedHosts.first { !$0.entry.isPattern && $0.entry.alias == saved }
+        return ConfigResolver.resolve(alias: saved, document: document, targetHeader: included?.entry.headerLine,
+                                      targetFile: included?.file, includes: includes)
+    }
+
+    /// Re-reads the Include files (they can change without the root file changing). When the saved
+    /// view's included hosts changed, the effective settings are dropped and reloaded. Connection
+    /// tests stay: they are per alias, and every other host is unaffected.
+    func refreshIncludes() {
+        let includesChanged = store.refreshIncludes()
+        if includesChanged {
+            savedHostsCache = nil
+            effectiveConfig.clear()
+        }
+        // Key files can change while the app is in the background: compare the stamps of the files the last lint
+        // pass looked at, so an activation with nothing changed leaves the memoized lint alone.
+        if includesChanged || keyFilesChangedSinceLint() { invalidateLint() }
+    }
+
+    /// (inode, size, mtime) of a key file the lint looked at; nil when it does not exist.
+    private struct KeyStamp: Equatable {
+        let inode: UInt64
+        let size: Int64
+        let mtimeSeconds: Int
+        let mtimeNanos: Int
+
+        init?(path: String) {
+            var info = stat()
+            guard stat(path, &info) == 0 else { return nil }
+            inode = UInt64(info.st_ino)
+            size = Int64(info.st_size)
+            mtimeSeconds = Int(info.st_mtimespec.tv_sec)
+            mtimeNanos = Int(info.st_mtimespec.tv_nsec)
+        }
+    }
+
+    @ObservationIgnored private var lintKeyStamps: [String: KeyStamp?]?
+
+    private func keyFilesChangedSinceLint() -> Bool {
+        guard let stamps = lintKeyStamps else { return false }
+        return stamps.contains { KeyStamp(path: $0.key) != $0.value }
     }
 
     /// The alias to connect to for a sidebar item: nil for patterns, Match blocks, missing hosts
@@ -281,7 +351,15 @@ final class AppModel {
         pendingDelete = nil
         do {
             try HostCommands.delete(item, in: store)
-            if selection == item { select(nil) }
+            if selection == item {
+                select(nil)
+            } else if case .host(let alias, let removed) = item,
+                      case .host(let selectedAlias, let m)? = selection, selectedAlias == alias, m > removed {
+                // Later blocks of the same alias moved up by one; the selection follows its block.
+                let moved = SidebarItem.host(alias: alias, occurrence: m - 1)
+                selection = moved
+                activeEditor?.follow(to: moved)
+            }
         } catch {
             errorMessage = Messages.text(for: error)
         }
@@ -292,7 +370,13 @@ final class AppModel {
     }
 
     func toggleFavorite(_ alias: String) {
-        memory.toggleFavorite(savedAlias(alias) ?? alias)
+        var existing = Set(savedConnectableHosts.map(\.entry.alias))
+        for host in store.document.hosts where !host.isPattern { existing.insert(host.alias) }
+        let target = savedAlias(alias) ?? alias
+        if !memory.toggleFavorite(target, existing: existing) {
+            let limit = String(HostMemory.maxFavorites)
+            errorMessage = String(localized: "favorite.limit \(limit)")
+        }
     }
 
     /// "Upload to Server…": `ssh-copy-id -i <pub> [-F <config>] -- <alias>` in the chosen terminal (interactive).
@@ -335,6 +419,7 @@ final class AppModel {
 
     func select(_ item: SidebarItem?) {
         selection = item
+        groupDraft = nil
         editorToken = UUID()
         activeEditor = nil
         activeEditorToken = nil
@@ -355,10 +440,14 @@ final class AppModel {
     /// Sets or (nil/blank) removes the host's `# group:` line as an unsaved edit. The open editor
     /// keeps its fields: it finds its block by alias and occurrence and compares only directives.
     func setGroup(_ item: SidebarItem, to name: String?) {
-        guard let entry = SidebarBuilder.hostEntry(for: item, in: store.document) else { return }
+        guard let entry = SidebarBuilder.hostEntry(for: item, in: store.document) else {
+            groupDraft = nil   // the host is gone: nothing to apply the draft to
+            return
+        }
         let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
             try store.apply { try $0.setGroup(ofHostAt: entry.headerLine, to: trimmed?.isEmpty == false ? trimmed : nil) }
+            groupDraft = nil
         } catch {
             errorMessage = Messages.text(for: error)
         }
@@ -371,40 +460,111 @@ final class AppModel {
         return names.sorted(by: SidebarBuilder.groupNameOrder)
     }
 
+    private struct LintCache {
+        let store: ObjectIdentifier
+        let document: ConfigDocument
+        let included: [IncludedHost]
+        let map: [SidebarItem: [HostIssue]]
+    }
+
     /// Lint of every root-file Host block in the document being edited (so fixes show at once),
-    /// keyed by sidebar item. One pass: duplicates and first blocks are computed once, and each
-    /// key file is read at most once. Pattern blocks get the IdentityFile checks only.
+    /// keyed by sidebar item. Computed once and reused while the document and the included hosts
+    /// are unchanged (the detail pane and the sidebar share it). One pass: duplicates and first
+    /// blocks are computed once, and each key file is read at most once. Pattern blocks get the
+    /// IdentityFile checks only.
     func lintIssueMap() -> [SidebarItem: [HostIssue]] {
+        _ = lintRevision
         let document = store.document
-        let reads = KeyReadMemo()
+        let included = store.includedHosts
+        let id = ObjectIdentifier(store)
+        if let cache = lintCache, cache.store == id, cache.document == document, cache.included == included { return cache.map }
+        let map = computeLintIssueMap(document: document, included: included)
+        // Writing the revision here would re-trigger observers; the cache is plain state.
+        lintCache = LintCache(store: id, document: document, included: included, map: map)
+        return map
+    }
+
+    private func computeLintIssueMap(document: ConfigDocument, included: [IncludedHost]) -> [SidebarItem: [HostIssue]] {
+        let reads = KeyReadMemo(reader: keyEncryptionReader)
+        defer { lintKeyStamps = Dictionary(uniqueKeysWithValues: reads.touchedPaths.map { ($0, KeyStamp(path: $0)) }) }
         let lint = HostLint(
             home: settings.homeDirectory,
-            fileExists: { FileManager.default.fileExists(atPath: $0.path) },
+            fileExists: { reads.exists($0) },
             encryption: { reads.encryption(of: $0) })
-        let duplicates = HostLint.duplicateCounts(document: document, included: store.includedHosts)
+        let duplicates = HostLint.duplicateCounts(document: document, included: included)
+        let exactDuplicates = HostLint.exactDuplicateCounts(document: document, included: included)
         var firstBlocks = HostLint.firstBlocks(document: document)
-        // ssh reads an Include where it stands: a root block after one is not the first for aliases
-        // the included files define too.
-        if let firstInclude = document.includes.map(\.line).min() {
-            for host in store.includedHosts {
-                let plain = host.entry.patterns.filter { !$0.hasPrefix("!") && !$0.contains("*") && !$0.contains("?") }
-                for name in plain.map(EffectiveConfigCache.key) {
-                    if let header = firstBlocks[name], header > firstInclude { firstBlocks[name] = -1 }
-                }
-            }
-        }
+        applyIncludeOrder(to: &firstBlocks, document: document)
         var seen: [String: Int] = [:]
         var map: [SidebarItem: [HostIssue]] = [:]
         for entry in document.hosts {
             let occurrence = seen[entry.alias, default: 0]
             seen[entry.alias] = occurrence + 1
-            var issues = lint.issues(for: entry, duplicates: duplicates, firstBlocks: firstBlocks)
+            var issues = lint.issues(for: entry, duplicates: duplicates, exactDuplicates: exactDuplicates, firstBlocks: firstBlocks)
             if entry.isPattern {
-                issues.removeAll { if case .duplicateAlias = $0 { true } else { false } }
+                issues.removeAll {
+                    switch $0 {
+                    case .duplicateAlias, .duplicateAliasCaseOnly: true
+                    default: false
+                    }
+                }
             }
             if !issues.isEmpty { map[.host(alias: entry.alias, occurrence: occurrence)] = issues }
         }
         return map
+    }
+
+    /// ssh reads an Include where it stands. A root block is no longer the first for a name when an
+    /// Include above it that ssh applies to that name (top-level, or inside a Host block whose
+    /// patterns match it) resolves to a file defining the name. Names compare exactly: ssh matches Host patterns
+    /// case-sensitively, so a file defining only a case variant does not come first.
+    private func applyIncludeOrder(to firstBlocks: inout [String: Int], document: ConfigDocument) {
+        let directives = document.includes
+        guard !directives.isEmpty, let lastHeader = firstBlocks.values.max() else { return }
+        let resolver = store.includeResolver
+        let hostHeaders = Dictionary(uniqueKeysWithValues: document.hosts.map { ($0.headerLine, $0) })
+        let matchHeaders = Set(document.matches.map(\.headerLine))
+        // `Match all` always applies (verified with ssh -G), so an Include in it counts as top-level.
+        // Other criteria are conditional and unknown here: those Includes are ignored.
+        let matchAll = Set(document.matches.filter {
+            $0.criteria.trimmingCharacters(in: .whitespaces).asciiLowercased == "all"
+        }.map(\.headerLine))
+        // The block an Include line sits in: the nearest header above it.
+        func scope(of line: Int) -> HostEntry?? {
+            let nearest = (Array(hostHeaders.keys) + Array(matchHeaders)).filter { $0 < line }.max()
+            guard let nearest else { return .some(nil) }       // top level
+            if let host = hostHeaders[nearest] { return .some(host) }
+            if matchAll.contains(nearest) { return .some(nil) }
+            return nil                                          // inside a Match block: condition unknown, ignored
+        }
+        for directive in directives where directive.line < lastHeader {
+            guard let blockScope = scope(of: directive.line) else { continue }
+            var defined: Set<String> = []
+            var visited: Set<String> = []
+            collectNames(of: directive, resolver: resolver, depth: 0, visited: &visited, into: &defined)
+            for key in defined {
+                guard let header = firstBlocks[key], header > directive.line, header != -1 else { continue }
+                if let host = blockScope {
+                    guard ConfigResolver.hostLineMatches(host.patterns, alias: key) else { continue }
+                }
+                firstBlocks[key] = -1
+            }
+        }
+    }
+
+    private func collectNames(of directive: IncludeDirective, resolver: IncludeResolver, depth: Int,
+                              visited: inout Set<String>, into names: inout Set<String>) {
+        guard depth < 16 else { return }
+        for (file, included) in resolver.includedDocuments(for: directive) {
+            // Each file once, like IncludeResolver: includes that name each other must not multiply reads.
+            guard visited.insert(file.resolvingSymlinksInPath().path).inserted else { continue }
+            for entry in included.hosts {
+                for name in entry.patterns where !name.hasPrefix("!") && !name.contains("*") && !name.contains("?") {
+                    names.insert(name)
+                }
+            }
+            for nested in included.includes { collectNames(of: nested, resolver: resolver, depth: depth + 1, visited: &visited, into: &names) }
+        }
     }
 
     func lintIssues(for item: SidebarItem) -> [HostIssue] {
@@ -412,7 +572,32 @@ final class AppModel {
         return lintIssueMap()[item] ?? []
     }
 
-    var hasPendingFormEdits: Bool { activeEditor?.hasPendingChanges ?? false }
+    /// The group the selected host's block has in the document.
+    func savedGroup(for item: SidebarItem) -> String {
+        guard let entry = SidebarBuilder.hostEntry(for: item, in: store.document) else { return "" }
+        return store.document.group(ofHostAt: entry.headerLine) ?? ""
+    }
+
+    /// Writes a pending group draft into the document (an unsaved edit), like pending form edits survive a save.
+    func applyPendingGroupDraft() {
+        guard let item = selection else { groupDraft = nil; return }
+        guard hasPendingGroupDraft else {
+            if SidebarBuilder.hostEntry(for: item, in: store.document) == nil { groupDraft = nil }
+            return
+        }
+        setGroup(item, to: groupDraft)
+    }
+
+    /// Edits the form could not apply (validation or write failure); an unapplied group draft is not one.
+    var hasBlockedFormEdits: Bool { activeEditor?.hasPendingChanges ?? false }
+
+    var hasPendingGroupDraft: Bool {
+        guard let draft = groupDraft, let item = selection,
+              SidebarBuilder.hostEntry(for: item, in: store.document) != nil else { return false }
+        return draft.trimmingCharacters(in: .whitespacesAndNewlines) != savedGroup(for: item)
+    }
+
+    var hasPendingFormEdits: Bool { hasBlockedFormEdits || hasPendingGroupDraft }
 
     /// Selects `item`, unless the form holds edits that were never applied; then asks first.
     func requestSelect(_ item: SidebarItem?) {
@@ -522,16 +707,34 @@ enum KeyAssignmentError: Error, Equatable {
     case pendingFormEdits
 }
 
-/// Reads each private key's head at most once per lint pass.
+/// Reads each private key's head at most once per lint pass, and remembers every path the pass looked at.
 private final class KeyReadMemo: @unchecked Sendable {
     private let lock = NSLock()
     private var cache: [URL: KeyEncryption] = [:]
+    private var touched: Set<String> = []
+    private let reader: @Sendable (URL) -> KeyEncryption
+
+    init(reader: @escaping @Sendable (URL) -> KeyEncryption) { self.reader = reader }
+
+    var touchedPaths: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return Array(touched)
+    }
+
+    func exists(_ url: URL) -> Bool {
+        lock.lock()
+        touched.insert(url.path)
+        lock.unlock()
+        return FileManager.default.fileExists(atPath: url.path)
+    }
 
     func encryption(of url: URL) -> KeyEncryption {
         lock.lock()
         defer { lock.unlock() }
+        touched.insert(url.path)
         if let known = cache[url] { return known }
-        let value = (try? KeyFileInspector.readHead(of: url)).map(KeyFileInspector.encryption(ofPrivateKeyHead:)) ?? .unknown
+        let value = reader(url)
         cache[url] = value
         return value
     }

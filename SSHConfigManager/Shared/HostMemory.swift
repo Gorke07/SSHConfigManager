@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 /// Recently connected and favorite aliases of one config file, kept in UserDefaults
-/// (spec v1.1 §2). Nothing is written to the config file.
+/// (spec v1.1 §2), by exact alias (ssh matches Host patterns case-sensitively). Nothing is written to the config file.
 @MainActor
 @Observable
 final class HostMemory {
@@ -18,39 +18,62 @@ final class HostMemory {
         self.defaults = defaults
         self.key = key
         let stored = defaults.dictionary(forKey: key)
-        favorites = stored?["favorites"] as? [String] ?? []
-        recents = stored?["recents"] as? [String] ?? []
+        let favoritesResult = Self.normalized(stored?["favorites"], cap: Self.maxFavorites)
+        let recentsResult = Self.normalized(stored?["recents"], cap: Self.maxRecents)
+        favorites = favoritesResult.values
+        recents = recentsResult.values
+        // Rewrite only when stored junk was dropped; a missing key or a fresh install writes nothing.
+        let notADictionary = stored == nil && defaults.object(forKey: key) != nil
+        if notADictionary || favoritesResult.dropped || recentsResult.dropped {
+            save()
+        }
+    }
+
+    /// Strings only, non-empty, exact duplicates removed (first wins), capped; anything else is dropped.
+    /// `dropped` is true when a stored value was present but something in it was discarded. A missing value is not a drop.
+    private static func normalized(_ raw: Any?, cap: Int) -> (values: [String], dropped: Bool) {
+        guard let raw else { return ([], false) }
+        guard let array = raw as? [Any] else { return ([], true) }
+        var seen = Set<String>()
+        var result: [String] = []
+        var dropped = false
+        for element in array {
+            guard result.count < cap, let alias = element as? String, !alias.isEmpty, seen.insert(alias).inserted else {
+                dropped = true
+                continue
+            }
+            result.append(alias)
+        }
+        return (result, dropped)
     }
 
     func isFavorite(_ alias: String) -> Bool {
-        favorites.contains { Self.same($0, alias) }
+        favorites.contains(alias)
     }
 
-    func toggleFavorite(_ alias: String) {
+    /// Removing always works. Adding at the cap first prunes favorites that are not in `existing`;
+    /// returns false when the list is still full.
+    @discardableResult
+    func toggleFavorite(_ alias: String, existing: Set<String>) -> Bool {
         if isFavorite(alias) {
-            favorites.removeAll { Self.same($0, alias) }
-        } else if favorites.count < Self.maxFavorites {
-            favorites.append(alias)
+            favorites.removeAll { $0 == alias }
+            save()
+            return true
         }
+        if favorites.count >= Self.maxFavorites {
+            favorites.removeAll { !existing.contains($0) }
+            guard favorites.count < Self.maxFavorites else { save(); return false }
+        }
+        favorites.append(alias)
         save()
+        return true
     }
 
     func recordConnection(_ alias: String) {
-        recents.removeAll { Self.same($0, alias) }
+        recents.removeAll { $0 == alias }
         recents.insert(alias, at: 0)
         recents = Array(recents.prefix(Self.maxRecents))
         save()
-    }
-
-    /// ssh matches host names ASCII case-insensitively.
-    static func same(_ a: String, _ b: String) -> Bool {
-        a.utf8.count == b.utf8.count && zip(a.unicodeScalars, b.unicodeScalars).allSatisfy { x, y in
-            lower(x) == lower(y)
-        }
-    }
-
-    private static func lower(_ scalar: Unicode.Scalar) -> UInt32 {
-        (65...90).contains(scalar.value) ? scalar.value + 32 : scalar.value
     }
 
     private func save() {

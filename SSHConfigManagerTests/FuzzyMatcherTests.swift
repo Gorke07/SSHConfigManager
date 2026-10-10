@@ -78,14 +78,31 @@ struct FuzzyMatcherTests {
         }
     }
 
-    @Test func pathologicalAliasIsFast() {
+    @Test func pathologicalAliasStaysPolynomial() {
         let alias = Array(repeating: "a", count: 40).joined(separator: "-")
+        let word = "aaaaaaaaaaaaaaaab"
+        let steps = FuzzyMatcher.searchSteps(word: word, alias: alias)
+        #expect(steps <= alias.count * word.count * 4, "steps: \(steps)")
         let clock = ContinuousClock()
         var result: FuzzyMatch?
-        let elapsed = clock.measure { result = FuzzyMatcher.match(query: "aaaaaaaaaaaaaaaab", alias: alias, others: []) }
+        let elapsed = clock.measure { result = FuzzyMatcher.match(query: word, alias: alias, others: []) }
         #expect(result == nil)
-        #expect(elapsed < .milliseconds(500))
+        #expect(elapsed < .seconds(5))  // hang guard only
         let scattered = FuzzyMatcher.match(query: "aaaaaaaaaaaaaaaa", alias: alias, others: [])
         #expect(scattered != nil)
+    }
+
+    @Test func scatteredAliasMatchOutranksOtherFieldsEvenOverManyGaps() throws {
+        let alias = "a" + String(repeating: "x", count: 300) + "b"
+        let scattered = try #require(FuzzyMatcher.match(query: "ab", alias: alias, others: []))
+        let other = try #require(FuzzyMatcher.match(query: "ab", alias: "zzz", others: ["ab.example.com"]))
+        #expect(scattered.score == 101)
+        #expect(scattered.score > other.score)
+    }
+
+    @Test func multiWordAliasMatchOutranksHostNameOnlyMatch() throws {
+        let both = try #require(FuzzyMatcher.match(query: "prod web", alias: "prod-web", others: []))
+        let viaHostName = try #require(FuzzyMatcher.match(query: "prod web", alias: "prod-db", others: ["web.example.com"]))
+        #expect(both.score > viaHostName.score)
     }
 }

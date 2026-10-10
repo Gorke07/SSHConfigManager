@@ -43,7 +43,7 @@ enum EffectiveSettingsBuilder {
             text = URL(filePath: text).standardizedFileURL.path
         }
         // ssh -G lowercases some values (host names, yes/no): compare ASCII case-insensitively.
-        return EffectiveConfigCache.key(text)
+        return text.asciiLowercased
     }
 
     private static func source(key: String, sshValues: [String], resolved: ResolvedConfig, home: URL) -> EffectiveSettingSource {
@@ -51,7 +51,9 @@ enum EffectiveSettingsBuilder {
             return resolved.hasMatchBlocks ? .uncertain : .defaultValue
         }
         let sshFirst = sshValues.first.map { normalize($0, key: key, home: home) }
-        guard sshFirst == normalize(first.value, key: key, home: home) else { return .uncertain }
+        // ssh normalizes values (`1m` -> `60`, `%h` tokens, case): the resolver's first value still
+        // names the block it came from. Only Match blocks (not evaluated here) make that doubtful.
+        if sshFirst != normalize(first.value, key: key, home: home), resolved.hasMatchBlocks { return .uncertain }
         switch first.source {
         case .thisBlock: return .thisBlock
         case .otherHost(let patterns): return .otherHost(patterns)

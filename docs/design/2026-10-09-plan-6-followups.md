@@ -1,26 +1,23 @@
 # Plan 6 (arayüz iyileştirmeleri v1.1): sonraki sürüme devreden konular
 
+Plan 7 (`docs/design/2026-10-10-plan-7-followups.md`) bu listedeki maddelerin çoğunu kapattı: alias kimliği artık ssh gibi büyük/küçük harf duyarlı ve tam eşleşmeli; `SendEnv` token'ları ve `-DESEN` kaldırma; Include içindeki hedef blok; ssh ile uyumlu port ayrıştırma; FIFO'da bloklanmayan anahtar okuma; favori/son listelerinin normalleştirilmesi ve görünür favori sınırı; arama katmanlarının çakışmaması ve deterministik performans testi; normalleştirilmiş değerlerin doğru kaynağı; zincirde "Atlandı" durumu; Include dosyası içeriğine göre yenileme; eksik önbellek testleri; uygulanmamış grup taslağının bekleyen düzenleme sayılması ve kaydetmede uygulanması; uyarı hesabının önbelleğe alınması (anahtar değişikliklerinde yenilenir); silme sonrası seçim; Include başına yinelenen alias ifadesi; boş araç çubuğu öğesi.
+
 ## Bilinen kısıtlar
 
-- **`savedAlias` eşlemesi:** Kaydedilmiş dosyadaki alias'a eşleme Unicode/büyük-küçük harf duyarsız yapılıyor; ssh `Host` eşleştirmesi ise büyük/küçük harf duyarlı. `Web` ile `web` ayrı hostlarsa yanlış blok seçilebilir (önceden vardı, bu sürümde değiştirilmedi).
-- **Etkin ayarlar kaynağı:** ssh -G'nin normalleştirdiği değerler (Match bloğu yokken) "belirsiz" etiketi alabiliyor; Include edilen hostların kendi satırları "Dahil" etiketi taşıyor; düz atlamalar (ProxyJump) "atlanan" işareti almıyor; yalnızca Include dosyası değişince çözümlenen kaynaklar yenilenmiyor.
-- **Çözümleyici:** `SendEnv` çok argümanlı satırlar token başına bölünmüyor; atlanan Include içindeki `Match` ve dahil edilen hostların `.thisBlock` durumu ele alınmıyor; `SendEnv -DESEN` testi anlamsız geçiyor.
-- **Port ayrıştırma:** `Int("+22")` kabul ediliyor.
-- **Arama:** Çok kelimeli puanlama toplamsal; dağınık eşleşme tabanı 200+ boşlukta diğer alanlar katmanıyla eşitlenebilir; 500 ms duvar saati sınaması yüklü CI'da kararsız olabilir.
-- **Favoriler:** 51. favori sessizce atılıyor ve gizli favoriler üst sınıra sayılıyor; yüklemede normalleştirme yok; ASCII dışı büyük/küçük harf yinelemeleri dedupe edilmiyor; sınır/bozuk veri/`fellBack`/`uploadKey`/yazılmış harf biçimi testleri eksik.
-- **ssh -G önbelleği:** Geçici hatalar (zaman aşımı/başlatma) yapılandırma değişene kadar önbellekte kalır (bilinçli); `peak == 2`, clear-sonra-yükle ve `switchConfig` temizleme testleri eksik.
-- **Grup alanı:** Uygulanmamış grup metni `hasPendingFormEdits`'e dahil değil; detaydaki uyarı hesabı her `body`'de tam geçiş yapıyor (belgeye göre önbelleğe alınabilir); IdentityFile okuması FIFO'da bloklanabilir (önceden var olan yardımcı).
-- **Silme:** Önceki bir tekrar silinince seçim indeksi kayıyor (önceden vardı).
-- **Yinelenen alias uyarısı ve Include:** Kök bloktan önce gelen herhangi bir `Include` satırı, alias'ı tanımlamasa ya da eşleşmeyen bir Host bloğunun içinde olsa bile kök bloğu "sonraki" sayar; doğrusu Include başına `includeResolver.includedDocuments(for:)` ile yalnızca o dosyaların adlarına bakmak.
-- **Hızlı Bağlan tekilleştirme:** `Host Web` ve `Host web` büyük/küçük harf katlanarak tek satıra iner (`savedAlias` sınırlamasıyla tutarlı; ssh ikisini ayrı host sayar).
-- **Küçük:** `connectionTests` doc yorumu yanlış yerde; araç çubuğunda boş `HStack` (görsel).
+- **Etkin ayarlar kaynağı:** Çok değerli anahtarlarda (`IdentityFile` vb.) kaynak etiketi yalnızca ilk değerin bloğunu gösterir.
+- **Hedef blok:** Aynı alias hem kök dosyada hem de ondan önce gelen bir Include'da tanımlıysa "Bu host" etiketi kök bloğa verilir (kullanıcının gördüğü ve düzenlediği blok); dahil edilen bloğun satırları "Dahil edilen" olarak görünür, değerler doğrudur.
+- **Yinelenen alias ifadesi:** `Match all` dışındaki `Match` bloklarının içindeki Include'lar hesaba katılmaz (koşula bağlı).
+- **Çözümleyici:** `SendEnv` içindeki ters eğik çizgi kaçışları yorumlanmaz.
+- **Port ayrıştırma:** Servis adları `getservbyname` ile çözülür (iş parçacığı güvenli değil; ayrıştırma ana aktörde yapılıyor).
+- **ssh -G önbelleği:** Geçici hatalar (zaman aşımı/başlatma) yapılandırma değişene kadar önbellekte kalır (bilinçli).
 
 ## Sürüm öncesi elle doğrulanmalı
 
 - **Komutlar:** Host menüsü komutlarının devre dışı durumu, seçim/belge değişince canlı güncelleniyor mu (Commands gözlemi).
 - **⌘⌫:** Kenar çubuğunda `onDeleteCommand` ile host silme gerçek uygulamada çalışıyor mu.
-- **Hızlı Bağlan:** Arama alanı alan düzenleyicisi odaktayken ⌥↩ ve ⌘S `onKeyPress`'e ulaşıyor mu (panel ve menü çubuğu).
-- **Araç çubuğu:** Boş `HStack`'in görsel etkisi.
+- **Hızlı Bağlan:** Arama alanı odaktayken ⌥↩ ve ⌘S `onKeyPress`'e ulaşıyor mu (panel ve menü çubuğu).
+- **Araç çubuğu:** Durum özeti öğesinin sonradan eklenmesi düzeni bozmuyor mu.
+- **Grup taslağı:** Uygulanmamış ya da uygulanamayan grup metniyle çıkışta/kaydetmede davranış.
 
 ## Kullanıcının elle kontrol etmesi gerekenler
 

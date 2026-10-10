@@ -3,12 +3,13 @@ import SSHConfigKit
 
 @MainActor
 enum HostCommands {
-    /// `base`, or `base-2`, `base-3` … — compared case-insensitively like ssh does.
+    /// `base`, or `base-2`, `base-3` … — compared ASCII case-insensitively so the new alias does not trigger
+    /// the duplicate-alias warning (spec §8); ssh itself matches Host patterns case-sensitively.
     static func uniqueAlias(_ base: String, in document: ConfigDocument) -> String {
-        let taken = Set(document.hosts.flatMap(\.patterns).map { $0.lowercased() })
-        if !taken.contains(base.lowercased()) { return base }
+        let taken = Set(document.hosts.flatMap(\.patterns).map(\.asciiLowercased))
+        if !taken.contains(base.asciiLowercased) { return base }
         var counter = 2
-        while taken.contains("\(base)-\(counter)".lowercased()) { counter += 1 }
+        while taken.contains("\(base)-\(counter)".asciiLowercased) { counter += 1 }
         return "\(base)-\(counter)"
     }
 

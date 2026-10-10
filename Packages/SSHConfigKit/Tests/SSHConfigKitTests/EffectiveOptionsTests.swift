@@ -33,19 +33,50 @@ struct EffectiveOptionsTests {
         ("", []),
         ("bastion", [JumpHop(user: nil, host: "bastion", port: nil)]),
         ("ssh://me@h.example.com:22", [JumpHop(user: "me", host: "h.example.com", port: 22)]),
-        ("[::1]:2200", [JumpHop(user: nil, host: "::1", port: 2200)]),
         ("me@[fe80::1]", [JumpHop(user: "me", host: "fe80::1", port: nil)]),
         ("a@b@host", [JumpHop(user: "a@b", host: "host", port: nil)]),
         ("::1", [JumpHop(user: nil, host: "::1", port: nil)]),
-        ("host:abc", []),
-        ("host:", []),
-        ("host:0", []),
-        ("host:99999", []),
-        ("[::1]:abc", []),
         ("a,,b", [JumpHop(user: nil, host: "a", port: nil), JumpHop(user: nil, host: "b", port: nil)]),
         ("@host", [JumpHop(user: nil, host: "host", port: nil)]),
     ])
     func parsesJumpLists(_ value: String, _ expected: [JumpHop]) {
         #expect(JumpHop.parseList(value) == expected)
+    }
+
+    @Test(arguments: [
+        ("[::1]:2200", [JumpHop(user: nil, host: "::1", port: 2200)]),
+        ("host:+22", [JumpHop(user: nil, host: "host", port: 22)]),
+        ("host:000022", [JumpHop(user: nil, host: "host", port: 22)]),
+        ("host:ssh", [JumpHop(user: nil, host: "host", port: 22)]),
+        ("[::1]:+22", [JumpHop(user: nil, host: "::1", port: 22)]),
+        ("[::1]:000022", [JumpHop(user: nil, host: "::1", port: 22)]),
+        ("[::1]:ssh", [JumpHop(user: nil, host: "::1", port: 22)]),
+        ("host:65535", [JumpHop(user: nil, host: "host", port: 65535)]),
+    ])
+    func validPorts(_ value: String, _ expected: [JumpHop]) {
+        #expect(JumpHop.parseList(value) == expected)
+    }
+
+    @Test(arguments: [
+        "host:abc",
+        "host:",
+        "host:0",
+        "host:99999",
+        "host:65536",
+        "host:-1",
+        "host: 22",
+        "host:٢٢",
+        "[::1]:0",
+        "[::1]:65536",
+        "[::1]: 22",
+        "[::1]:٢٢",
+        "host:22x",
+        "host:+",
+        "host:+ssh",
+        "host:no-such-service-xyz",
+        "[::1]:abc",
+    ])
+    func invalidPortsDropTheHop(_ value: String) {
+        #expect(JumpHop.parseList(value).isEmpty)
     }
 }

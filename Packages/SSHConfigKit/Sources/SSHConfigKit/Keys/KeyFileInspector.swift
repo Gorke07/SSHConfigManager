@@ -26,15 +26,20 @@ public struct PublicKeyInfo: Equatable, Sendable {
     }
 }
 
+public enum KeyFileError: Error, Equatable, LocalizedError {
+    case notARegularFile(String)
+    public var errorDescription: String? {
+        switch self { case .notARegularFile(let path): "Not a regular file: \(path)" }
+    }
+}
+
 /// Looks only at the first bytes of a private key file (header and first base64 line); the key
 /// material is never parsed or kept (spec §8.1).
 public enum KeyFileInspector {
     public static let headLimit = 512
 
     public static func readHead(of url: URL) throws -> Data {
-        let handle = try FileHandle(forReadingFrom: url)
-        defer { try? handle.close() }
-        return try handle.read(upToCount: headLimit) ?? Data()
+        try RegularFile.read(url, limit: headLimit)
     }
 
     /// Lines split on LF bytes, a trailing CR removed.

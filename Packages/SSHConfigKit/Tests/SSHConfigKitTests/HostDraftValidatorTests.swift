@@ -21,7 +21,9 @@ struct HostDraftValidatorTests {
         #expect(issues(HostDraft(patterns: [])) == [.emptyAlias])
         #expect(issues(HostDraft(patterns: [""])) == [.emptyAlias])
         #expect(issues(HostDraft(patterns: ["a b"])) == [.aliasHasWhitespace])
-        #expect(issues(HostDraft(patterns: ["WEB2"])) == [.duplicateAlias("WEB2")])
+        #expect(issues(HostDraft(patterns: ["web2"])) == [.duplicateAlias("web2")])
+        #expect(issues(HostDraft(patterns: ["WEB2"])) == [.duplicateAliasCaseOnly("WEB2")])
+        #expect(!DraftIssue.duplicateAliasCaseOnly("WEB2").isBlocking)
     }
 
     @Test func editingItselfIsNotADuplicate() {
@@ -86,8 +88,37 @@ struct HostDraftValidatorTests {
     }
 
     @Test func duplicateAliasesWithinDraft() {
-        let found = issues(HostDraft(patterns: ["a", "A"]))
-        #expect(found == [.duplicateAlias("A")])
+        #expect(issues(HostDraft(patterns: ["a", "a"])) == [.duplicateAlias("a")])
+        #expect(issues(HostDraft(patterns: ["a", "A"])) == [.duplicateAliasCaseOnly("A")])
+    }
+
+    @Test func editingAHostBesideItsCaseVariantOrExactTwinIsNotBlocked() {
+        let variant = ConfigDocument(parsing: "Host web\n  User a\nHost Web\n  User b\n")
+        let draft = HostDraft(patterns: ["web"], directives: [DraftDirective(key: "User", value: "changed")])
+        #expect(validator.issues(for: draft, in: variant, editing: variant.hosts[0].headerLine).isEmpty)
+        #expect(validator.issues(for: HostDraft(patterns: ["Web"]), in: variant, editing: variant.hosts[1].headerLine).isEmpty)
+
+        let twin = ConfigDocument(parsing: "Host web\n  User a\nHost web\n  User b\n")
+        #expect(validator.issues(for: draft, in: twin, editing: twin.hosts[1].headerLine).isEmpty)
+    }
+
+    @Test func repeatsWithinTheDraftAreFlaggedEvenForTheBlocksOwnAlias() {
+        let doc = ConfigDocument(parsing: "Host web\n")
+        let editing = doc.hosts[0].headerLine
+        #expect(validator.issues(for: HostDraft(patterns: ["web", "web"]), in: doc, editing: editing) == [.duplicateAlias("web")])
+        #expect(validator.issues(for: HostDraft(patterns: ["web", "Web"]), in: doc, editing: editing) == [.duplicateAliasCaseOnly("Web")])
+    }
+
+    @Test func renamingOntoAnExistingExactAliasIsStillRejected() {
+        let two = ConfigDocument(parsing: "Host web\nHost other\n")
+        #expect(validator.issues(for: HostDraft(patterns: ["web"]), in: two, editing: two.hosts[1].headerLine) == [.duplicateAlias("web")])
+    }
+
+    @Test func addingACaseVariantBesideAnExistingHostDoesNotBlock() {
+        let one = ConfigDocument(parsing: "Host web\n")
+        let found = validator.issues(for: HostDraft(patterns: ["Web"]), in: one, editing: nil)
+        #expect(found == [.duplicateAliasCaseOnly("Web")])
+        #expect(found.allSatisfy { !$0.isBlocking })
     }
 
     @Test func controlCharacterInPortValue() {

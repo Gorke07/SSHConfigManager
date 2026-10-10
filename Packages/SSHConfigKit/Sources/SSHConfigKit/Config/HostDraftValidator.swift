@@ -2,7 +2,10 @@ public enum DraftIssue: Equatable, Sendable {
     case controlCharacter(String)
     case emptyAlias
     case aliasHasWhitespace
+    /// Another Host block uses this alias exactly as written.
     case duplicateAlias(String)
+    /// Another Host block uses this alias differing only in ASCII letter case (a warning: ssh sees different hosts).
+    case duplicateAliasCaseOnly(String)
     case invalidPort(String)
     case invalidDirectiveKey(String)
     case forbiddenDirectiveKey(String)
@@ -11,8 +14,10 @@ public enum DraftIssue: Equatable, Sendable {
 
     /// Blocking issues prevent applying the draft; warnings do not.
     public var isBlocking: Bool {
-        if case .identityFileMissing = self { return false }
-        return true
+        switch self {
+        case .identityFileMissing, .duplicateAliasCaseOnly: false
+        default: true
+        }
     }
 }
 
@@ -54,23 +59,30 @@ public struct HostDraftValidator: Sendable {
         } else if draft.patterns.contains(where: { $0.unicodeScalars.contains(where: LineTokenizer.isSpace) }) {
             issues.append(.aliasHasWhitespace)
         } else {
-            // ssh lowercases host names before matching, so duplicates are case-insensitive.
-            let taken = Set(document.hosts
-                .filter { $0.headerLine != header && !$0.isPattern }
-                .flatMap(\.patterns)
-                .map(\.asciiLowercased))
+            // Only aliases the draft adds are checked: patterns already in the block being edited are skipped, so
+            // existing duplicates never block editing. An added alias that exactly equals another block's (or a
+            // repeat within the draft) is a blocking duplicate. One that differs only in ASCII case from another
+            // block's is a non-blocking warning: ssh matches Host patterns case-sensitively, so it is allowed,
+            // but flagged as a likely mistake (spec §8).
+            let own = Set(header.flatMap { line in document.hosts.first { $0.headerLine == line } }.map { HostDraft($0).patterns } ?? [])
+            let others = document.hosts.filter { $0.headerLine != header && !$0.isPattern }.flatMap(\.patterns)
+            let takenExact = Set(others)
+            let takenFolded = Set(others.map(\.asciiLowercased))
 
-            // Check for duplicates within the draft itself (case-insensitive)
-            var seenLower = Set<String>()
+            var seenExact = Set<String>()
+            var seenFolded = Set<String>()
             for pattern in draft.patterns where !HostEntry(headerLine: 0, patterns: [pattern], directives: []).isPattern {
-                let lower = pattern.asciiLowercased
-                if seenLower.contains(lower) {
+                // Aliases the block already had are not checked against other blocks (editing must stay
+                // possible), but repeats within the draft still are.
+                let isOwn = own.contains(pattern)
+                let folded = pattern.asciiLowercased
+                if seenExact.contains(pattern) || (!isOwn && takenExact.contains(pattern)) {
                     issues.append(.duplicateAlias(pattern))
-                } else if taken.contains(lower) {
-                    issues.append(.duplicateAlias(pattern))
-                } else {
-                    seenLower.insert(lower)
+                } else if seenFolded.contains(folded) || (!isOwn && takenFolded.contains(folded)) {
+                    issues.append(.duplicateAliasCaseOnly(pattern))
                 }
+                seenExact.insert(pattern)
+                seenFolded.insert(folded)
             }
         }
 

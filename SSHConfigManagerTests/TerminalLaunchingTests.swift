@@ -180,7 +180,9 @@ struct TerminalLaunchingTests {
         #expect(app.store.hasUnsavedChanges)
         #expect(app.connectableAlias(for: .host(alias: "renamed", occurrence: 0)) == nil)
         #expect(app.connectableAliases == ["Web"])
-        #expect(app.connect(alias: "web") == .launched(.terminal))
+        #expect(app.connect(alias: "web") == .failed(.failed("not in the saved file")))   // exact: ssh does not match web to Web
+        #expect(launcher.requests.isEmpty)
+        #expect(app.connect(alias: "Web") == .launched(.terminal))
         #expect(launcher.requests.first?.sshArguments == ["--", "Web"])
     }
 

@@ -100,3 +100,23 @@ struct KeyFileInspectorTests {
         #expect(KeyFileInspector.encryption(ofPrivateKeyHead: Data("-----BEGIN RSA PRIVATE KEY-----\r\nMIIE\r\n".utf8)) == .unencrypted)
     }
 }
+
+struct KeyFileInspectorSafetyTests {
+    @Test func fifoAndDirectoryThrowInsteadOfBlocking() throws {
+        let tmp = try TempDir()
+        let fifo = tmp.url.appending(path: "pipe")
+        #expect(Darwin.mkfifo(fifo.path, 0o600) == 0)
+        #expect(throws: (any Error).self) { try KeyFileInspector.readHead(of: fifo) }
+        #expect(throws: (any Error).self) { try KeyFileInspector.readHead(of: tmp.url) }
+    }
+
+    @Test func regularFilesAndSymlinksToThemStillRead() throws {
+        let tmp = try TempDir()
+        let file = tmp.url.appending(path: "k")
+        try Data("-----BEGIN PRIVATE KEY-----\n".utf8).write(to: file)
+        let link = tmp.url.appending(path: "l")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: file)
+        #expect(try KeyFileInspector.readHead(of: file).count > 0)
+        #expect(try KeyFileInspector.readHead(of: link).count > 0)
+    }
+}
