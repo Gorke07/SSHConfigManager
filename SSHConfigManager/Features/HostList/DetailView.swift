@@ -19,6 +19,7 @@ struct DetailView: View {
             VStack(spacing: 0) {
                 ConnectionBar(model: model, alias: model.connectableAlias(for: item), showsSaveHint: model.isUnsavedHost(item))
                 EffectiveSettingsView(model: model, alias: model.connectableAlias(for: item), isUnsaved: model.isUnsavedHost(item))
+                    .id(model.connectableAlias(for: item) ?? "")
                 Divider()
                 HostEditorContainer(model: model)
                     .id(model.editorToken)
@@ -28,6 +29,7 @@ struct DetailView: View {
                 VStack(spacing: 0) {
                     ConnectionBar(model: model, alias: model.connectableAlias(for: item))
                     EffectiveSettingsView(model: model, alias: model.connectableAlias(for: item), isUnsaved: false)
+                        .id(model.connectableAlias(for: item) ?? "")
                     Divider()
                     IncludedHostView(host: host, displayPath: model.settings.displayPath(for: host.file))
                 }

@@ -20,12 +20,13 @@ struct EffectiveSettingsView: View {
                     settings(for: alias)
                 }
                 ProxyChainView(model: model, alias: alias)
+                    .id(alias)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .task(id: "\(alias)\u{0}\(model.effectiveConfig.generation)") {
-                await model.effectiveConfig.load(alias, using: model.commandBuilder)
                 resolved = model.resolvedConfig(forSavedAlias: alias)
+                await model.effectiveConfig.load(alias, using: model.commandBuilder)
             }
         } else if isUnsaved {
             Text(String(localized: "effective.unsaved"))

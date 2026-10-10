@@ -30,6 +30,15 @@ struct ProxyChainModelTests {
             options: options(["db": "proxyjump a,b", "a": "hostname a", "b": "hostname b"]),
             isSavedAlias: { ["db", "a", "b"].contains($0) ? $0 : nil })
         #expect(nodes.map(\.title) == ["a", "b", "db"])
+        #expect(nodes.map(\.alias) == ["a", nil, "db"])
+    }
+
+    @Test func laterHopsDoNotCountAsLoops() {
+        let nodes = ProxyChainBuilder.nodes(
+            for: "db",
+            options: options(["db": "proxyjump a,b", "a": "proxyjump b"]),
+            isSavedAlias: { ["db", "a", "b"].contains($0) ? $0 : nil })
+        #expect(!nodes.contains { $0.isCycle })
     }
 
     @Test func onlyTheFirstHopOfAListExpands() {

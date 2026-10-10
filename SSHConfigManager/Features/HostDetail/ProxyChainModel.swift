@@ -31,13 +31,16 @@ enum ProxyChainBuilder {
             var cycle = false
             for (index, hop) in hops.prefix(budget).enumerated() {
                 let title = [hop.user.map { $0 + "@" }, hop.host, hop.port.map { ":\($0)" }].compactMap { $0 }.joined()
-                guard let saved = isSavedAlias(hop.host), hop.user == nil, hop.port == nil else {
+                // Later hops are reached through the earlier ones: shown as typed, never tested alone,
+                // and not part of the loop check.
+                guard index == 0, let saved = isSavedAlias(hop.host), hop.user == nil, hop.port == nil else {
                     entries.append((title, nil, false))
                     continue
                 }
                 let isCycle = !visited.insert(EffectiveConfigCache.key(saved)).inserted
                 entries.append((saved, saved, isCycle))
-                if index == 0 { cycle = isCycle; next = isCycle ? nil : saved }
+                cycle = isCycle
+                next = isCycle ? nil : saved
             }
             chain.insert(contentsOf: entries, at: 0)
             guard let next, !cycle else { break }
