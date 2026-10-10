@@ -13,13 +13,13 @@ struct HostLintTests {
 
     @Test func missingIdentityFilesAreReportedButUnresolvableOnesAreNot() {
         let doc = ConfigDocument(parsing: "Host a\n  IdentityFile ~/.ssh/gone\n  IdentityFile ~/.ssh/here\n  IdentityFile ~/.ssh/id_%h\n")
-        let issues = lint(existing: ["/h/.ssh/here"]).issues(for: doc.hosts[0], duplicates: [:], firstBlocks: [:])
+        let issues = lint(existing: ["/h/.ssh/here"]).issues(for: doc.hosts[0], duplicates: [:], exactDuplicates: [:], firstBlocks: [:])
         #expect(issues == [.missingIdentityFile("~/.ssh/gone")])
     }
 
     @Test func unencryptedKeysAreReported() {
         let doc = ConfigDocument(parsing: "Host a\n  IdentityFile ~/.ssh/plain\n")
-        let issues = lint(existing: ["/h/.ssh/plain"], unencrypted: ["/h/.ssh/plain"]).issues(for: doc.hosts[0], duplicates: [:], firstBlocks: [:])
+        let issues = lint(existing: ["/h/.ssh/plain"], unencrypted: ["/h/.ssh/plain"]).issues(for: doc.hosts[0], duplicates: [:], exactDuplicates: [:], firstBlocks: [:])
         #expect(issues == [.unencryptedKey("~/.ssh/plain")])
     }
 
@@ -68,23 +68,23 @@ struct HostLintTests {
 
     @Test func patternBlocksStillReportMissingIdentityFiles() {
         let doc = ConfigDocument(parsing: "Host *\n  IdentityFile ~/.ssh/gone\n")
-        #expect(lint().issues(for: doc.hosts[0], duplicates: [:], firstBlocks: [:]) == [.missingIdentityFile("~/.ssh/gone")])
+        #expect(lint().issues(for: doc.hosts[0], duplicates: [:], exactDuplicates: [:], firstBlocks: [:]) == [.missingIdentityFile("~/.ssh/gone")])
     }
 
     @Test func nonexistentUnencryptedKeyIsOnlyMissing() {
         let doc = ConfigDocument(parsing: "Host a\n  IdentityFile ~/.ssh/k\n")
-        let issues = lint(unencrypted: ["/h/.ssh/k"]).issues(for: doc.hosts[0], duplicates: [:], firstBlocks: [:])
+        let issues = lint(unencrypted: ["/h/.ssh/k"]).issues(for: doc.hosts[0], duplicates: [:], exactDuplicates: [:], firstBlocks: [:])
         #expect(issues == [.missingIdentityFile("~/.ssh/k")])
     }
 
     @Test func unknownEncryptionIsNotFlagged() {
         let doc = ConfigDocument(parsing: "Host a\n  IdentityFile ~/.ssh/k\n")
         let unknown = HostLint(home: home, fileExists: { _ in true }, encryption: { _ in .unknown })
-        #expect(unknown.issues(for: doc.hosts[0], duplicates: [:], firstBlocks: [:]).isEmpty)
+        #expect(unknown.issues(for: doc.hosts[0], duplicates: [:], exactDuplicates: [:], firstBlocks: [:]).isEmpty)
     }
 
     @Test func identityFileNoneIsSkipped() {
         let doc = ConfigDocument(parsing: "Host a\n  IdentityFile None\n")
-        #expect(lint().issues(for: doc.hosts[0], duplicates: [:], firstBlocks: [:]).isEmpty)
+        #expect(lint().issues(for: doc.hosts[0], duplicates: [:], exactDuplicates: [:], firstBlocks: [:]).isEmpty)
     }
 }

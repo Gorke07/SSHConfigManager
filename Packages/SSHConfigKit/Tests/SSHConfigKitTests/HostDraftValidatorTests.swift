@@ -102,6 +102,13 @@ struct HostDraftValidatorTests {
         #expect(validator.issues(for: draft, in: twin, editing: twin.hosts[1].headerLine).isEmpty)
     }
 
+    @Test func repeatsWithinTheDraftAreFlaggedEvenForTheBlocksOwnAlias() {
+        let doc = ConfigDocument(parsing: "Host web\n")
+        let editing = doc.hosts[0].headerLine
+        #expect(validator.issues(for: HostDraft(patterns: ["web", "web"]), in: doc, editing: editing) == [.duplicateAlias("web")])
+        #expect(validator.issues(for: HostDraft(patterns: ["web", "Web"]), in: doc, editing: editing) == [.duplicateAliasCaseOnly("Web")])
+    }
+
     @Test func renamingOntoAnExistingExactAliasIsStillRejected() {
         let two = ConfigDocument(parsing: "Host web\nHost other\n")
         #expect(validator.issues(for: HostDraft(patterns: ["web"]), in: two, editing: two.hosts[1].headerLine) == [.duplicateAlias("web")])

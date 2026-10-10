@@ -72,11 +72,13 @@ public struct HostDraftValidator: Sendable {
             var seenExact = Set<String>()
             var seenFolded = Set<String>()
             for pattern in draft.patterns where !HostEntry(headerLine: 0, patterns: [pattern], directives: []).isPattern {
-                if own.contains(pattern) { continue }
+                // Aliases the block already had are not checked against other blocks (editing must stay
+                // possible), but repeats within the draft still are.
+                let isOwn = own.contains(pattern)
                 let folded = pattern.asciiLowercased
-                if seenExact.contains(pattern) || takenExact.contains(pattern) {
+                if seenExact.contains(pattern) || (!isOwn && takenExact.contains(pattern)) {
                     issues.append(.duplicateAlias(pattern))
-                } else if seenFolded.contains(folded) || takenFolded.contains(folded) {
+                } else if seenFolded.contains(folded) || (!isOwn && takenFolded.contains(folded)) {
                     issues.append(.duplicateAliasCaseOnly(pattern))
                 }
                 seenExact.insert(pattern)

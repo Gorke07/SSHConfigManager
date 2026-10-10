@@ -59,7 +59,7 @@ public struct HostLint: Sendable {
     /// `entry` must be a root-file block. `duplicates` are the ASCII-folded counts, `exactDuplicates` the counts of
     /// names exactly as written and `firstBlocks` the exact-name map, from the static helpers above. A name another
     /// block repeats exactly gets first/later; a name only case variants share gets the case-only issue.
-    public func issues(for entry: HostEntry, duplicates: [String: Int], exactDuplicates: [String: Int] = [:],
+    public func issues(for entry: HostEntry, duplicates: [String: Int], exactDuplicates: [String: Int],
                        firstBlocks: [String: Int]) -> [HostIssue] {
         var result: [HostIssue] = []
         var seen: Set<String> = []
