@@ -39,6 +39,9 @@ final class AppModel {
     @ObservationIgnored private var activeEditorToken: UUID?
     /// A selection waiting for the user to confirm discarding blocked form edits.
     var pendingSelection: SidebarItem?
+    /// Effective Settings disclosure state; lives for the session, across host switches and editor rebuilds.
+    var effectiveSettingsExpanded = false
+    var effectiveSettingsShowAll = false
 
     @ObservationIgnored private let makeStore: StoreFactory
     @ObservationIgnored private let makeKnownHostsStore: KnownHostsStoreFactory
@@ -365,12 +368,12 @@ final class AppModel {
     var existingGroups: [String] {
         let document = store.document
         let names = Set(document.hosts.compactMap { document.group(ofHostAt: $0.headerLine) })
-        return names.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        return names.sorted(by: SidebarBuilder.groupNameOrder)
     }
 
     /// Lint of every root-file Host block in the document being edited (so fixes show at once),
     /// keyed by sidebar item. One pass: duplicates and first blocks are computed once, and each
-    /// key file is read at most once. Patterns are not linted.
+    /// key file is read at most once. Pattern blocks get the IdentityFile checks only.
     func lintIssueMap() -> [SidebarItem: [HostIssue]] {
         let document = store.document
         let reads = KeyReadMemo()
@@ -379,14 +382,26 @@ final class AppModel {
             fileExists: { FileManager.default.fileExists(atPath: $0.path) },
             encryption: { reads.encryption(of: $0) })
         let duplicates = HostLint.duplicateCounts(document: document, included: store.includedHosts)
-        let firstBlocks = HostLint.firstBlocks(document: document)
+        var firstBlocks = HostLint.firstBlocks(document: document)
+        // ssh reads an Include where it stands: a root block after one is not the first for aliases
+        // the included files define too.
+        if let firstInclude = document.includes.map(\.line).min() {
+            for host in store.includedHosts {
+                let plain = host.entry.patterns.filter { !$0.hasPrefix("!") && !$0.contains("*") && !$0.contains("?") }
+                for name in plain.map(EffectiveConfigCache.key) {
+                    if let header = firstBlocks[name], header > firstInclude { firstBlocks[name] = -1 }
+                }
+            }
+        }
         var seen: [String: Int] = [:]
         var map: [SidebarItem: [HostIssue]] = [:]
         for entry in document.hosts {
             let occurrence = seen[entry.alias, default: 0]
             seen[entry.alias] = occurrence + 1
-            guard !entry.isPattern else { continue }
-            let issues = lint.issues(for: entry, duplicates: duplicates, firstBlocks: firstBlocks)
+            var issues = lint.issues(for: entry, duplicates: duplicates, firstBlocks: firstBlocks)
+            if entry.isPattern {
+                issues.removeAll { if case .duplicateAlias = $0 { true } else { false } }
+            }
             if !issues.isEmpty { map[.host(alias: entry.alias, occurrence: occurrence)] = issues }
         }
         return map

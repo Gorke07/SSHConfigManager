@@ -52,7 +52,10 @@ final class EffectiveConfigCache {
                 self.results[key] = EffectiveOptions(parsing: result.stdout)
             case .success(let result):
                 let line = ConnectionClassifier.firstLine(result.stderr)
-                self.failures[key] = result.timedOut ? "timed out" : (line.isEmpty ? "exit \(result.exitCode)" : line)
+                let code = String(result.exitCode)
+                self.failures[key] = result.timedOut
+                    ? String(localized: "effective.error.timeout")
+                    : (line.isEmpty ? String(localized: "effective.error.exit \(code)") : line)
             case .failure(let error):
                 self.failures[key] = error.localizedDescription
             }

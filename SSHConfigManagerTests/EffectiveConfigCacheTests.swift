@@ -72,7 +72,8 @@ struct EffectiveConfigCacheTests {
         let runner = FixedRunner(result: ProcessResult(exitCode: 255, stdout: "", stderr: "", timedOut: false))
         let cache = EffectiveConfigCache(runner: runner)
         await cache.load("a", using: builder)
-        #expect(cache.failure(for: "a") == "exit 255")
+        let code = "255"
+        #expect(cache.failure(for: "a") == String(localized: "effective.error.exit \(code)"))
     }
 
     @Test func failuresAreKept() async {

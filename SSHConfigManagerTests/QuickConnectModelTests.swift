@@ -142,10 +142,8 @@ struct QuickConnectModelTests {
         let app = makeTestModel(tmp, config: "Host web\n", runner: runner)
         let model = QuickConnectModel(app: app)
         let entry = try #require(model.selectedEntry)
-        #expect(model.previewText(for: entry) == nil)
-        #expect(model.isPreviewLoading(for: entry))
+        #expect(model.previewText(for: entry) == "…")
         await app.effectiveConfig.load("web", using: app.commandBuilder)
-        #expect(!model.isPreviewLoading(for: entry))
         #expect(model.previewText(for: entry) == "ubuntu@10.0.1.12:2222 · " + String(localized: "quick.preview.via \("bastion")"))
     }
 
@@ -156,7 +154,26 @@ struct QuickConnectModelTests {
         let entry = try #require(model.selectedEntry)
         await app.effectiveConfig.load("web", using: app.commandBuilder)
         #expect(model.previewText(for: entry) == nil)
-        #expect(!model.isPreviewLoading(for: entry))
+    }
+
+    @Test func whileLoadingThePreviewShowsTheSavedHostName() throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host web\n  HostName 10.0.0.5\nHost bare\n")
+        let model = QuickConnectModel(app: app)
+        let web = try #require(model.entries.first { $0.alias == "web" })
+        let bare = try #require(model.entries.first { $0.alias == "bare" })
+        #expect(model.previewText(for: web) == "10.0.0.5")
+        #expect(model.previewText(for: bare) == "…")
+    }
+
+    @Test func duplicateAliasesAppearOnceWhileSearching() throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host web\n  User a\nHost web\n  User b\nHost db\n")
+        let model = QuickConnectModel(app: app)
+        model.query = "web"
+        #expect(model.entries.map(\.alias) == ["web"])
+        model.query = ""
+        #expect(model.entries.map(\.alias).sorted() == ["db", "web"])
     }
 
     @Test func togglingFavoriteKeepsTheSelectionOnTheSameHost() throws {

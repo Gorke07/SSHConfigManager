@@ -13,6 +13,8 @@ struct QuickConnectEntry: Identifiable, Hashable, Sendable {
     var section: QuickConnectSection? = nil
     var aliasOffsets: [Int] = []
     var isFavorite = false
+    /// The saved block's HostName, shown as the preview until ssh -G answers.
+    var hostName: String? = nil
     var id: String { alias }
 }
 
@@ -48,20 +50,24 @@ final class QuickConnectModel {
     /// Empty query: favorites, recents, then the rest. Otherwise ranked fuzzy matches.
     var entries: [QuickConnectEntry] {
         let saved = app.savedConnectableHosts
-        let base: [QuickConnectEntry] = saved.map { host in
+        // Aliases are unique in the list (ssh treats a repeated one as the same host); the first wins.
+        var seenAliases = Set<String>()
+        let unique = saved.filter { seenAliases.insert(EffectiveConfigCache.key($0.entry.alias)).inserted }
+        let base: [QuickConnectEntry] = unique.map { host in
             QuickConnectEntry(
                 alias: host.entry.alias,
                 subtitle: SidebarBuilder.subtitle(for: host.entry),
                 isIncluded: host.isIncluded,
                 group: host.isIncluded ? nil : app.store.savedDocument.group(ofHostAt: host.entry.headerLine),
-                isFavorite: app.memory.isFavorite(host.entry.alias))
+                isFavorite: app.memory.isFavorite(host.entry.alias),
+                hostName: host.entry.value(for: "HostName"))
         }
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return sectioned(base) }
         let fuzzy = FuzzyQuery(trimmed)
         let recents = app.recentAliases
         let scored: [(QuickConnectEntry, Int, Int)] = base.enumerated().compactMap { index, entry in
-            let host = saved[index].entry
+            let host = unique[index].entry
             let others = [host.value(for: "HostName"), host.value(for: "User"), entry.group].compactMap { $0 }
             guard let match = FuzzyMatcher.match(fuzzy, alias: entry.alias, others: others) else { return nil }
             var hit = entry
@@ -75,9 +81,10 @@ final class QuickConnectModel {
     private func sectioned(_ base: [QuickConnectEntry]) -> [QuickConnectEntry] {
         var used = Set<String>()
         var result: [QuickConnectEntry] = []
+        let byKey = Dictionary(base.map { (EffectiveConfigCache.key($0.alias), $0) }, uniquingKeysWith: { first, _ in first })
         func add(_ alias: String, _ section: QuickConnectSection) {
-            guard let entry = base.first(where: { HostMemory.same($0.alias, alias) }),
-                  used.insert(EffectiveConfigCache.key(entry.alias)).inserted else { return }
+            let key = EffectiveConfigCache.key(alias)
+            guard let entry = byKey[key], used.insert(key).inserted else { return }
             var copy = entry
             copy.section = section
             result.append(copy)
@@ -88,8 +95,10 @@ final class QuickConnectModel {
         return result
     }
 
-    var selectedEntry: QuickConnectEntry? {
-        let list = entries
+    var selectedEntry: QuickConnectEntry? { selectedEntry(in: entries) }
+
+    /// The selection within an already computed list, so a view computes `entries` once per render.
+    func selectedEntry(in list: [QuickConnectEntry]) -> QuickConnectEntry? {
         guard !list.isEmpty else { return nil }
         return list[min(max(selectedIndex, 0), list.count - 1)]
     }
@@ -133,9 +142,13 @@ final class QuickConnectModel {
         requestPreview()
     }
 
-    /// `user@host:port · via hop`, or nil until ssh -G answered.
+    /// `user@host:port · via hop`. While ssh -G is still loading: the saved HostName, or "…".
+    /// Nil once ssh -G failed (or answered without a hostname).
     func previewText(for entry: QuickConnectEntry) -> String? {
-        guard let options = app.effectiveConfig.options(for: entry.alias), let host = options.first("hostname") else { return nil }
+        guard let options = app.effectiveConfig.options(for: entry.alias) else {
+            return app.effectiveConfig.failure(for: entry.alias) == nil ? (entry.hostName ?? "…") : nil
+        }
+        guard let host = options.first("hostname") else { return nil }
         var text = host
         if let user = options.first("user") { text = user + "@" + text }
         if let port = options.first("port"), port != "22" { text += ":" + port }
@@ -144,11 +157,6 @@ final class QuickConnectModel {
             text += " · " + String(localized: "quick.preview.via \(name)")
         }
         return text
-    }
-
-    /// Nothing answered yet: not loaded and not failed.
-    func isPreviewLoading(for entry: QuickConnectEntry) -> Bool {
-        app.effectiveConfig.options(for: entry.alias) == nil && app.effectiveConfig.failure(for: entry.alias) == nil
     }
 
     /// Loads the selected host's ssh -G after a short pause; a new selection cancels it.

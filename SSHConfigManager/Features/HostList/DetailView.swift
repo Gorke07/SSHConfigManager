@@ -19,7 +19,6 @@ struct DetailView: View {
             VStack(spacing: 0) {
                 ConnectionBar(model: model, alias: model.connectableAlias(for: item), showsSaveHint: model.isUnsavedHost(item))
                 EffectiveSettingsView(model: model, alias: model.connectableAlias(for: item), isUnsaved: model.isUnsavedHost(item))
-                    .id(model.connectableAlias(for: item) ?? "")
                 Divider()
                 HostEditorContainer(model: model)
                     .id(model.editorToken)
@@ -29,7 +28,6 @@ struct DetailView: View {
                 VStack(spacing: 0) {
                     ConnectionBar(model: model, alias: model.connectableAlias(for: item))
                     EffectiveSettingsView(model: model, alias: model.connectableAlias(for: item), isUnsaved: false)
-                        .id(model.connectableAlias(for: item) ?? "")
                     Divider()
                     IncludedHostView(host: host, displayPath: model.settings.displayPath(for: host.file))
                 }
@@ -81,8 +79,9 @@ private struct HostEditorContainer: View {
         Group {
             if let editor {
                 VStack(spacing: 0) {
-                    if isRootHost(editor.item) {
-                        HostGroupRow(model: model, item: editor.item)
+                    if let entry = SidebarBuilder.hostEntry(for: editor.item, in: model.store.document) {
+                        // Patterns have no group; they get the IdentityFile checks only.
+                        if !entry.isPattern { HostGroupRow(model: model, item: editor.item) }
                         LintIssuesList(issues: model.lintIssues(for: editor.item))
                         Divider()
                     }
@@ -100,14 +99,6 @@ private struct HostEditorContainer: View {
     }
 }
 
-/// Root-file, non-pattern hosts only (included hosts and patterns have no group field or lint).
-private extension HostEditorContainer {
-    func isRootHost(_ item: SidebarItem) -> Bool {
-        guard let entry = SidebarBuilder.hostEntry(for: item, in: model.store.document) else { return false }
-        return !entry.isPattern
-    }
-}
-
 private struct HostGroupRow: View {
     let model: AppModel
     let item: SidebarItem
@@ -122,7 +113,7 @@ private struct HostGroupRow: View {
             if !groups.isEmpty {
                 Menu(String(localized: "editor.group.suggestions")) {
                     ForEach(groups, id: \.self) { name in
-                        Button { groupText = name; apply() } label: { Text(verbatim: name) }
+                        Button { groupText = name; model.setGroup(item, to: name) } label: { Text(verbatim: name) }
                     }
                 }
                 .fixedSize()
@@ -141,6 +132,8 @@ private struct HostGroupRow: View {
     }
 
     private func apply() {
+        // Leave the document alone when nothing changed (Return must not rewrite or dirty it).
+        guard groupText.trimmingCharacters(in: .whitespacesAndNewlines) != savedGroup else { return }
         model.setGroup(item, to: groupText)
     }
 }

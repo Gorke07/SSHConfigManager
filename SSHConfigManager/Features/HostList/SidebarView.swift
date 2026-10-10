@@ -27,7 +27,7 @@ struct SidebarView: View {
             ForEach(sections.hostGroups) { group in
                 section(groupTitle(group, onlyUnnamed: onlyUnnamed), rows: group.rows, icon: "server.rack", editable: true, lint: lint)
             }
-            section(String(localized: "sidebar.section.patterns"), rows: sections.patterns, icon: "asterisk", editable: true, lint: [:])
+            section(String(localized: "sidebar.section.patterns"), rows: sections.patterns, icon: "asterisk", editable: true, lint: lint)
             section(String(localized: "sidebar.section.included"), rows: sections.included, icon: "lock", editable: false, lint: [:])
             section(String(localized: "sidebar.section.match"), rows: sections.matches, icon: "lock", editable: false, lint: [:])
         }
@@ -63,7 +63,7 @@ struct SidebarView: View {
                                 if model.memory.isFavorite(alias) {
                                     Image(systemName: "star.fill")
                                         .foregroundStyle(.yellow)
-                                        .accessibilityLabel(String(localized: "favorite.remove"))
+                                        .accessibilityLabel(String(localized: "quick.favorite.accessibility"))
                                 }
                                 ConnectionStatusBadge(model: model.connectionTests, alias: alias, showsTitle: false)
                             }

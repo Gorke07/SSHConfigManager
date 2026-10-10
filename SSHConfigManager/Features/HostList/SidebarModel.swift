@@ -58,7 +58,7 @@ enum SidebarBuilder {
                 }
             }
         }
-        result.hostGroups = grouped.keys.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        result.hostGroups = grouped.keys.sorted(by: groupNameOrder)
             .map { SidebarGroup(name: $0, rows: grouped[$0] ?? []) }
         if !ungrouped.isEmpty { result.hostGroups.append(SidebarGroup(name: nil, rows: ungrouped)) }
 
@@ -75,6 +75,15 @@ enum SidebarBuilder {
             result.matches.append(SidebarRow(item: .match(index: index), title: "Match " + match.criteria, subtitle: ""))
         }
         return result
+    }
+
+    /// Natural order; names that compare equal (case-only variants) fall back to `<` so the order is stable.
+    static func groupNameOrder(_ a: String, _ b: String) -> Bool {
+        switch a.localizedStandardCompare(b) {
+        case .orderedAscending: true
+        case .orderedDescending: false
+        case .orderedSame: a < b
+        }
     }
 
     static func subtitle(for entry: HostEntry) -> String {
