@@ -117,9 +117,14 @@ final class GatedRunner: ProcessRunning {
 
     var arguments: [[String]] { calls.withLock { $0 } }
 
-    /// Suspends until a run has started.
-    func waitUntilEntered() async {
-        for await _ in entered { return }
+    /// Suspends until `count` runs have started (one iterator, so entries are never lost between waits).
+    /// Callers carry `.timeLimit`, since this waits on an external signal.
+    func waitUntilEntered(count: Int = 1) async {
+        var seen = 0
+        for await _ in entered {
+            seen += 1
+            if seen >= count { return }
+        }
     }
 
     func release() { releaseContinuation.yield() }

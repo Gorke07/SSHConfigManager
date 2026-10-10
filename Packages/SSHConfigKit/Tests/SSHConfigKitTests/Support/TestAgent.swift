@@ -19,7 +19,16 @@ final class TestAgent {
         for _ in 0..<100 where !FileManager.default.fileExists(atPath: socket) {
             Thread.sleep(forTimeInterval: 0.02)
         }
+        guard FileManager.default.fileExists(atPath: socket) else {
+            // Stop our own process (by handle) and clean up before reporting the failure.
+            process.terminate()
+            process.waitUntilExit()
+            try? FileManager.default.removeItem(at: directory)
+            throw Failure.socketNeverAppeared(socket)
+        }
     }
+
+    enum Failure: Error { case socketNeverAppeared(String) }
 
     deinit {
         if process.isRunning { process.terminate() }

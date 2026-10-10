@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import SSHConfigKit
 
+@Suite(.timeLimit(.minutes(1)))
 struct KeyManagerTests {
     /// Never the user's agent: an unreachable socket unless a TestAgent is given.
     func manager(_ tmp: TempDir, agent: TestAgent? = nil) -> KeyManager {

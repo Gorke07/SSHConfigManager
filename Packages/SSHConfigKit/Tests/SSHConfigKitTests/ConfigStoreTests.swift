@@ -265,7 +265,7 @@ struct ConfigStoreTests {
         #expect(!store.externalChangePending)
     }
 
-    @Test func externalEditDuringValidationIsAConflict() async throws {
+    @Test(.timeLimit(.minutes(1))) func externalEditDuringValidationIsAConflict() async throws {
         let tmp = try TempDir()
         try tmp.file("config", "Host a\n")
         let runner = GatedRunner()
@@ -286,7 +286,7 @@ struct ConfigStoreTests {
         #expect(try tmp.read("config") == "Host external\n")
     }
 
-    @Test func discardDuringValidationCancelsSave() async throws {
+    @Test(.timeLimit(.minutes(1))) func discardDuringValidationCancelsSave() async throws {
         let tmp = try TempDir()
         try tmp.file("config", "Host a\n  User u\n")
         let runner = GatedRunner()
@@ -308,7 +308,7 @@ struct ConfigStoreTests {
         #expect(!store.isSaving)
     }
 
-    @Test func secondConcurrentSaveIsRejected() async throws {
+    @Test(.timeLimit(.minutes(1))) func secondConcurrentSaveIsRejected() async throws {
         let tmp = try TempDir()
         try tmp.file("config", "Host a\n  User u\n")
         let runner = GatedRunner()

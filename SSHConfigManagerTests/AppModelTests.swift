@@ -342,6 +342,29 @@ struct AppModelTests {
         #expect(!model.isUnsavedHost(.match(index: 0)))
     }
 
+    @Test func renamingASavedHostMakesItUnsaved() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host saved\n  HostName 10.0.0.1\n")
+        #expect(!model.isUnsavedHost(.host(alias: "saved", occurrence: 0)))
+        try model.store.apply { try $0.updateHost(at: 0, to: HostDraft(patterns: ["renamed"], directives: [DraftDirective(key: "HostName", value: "10.0.0.1")])) }
+        #expect(model.isUnsavedHost(.host(alias: "renamed", occurrence: 0)))
+    }
+
+    @Test func aLetterCaseVariantOfASavedAliasIsUnsaved() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\n  HostName 10.0.0.1\n")
+        try model.store.apply { try $0.updateHost(at: 0, to: HostDraft(patterns: ["Web"], directives: [DraftDirective(key: "HostName", value: "10.0.0.1")])) }
+        #expect(model.isUnsavedHost(.host(alias: "Web", occurrence: 0)))   // alias identity is exact, like ssh's matching
+    }
+
+    @Test func includedHostsAreNeverUnsaved() throws {
+        let tmp = try TempDir()
+        try tmp.file(".ssh/config.d/work", "Host vpn\n  HostName vpn.example\n")
+        let model = makeTestModel(tmp, config: "Include config.d/*\nHost saved\n")
+        let included = try #require(model.store.includedHosts.first)
+        #expect(!model.isUnsavedHost(.included(id: included.id)))
+    }
+
     @Test func noSaveHintWhileAnExternalChangeIsPending() async throws {
         let tmp = try TempDir()
         let model = makeTestModel(tmp, config: "Host saved\n  HostName 10.0.0.1\n")

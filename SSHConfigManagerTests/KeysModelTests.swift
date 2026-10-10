@@ -186,28 +186,27 @@ struct KeysModelTests {
         #expect(model.keys.rows.first?.inAgent == nil)
     }
 
-    @Test func createdButNotAssignedKeepsTheSheetConsistent() async throws {
+    @Test(.timeLimit(.minutes(1))) func createdButNotAssignedClosesWithAWindowNotice() async throws {
         let tmp = try TempDir()
-        let model = makeTestModel(tmp, config: "Host web\n  HostName 10.0.0.1\n")
+        let keygen = GatedKeygenRunner()
+        let actions = RecordingKeyActions()
+        actions.managerRunner = keygen
+        let model = makeTestModel(tmp, config: "Host web\n  HostName 10.0.0.1\n", keyActions: actions)
         let item = SidebarItem.host(alias: "web", occurrence: 0)
         model.select(item)
         let editor = try #require(model.editor(for: item))
         let keys = model.keys
-        // rsa 4096 takes long enough to dirty the form while ssh-keygen runs (the main actor is free meanwhile).
-        let task = Task { await keys.generate(type: .rsa, fileName: "deploy", comment: "c", passphrase: "", assignTo: "web") }
-        let privateKey = tmp.url.appending(path: ".ssh/deploy").path
-        let deadline = ContinuousClock.now + .seconds(30)
-        while !FileManager.default.fileExists(atPath: privateKey) {
-            if ContinuousClock.now > deadline { Issue.record("key file never appeared"); break }
-            await Task.yield()
-        }
-        editor.fields["Port"] = "abc"
+        let task = Task { await keys.generate(type: .ed25519, fileName: "deploy", comment: "c", passphrase: "", assignTo: "web") }
+        await keygen.waitUntilEntered()          // ssh-keygen is running (suspended); the main actor is free
+        editor.fields["Port"] = "abc"            // dirty the form while the key is being made
         #expect(!editor.commit())
+        keygen.release()
         #expect(await task.value == true)
+        let privateKey = tmp.url.appending(path: ".ssh/deploy").path
         let prefix = String(localized: "keys.error.createdNotAssigned \("~/.ssh/deploy")")
         #expect(keys.notice == prefix + String(localized: "keys.error.pendingFormEdits"))
         #expect(FileManager.default.fileExists(atPath: privateKey))
-        #expect(keys.suggestedFileName(for: .rsa) == "id_rsa")   // a fresh name, so Create again cannot hit "file exists"
+        #expect(keys.suggestedFileName(for: .ed25519) == "id_ed25519")   // a fresh name, so Create again cannot hit "file exists"
         #expect(!model.store.hasUnsavedChanges)
     }
 
@@ -313,6 +312,34 @@ enum TestSupportKeygen {
         return try await ProcessRunner().run(URL(filePath: "/usr/bin/ssh-keygen"),
                                              arguments: ["-q", "-t", "ed25519", "-N", "", "-f", url.path],
                                              environment: [:], timeout: .seconds(30))
+    }
+}
+
+/// Stands in for ssh-keygen: writes the key pair where it was asked to, but only after the test calls `release()`.
+private final class GatedKeygenRunner: ProcessRunning, @unchecked Sendable {
+    private let entries: AsyncStream<Void>
+    private let entered: AsyncStream<Void>.Continuation
+    private let gate: AsyncStream<Void>
+    private let opener: AsyncStream<Void>.Continuation
+
+    init() {
+        (entries, entered) = AsyncStream.makeStream()
+        (gate, opener) = AsyncStream.makeStream()
+    }
+
+    func waitUntilEntered() async { for await _ in entries { return } }
+    func release() { opener.yield() }
+
+    func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
+        guard executable.lastPathComponent == "ssh-keygen", let flag = arguments.firstIndex(of: "-f") else {
+            return ProcessResult(exitCode: 1, stdout: "", stderr: "", timedOut: false)
+        }
+        entered.yield()
+        for await _ in gate { break }
+        let path = arguments[flag + 1]
+        FileManager.default.createFile(atPath: path, contents: Data("private".utf8), attributes: [.posixPermissions: 0o600])
+        FileManager.default.createFile(atPath: path + ".pub", contents: Data("public".utf8), attributes: [.posixPermissions: 0o644])
+        return ProcessResult(exitCode: 0, stdout: "", stderr: "", timedOut: false)
     }
 }
 

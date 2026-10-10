@@ -31,6 +31,18 @@ struct FuzzyMatcherTests {
         #expect(match.aliasOffsets == [9, 10])
     }
 
+    /// The folding locale is injected, so the result never depends on the machine running the tests.
+    @Test(arguments: ["en_US_POSIX", "tr_TR"])
+    func foldingGivesTheSameMatchesInEveryLocale(identifier: String) throws {
+        let locale = Locale(identifier: identifier)
+        #expect(FuzzyMatcher.match(query: "istanbul", alias: "İSTANBUL-db", others: [], locale: locale) != nil)
+        #expect(FuzzyMatcher.match(query: "ISTANBUL", alias: "istanbul-db", others: [], locale: locale) != nil)
+        #expect(FuzzyMatcher.match(query: "isik", alias: "ışık", others: [], locale: locale) != nil)
+        #expect(FuzzyMatcher.match(query: "gokhan", alias: "web", others: ["Gökhan"], locale: locale) != nil)
+        let match = try #require(FuzzyMatcher.match(query: "db", alias: "İSTANBUL-db", others: [], locale: locale))
+        #expect(match.aliasOffsets == [9, 10])
+    }
+
     @Test func highlightingMakesMatchedCharactersBold() {
         let text = FuzzyMatcher.highlighted("prod", offsets: [0, 3])
         let bold = text.runs.filter { $0.inlinePresentationIntent == .stronglyEmphasized }.map { String(text[$0.range].characters) }

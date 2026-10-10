@@ -46,6 +46,8 @@ struct HostKeyRemovalTests {
     @Test func confirmingDeletesOnlyThoseLinesAndForgetsTheTestResult() async throws {
         let tmp = try TempDir()
         let model = make(tmp, sshG: "hostname web.example.com\nport 22\n")
+        await model.connectionTests.test("web", using: model.commandBuilder)   // seed a result to be forgotten
+        #expect(model.connectionTests.results["web"] != nil)
         await model.requestHostKeyRemoval(alias: "web")
         model.confirmHostKeyRemoval()
         #expect(model.hostKeyRemoval == nil)
@@ -103,6 +105,29 @@ struct HostKeyRemovalTests {
         model.cancelHostKeyRemoval()
         await task.value
         #expect(model.hostKeyRemoval == nil)
+    }
+
+    @Test(.timeLimit(.minutes(1))) func aSecondRequestReplacesTheFirstAndTheFirstLateAnswerIsDropped() async throws {
+        let tmp = try TempDir()
+        _ = try tmp.file(".ssh/known_hosts", Self.knownHosts)
+        let runner = GatedRunner()
+        runner.setOutput("hostname web.example.com\nport 22\n")
+        let model = makeTestModel(tmp, config: Self.config, runner: runner)
+        let first = Task { await model.requestHostKeyRemoval(alias: "web") }
+        for await _ in runner.entries { break }
+        let firstID = model.hostKeyRemoval?.id
+        let second = Task { await model.requestHostKeyRemoval(alias: "web") }
+        var seen = 1
+        for await _ in runner.entries { seen += 1; if seen == 2 { break } }
+        #expect(model.hostKeyRemoval?.id != firstID)
+        runner.open()   // both answers arrive; only the newest request may show its result
+        await first.value
+        await second.value
+        guard case .confirm(let entries) = model.hostKeyRemoval?.phase else {
+            Issue.record("expected confirm, got \(String(describing: model.hostKeyRemoval))"); return
+        }
+        #expect(entries.map(\.lineIndex) == [0])
+        #expect(model.hostKeyRemoval?.id != firstID)
     }
 
     @Test func switchingTheFileWhileConfirmingDeletesNothing() async throws {

@@ -11,16 +11,19 @@ struct FuzzyMatch: Equatable {
 /// A query split into folded words once, to be reused across all hosts.
 struct FuzzyQuery {
     let words: [String]
+    /// Locale used to fold both the query and the candidates (injectable so tests need not depend on the host's).
+    let locale: Locale
 
-    init(_ query: String) {
-        words = query.split(whereSeparator: \.isWhitespace).map { FuzzyMatcher.fold(String($0)).joined() }
+    init(_ query: String, locale: Locale = .current) {
+        self.locale = locale
+        words = query.split(whereSeparator: \.isWhitespace).map { FuzzyMatcher.fold(String($0), locale: locale).joined() }
     }
 }
 
 enum FuzzyMatcher {
     /// Folds one character at a time so offsets stay aligned with the original alias.
     /// ASCII characters take a fast path; only other characters go through locale-aware folding.
-    static func fold(_ text: String) -> [String] {
+    static func fold(_ text: String, locale: Locale = .current) -> [String] {
         text.map { character -> String in
             if character.isASCII { return character.lowercased() }
             switch character {
@@ -31,21 +34,21 @@ enum FuzzyMatcher {
     }
 
     /// Folds a whole string (no offset alignment needed), mapping Turkish dotted/dotless i to "i" first.
-    static func foldWhole(_ text: String) -> String {
+    static func foldWhole(_ text: String, locale: Locale = .current) -> String {
         if text.allSatisfy(\.isASCII) { return text.lowercased() }
         let mapped = String(text.map { "ıİI".contains($0) ? Character("i") : $0 })
-        return mapped.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        return mapped.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: locale)
     }
 
-    static func match(query: String, alias: String, others: [String]) -> FuzzyMatch? {
-        match(FuzzyQuery(query), alias: alias, others: others)
+    static func match(query: String, alias: String, others: [String], locale: Locale = .current) -> FuzzyMatch? {
+        match(FuzzyQuery(query, locale: locale), alias: alias, others: others)
     }
 
     static func match(_ query: FuzzyQuery, alias: String, others: [String]) -> FuzzyMatch? {
         let words = query.words
         guard !words.isEmpty else { return FuzzyMatch(score: 0, aliasOffsets: []) }
-        let folded = fold(alias)
-        let foldedOthers = others.map(foldWhole)
+        let folded = fold(alias, locale: query.locale)
+        let foldedOthers = others.map { foldWhole($0, locale: query.locale) }
         // Multi-word queries sum the per-word scores. Every word must match, so all candidates of
         // one query have the same word count and the sums compare like-for-like.
         var score = 0

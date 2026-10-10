@@ -43,7 +43,7 @@ struct KnownHostsStoreTests {
         #expect(store.loadState == .loaded)
     }
 
-    @Test func watcherFollowsSymlinkRetargetedToAnotherDirectory() async throws {
+    @Test(.timeLimit(.minutes(1))) func watcherFollowsSymlinkRetargetedToAnotherDirectory() async throws {
         let tmp = try TempDir()
         try tmp.file("a/known_hosts", Self.text, permissions: 0o644)
         try tmp.file("b/known_hosts", Self.text, permissions: 0o644)
@@ -124,6 +124,42 @@ struct KnownHostsStoreTests {
         #expect(store.document.entries.count == 1)
         let mode = try FileManager.default.attributesOfItem(atPath: tmp.url.appending(path: "known_hosts").path)[.posixPermissions] as? Int
         #expect(mode == 0o600)
+    }
+
+    @Test func restoreOverAFileCreatedExternallyIsAConflict() throws {
+        let tmp = try TempDir()
+        let store = try makeStore(tmp, contents: nil)
+        #expect(store.loadState == .missing)
+        try tmp.file("known_hosts", "x.example.com ssh-ed25519 \(Self.ed)\n", permissions: 0o644)   // appears after the load
+        #expect(throws: KnownHostsStoreError.conflict) { try store.restore(text: "a.example.com ssh-ed25519 \(Self.ed)\n") }
+        #expect(try tmp.read("known_hosts") == "x.example.com ssh-ed25519 \(Self.ed)\n")   // nothing was overwritten
+        #expect(store.loadState == .loaded)   // the conflict reloaded what is on disk
+        #expect(store.document.entries.count == 1)
+    }
+
+    @Test func restoreIsRefusedForANotUTF8File() throws {
+        let tmp = try TempDir()
+        let bytes = Data([0xFF, 0xFE, 0x00])
+        try bytes.write(to: tmp.url.appending(path: "known_hosts"))
+        let store = try makeStore(tmp, contents: nil)
+        #expect(store.loadState == .notUTF8)
+        #expect(throws: KnownHostsStoreError.notEditable) { try store.restore(text: Self.text) }
+        #expect(try Data(contentsOf: tmp.url.appending(path: "known_hosts")) == bytes)
+    }
+
+    @Test func fileDidChangeReloadsOnlyWhenTheFileChanged() throws {
+        let tmp = try TempDir()
+        let store = try makeStore(tmp)
+        let revision = store.revision
+        store.fileDidChange()   // nothing changed on disk
+        #expect(store.revision == revision)
+        try tmp.file("known_hosts", "only.example.com ssh-ed25519 \(Self.ed)\n", permissions: 0o644)
+        store.fileDidChange()
+        #expect(store.revision == revision + 1)
+        #expect(store.document.entries.count == 1)
+        try FileManager.default.removeItem(at: tmp.url.appending(path: "known_hosts"))
+        store.fileDidChange()
+        #expect(store.loadState == .missing)
     }
 
     @Test func restoreBacksUpTheCurrentFile() throws {

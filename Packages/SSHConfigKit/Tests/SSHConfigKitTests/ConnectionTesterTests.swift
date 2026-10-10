@@ -3,6 +3,7 @@ import Synchronization
 import Testing
 @testable import SSHConfigKit
 
+@Suite(.timeLimit(.minutes(1)))
 struct ConnectionTesterTests {
     static let changedKey = """
     @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -87,20 +88,20 @@ struct ConnectionTesterTests {
         #expect(collected.values.sorted() == aliases.sorted())
     }
 
-    @Test func cancelledTestAllReportsNothingAndStopsQueueing() async {
-        let fake = FakeRunner(delay: .milliseconds(300)) { _ in ProcessResult(exitCode: 0, stdout: "", stderr: "", timedOut: false) }
+    @Test(.timeLimit(.minutes(1))) func cancelledTestAllReportsNothingAndStopsQueueing() async {
+        let gated = GatedRunner()
         let builder = SSHCommandBuilder(configFile: URL(filePath: "/h/.ssh/config"), homeDirectory: URL(filePath: "/h"))
         let collected = Collected()
         let task = Task {
-            await ConnectionTester(commandBuilder: builder, runner: fake).testAll((1...10).map { "h\($0)" }, maxConcurrent: 4) { alias, _ in
+            await ConnectionTester(commandBuilder: builder, runner: gated).testAll((1...10).map { "h\($0)" }, maxConcurrent: 4) { alias, _ in
                 collected.add(alias)
             }
         }
-        try? await Task.sleep(for: .milliseconds(50))
+        await gated.waitUntilEntered(count: 4)   // the first four are running and pending
         task.cancel()
         await task.value
         #expect(collected.values.isEmpty)
-        #expect(fake.calls.count <= 4)
+        #expect(gated.arguments.count <= 4)
     }
 }
 

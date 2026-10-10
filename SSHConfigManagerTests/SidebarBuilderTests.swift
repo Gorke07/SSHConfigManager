@@ -61,6 +61,13 @@ struct SidebarBuilderTests {
         #expect(sections.hosts.map(\.title) == expected)
     }
 
+    @Test func searchKeepsTheOccurrenceIndexOfTheHostThatSurvives() {
+        // "10.0.0.2" only matches the second "web" block; its item must still say occurrence 1.
+        let sections = SidebarBuilder.sections(document: doc, included: [], search: "10.0.0.2")
+        #expect(sections.hosts.map(\.item) == [.host(alias: "web", occurrence: 1)])
+        #expect(sections.hosts.map(\.subtitle) == ["10.0.0.2"])
+    }
+
     @Test func searchAlsoFiltersPatternsIncludedAndMatches() {
         let sections = SidebarBuilder.sections(document: doc, included: included, search: "vpn")
         #expect(sections.hosts.isEmpty)
