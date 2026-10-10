@@ -39,6 +39,20 @@ struct ConfigStoreTests {
         #expect(!store.refreshIncludes())
     }
 
+    @Test func refreshIncludesSeesGlobalLineAndMatchEditsInAnInclude() throws {
+        let tmp = try TempDir()
+        try tmp.file("inc.conf", "Host inc\n  User a\n")
+        try tmp.file("config", "Include \(tmp.url.appending(path: "inc.conf").path)\nHost web\n")
+        let store = makeStore(tmp)
+        #expect(!store.refreshIncludes())
+        try tmp.file("inc.conf", "User glob\nHost inc\n  User a\n")
+        #expect(store.refreshIncludes())
+        #expect(!store.refreshIncludes())
+        try tmp.file("inc.conf", "User glob\nHost inc\n  User a\nMatch all\n  Port 1\n")
+        #expect(store.refreshIncludes())
+        #expect(!store.refreshIncludes())
+    }
+
     @Test func backupKindSelectsBackupDirectory() async throws {
         let tmp = try TempDir()
         try tmp.file("config", "Host a\n")

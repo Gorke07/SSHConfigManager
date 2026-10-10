@@ -92,4 +92,16 @@ struct ProxyChainModelTests {
         #expect(test.states[2] == .skipped)
         #expect(test.states[3] == .skipped)
     }
+
+    @Test func aCycleNodeAfterAFailureIsSkipped() async throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host bastion\nHost db\n", runner: FixedRunner.invalid("Connection refused"))
+        let nodes = [ProxyChainNode(id: 0, title: "bastion", alias: "bastion", isCycle: false),
+                     ProxyChainNode(id: 1, title: "bastion", alias: "bastion", isCycle: true),
+                     ProxyChainNode(id: 2, title: "db", alias: "db", isCycle: false)]
+        let test = ProxyChainTest()
+        await test.run(nodes: nodes, app: app)
+        #expect(test.states[1] == .skipped)
+        #expect(test.states[2] == .skipped)
+    }
 }

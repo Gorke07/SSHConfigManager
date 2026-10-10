@@ -21,17 +21,42 @@ final class PeakRunner: ProcessRunning, @unchecked Sendable {
     }
 }
 
-/// Holds every run open until `open()`, so a test can observe how many are running at once.
+/// Suspends every run until `open()` and signals each entry, so tests need no polling or sleeping.
 final class GatedRunner: ProcessRunning, @unchecked Sendable {
-    private let state = Mutex((running: 0, peak: 0, runs: 0, open: false, output: "hostname h\n"))
-    var running: Int { state.withLock { $0.running } }
+    private struct State {
+        var running = 0, peak = 0, runs = 0
+        var isOpen = false
+        var output = "hostname h\n"
+        var gates: [CheckedContinuation<Void, Never>] = []
+    }
+    private let state = Mutex(State())
+    /// Yields once per run that started.
+    let entries: AsyncStream<Void>
+    private let entered: AsyncStream<Void>.Continuation
     var peak: Int { state.withLock { $0.peak } }
     var runs: Int { state.withLock { $0.runs } }
-    func open() { state.withLock { $0.open = true } }
+    init() { (entries, entered) = AsyncStream.makeStream() }
     func setOutput(_ text: String) { state.withLock { $0.output = text } }
+    /// Releases the suspended runs and lets later ones through.
+    func open() {
+        let gates = state.withLock { state -> [CheckedContinuation<Void, Never>] in
+            state.isOpen = true
+            defer { state.gates = [] }
+            return state.gates
+        }
+        for gate in gates { gate.resume() }
+    }
     func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
         state.withLock { $0.running += 1; $0.peak = max($0.peak, $0.running); $0.runs += 1 }
-        while !state.withLock({ $0.open }) { try? await Task.sleep(for: .milliseconds(5)) }
+        entered.yield()
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let pass = state.withLock { state -> Bool in
+                if state.isOpen { return true }
+                state.gates.append(continuation)
+                return false
+            }
+            if pass { continuation.resume() }
+        }
         let output = state.withLock { $0.running -= 1; return $0.output }
         return ProcessResult(exitCode: 0, stdout: output, stderr: "", timedOut: false)
     }
@@ -129,10 +154,11 @@ struct EffectiveConfigCacheTests {
         let runner = GatedRunner()
         let cache = EffectiveConfigCache(runner: runner)
         let tasks = ["a", "b", "c"].map { alias in Task { await cache.load(alias, using: builder) } }
-        for _ in 0..<400 where runner.running < 2 { try? await Task.sleep(for: .milliseconds(5)) }
-        // Give the third load every chance to (wrongly) start.
-        try? await Task.sleep(for: .milliseconds(100))
-        #expect(runner.running == 2)
+        var entries = runner.entries.makeAsyncIterator()
+        await entries.next()
+        await entries.next()
+        // The third load is queued behind the limit: it must not have started.
+        for _ in 0..<20 { await Task.yield() }
         #expect(runner.runs == 2)
         runner.open()
         for task in tasks { await task.value }

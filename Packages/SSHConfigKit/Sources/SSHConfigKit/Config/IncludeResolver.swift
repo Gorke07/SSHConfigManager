@@ -11,6 +11,12 @@ public struct IncludedHost: Identifiable, Equatable, Sendable {
     public var id: String { "\(file.path)#\(entry.headerLine)" }
 }
 
+/// One file an Include chain reads: its standardized path and text (nil when unreadable or not UTF-8).
+public struct IncludeFileState: Equatable, Sendable {
+    public let path: String
+    public let text: String?
+}
+
 /// Follows `Include` directives the way ssh does: relative paths resolve against `~/.ssh`
 /// (even when the root config lives elsewhere), `~` expands to home, globs are sorted.
 public struct IncludeResolver: Sendable {
@@ -30,6 +36,30 @@ public struct IncludeResolver: Sendable {
         var result: [IncludedHost] = []
         collect(document, depth: 0, visited: &visited, into: &result)
         return result
+    }
+
+    /// Every file the Include chain of `document` reads, in order, with its text: changes to any of
+    /// them (global lines, Match blocks, hosts) change the result of resolving through them.
+    public func includeFileStates(of document: ConfigDocument, rootFile: URL?) -> [IncludeFileState] {
+        var visited = Set<String>()
+        if let rootFile { visited.insert(rootFile.resolvingSymlinksInPath().path) }
+        var result: [IncludeFileState] = []
+        collectStates(document, depth: 0, visited: &visited, into: &result)
+        return result
+    }
+
+    private func collectStates(_ document: ConfigDocument, depth: Int, visited: inout Set<String>, into result: inout [IncludeFileState]) {
+        guard depth < maxDepth else { return }
+        for include in document.includes {
+            for pattern in include.paths {
+                for file in expand(pattern) {
+                    guard visited.insert(file.resolvingSymlinksInPath().path).inserted else { continue }
+                    let text = (try? Data(contentsOf: file)).flatMap { String(validating: $0, as: UTF8.self) }
+                    result.append(IncludeFileState(path: file.standardizedFileURL.path, text: text))
+                    if let text { collectStates(ConfigDocument(parsing: text), depth: depth + 1, visited: &visited, into: &result) }
+                }
+            }
+        }
     }
 
     /// The files one Include directive names, parsed, in ssh's (sorted glob) order.

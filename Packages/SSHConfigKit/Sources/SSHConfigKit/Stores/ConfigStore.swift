@@ -49,6 +49,8 @@ public final class ConfigStore {
     /// True iff the FileWatcher was created.
     public private(set) var isWatching = false
 
+    /// Files and texts the saved document's Includes read, to tell whether `refreshIncludes()` saw a change.
+    @ObservationIgnored private var savedIncludeStates: [IncludeFileState] = []
     @ObservationIgnored private var diskFingerprint: FileFingerprint?
     /// The text `savedDocument` was built from (nil: no file); lets refreshes skip no-op notifications.
     @ObservationIgnored private var savedViewText: String?
@@ -118,6 +120,7 @@ public final class ConfigStore {
         loadState = .loaded
         includedHosts = includeResolver.includedHosts(of: document, rootFile: fileURL)
         savedIncludedHosts = includedHosts
+        savedIncludeStates = includeResolver.includeFileStates(of: savedDocument, rootFile: fileURL)
         onDiskStateChange?()
     }
 
@@ -151,14 +154,17 @@ public final class ConfigStore {
     /// Re-reads the Include files of the working and the saved document, for edits made to an Include
     /// file alone (the root file, its text and its dirty state stay untouched). Assigns a property only
     /// when its value changed, so observers and equality-based caches see real changes only.
-    /// Returns true when the saved view's included hosts changed (what ssh reads).
+    /// Returns true when any file the saved document includes changed (what ssh reads).
     @discardableResult
     public func refreshIncludes() -> Bool {
         let working = includeResolver.includedHosts(of: document, rootFile: fileURL)
         if working != includedHosts { includedHosts = working }
         let saved = includeResolver.includedHosts(of: savedDocument, rootFile: fileURL)
-        guard saved != savedIncludedHosts else { return false }
-        savedIncludedHosts = saved
+        if saved != savedIncludedHosts { savedIncludedHosts = saved }
+        // Global lines or Match blocks in an Include file change what ssh resolves without changing the hosts.
+        let states = includeResolver.includeFileStates(of: savedDocument, rootFile: fileURL)
+        guard states != savedIncludeStates else { return false }
+        savedIncludeStates = states
         return true
     }
 
@@ -212,6 +218,7 @@ public final class ConfigStore {
         externalChangePending = false
         includedHosts = includeResolver.includedHosts(of: savedDocument, rootFile: fileURL)
         savedIncludedHosts = includedHosts
+        savedIncludeStates = includeResolver.includeFileStates(of: savedDocument, rootFile: fileURL)
         onDiskStateChange?()
     }
 
@@ -255,9 +262,11 @@ public final class ConfigStore {
         if let text {
             savedDocument = ConfigDocument(parsing: text)
             savedIncludedHosts = includeResolver.includedHosts(of: savedDocument, rootFile: fileURL)
+            savedIncludeStates = includeResolver.includeFileStates(of: savedDocument, rootFile: fileURL)
         } else {
             savedDocument = .empty
             savedIncludedHosts = []
+            savedIncludeStates = []
         }
         onDiskStateChange?()
     }
@@ -279,6 +288,7 @@ public final class ConfigStore {
         diskFingerprint = nil
         includedHosts = []
         savedIncludedHosts = []
+        savedIncludeStates = []
         loadState = state
         onDiskStateChange?()
     }

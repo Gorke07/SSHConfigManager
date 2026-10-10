@@ -204,6 +204,8 @@ final class AppModel {
         let document = store.savedDocument
         let resolver = store.includeResolver
         let includes: (IncludeDirective) -> [(file: URL, document: ConfigDocument)] = { resolver.includedDocuments(for: $0) }
+        // The root block is the target even when an earlier Include defines the same alias: it is the block the
+        // sidebar shows and the user edits; the included block's rows still show `.include(...)`.
         if let header = document.hosts.first(where: { !$0.isPattern && $0.alias == saved })?.headerLine {
             return ConfigResolver.resolve(alias: saved, document: document, targetHeader: header, includes: includes)
         }
