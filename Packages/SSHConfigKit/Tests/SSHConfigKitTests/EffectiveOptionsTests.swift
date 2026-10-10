@@ -20,6 +20,14 @@ struct EffectiveOptionsTests {
         #expect(options.jumpHops == [JumpHop(user: "admin", host: "bastion", port: 2200), JumpHop(user: nil, host: "jump2", port: nil)])
     }
 
+    @Test func handlesCRLFSpacedValuesAndValuelessLines() {
+        let options = EffectiveOptions(parsing: "user bob\r\nlocalcommand echo hi there\r\nforwardx11\r\nport 22\r\n")
+        #expect(options.first("user") == "bob")
+        #expect(options.first("localcommand") == "echo hi there")
+        #expect(options.values["forwardx11"] == nil)
+        #expect(options.first("port") == "22")
+    }
+
     @Test(arguments: [
         ("none", [JumpHop]()),
         ("", []),
@@ -27,6 +35,15 @@ struct EffectiveOptionsTests {
         ("ssh://me@h.example.com:22", [JumpHop(user: "me", host: "h.example.com", port: 22)]),
         ("[::1]:2200", [JumpHop(user: nil, host: "::1", port: 2200)]),
         ("me@[fe80::1]", [JumpHop(user: "me", host: "fe80::1", port: nil)]),
+        ("a@b@host", [JumpHop(user: "a@b", host: "host", port: nil)]),
+        ("::1", [JumpHop(user: nil, host: "::1", port: nil)]),
+        ("host:abc", []),
+        ("host:", []),
+        ("host:0", []),
+        ("host:99999", []),
+        ("[::1]:abc", []),
+        ("a,,b", [JumpHop(user: nil, host: "a", port: nil), JumpHop(user: nil, host: "b", port: nil)]),
+        ("@host", [JumpHop(user: nil, host: "host", port: nil)]),
     ])
     func parsesJumpLists(_ value: String, _ expected: [JumpHop]) {
         #expect(JumpHop.parseList(value) == expected)

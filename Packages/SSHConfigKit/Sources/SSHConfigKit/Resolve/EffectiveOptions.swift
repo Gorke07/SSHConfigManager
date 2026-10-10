@@ -42,7 +42,8 @@ public struct JumpHop: Equatable, Sendable {
         if rest.hasPrefix("ssh://") { rest = rest.dropFirst(6) }
         var user: String?
         if let at = rest.lastIndex(of: "@") {
-            user = String(rest[..<at])
+            let name = String(rest[..<at])
+            user = name.isEmpty ? nil : name
             rest = rest[rest.index(after: at)...]
         }
         var host: String
@@ -51,10 +52,16 @@ public struct JumpHop: Equatable, Sendable {
             guard let close = rest.firstIndex(of: "]") else { return nil }
             host = String(rest[rest.index(after: rest.startIndex)..<close])
             let after = rest[rest.index(after: close)...]
-            if after.hasPrefix(":") { port = Int(after.dropFirst()) }
+            if after.hasPrefix(":") {
+                guard let parsed = Int(after.dropFirst()) else { return nil }
+                port = parsed
+            } else if !after.isEmpty {
+                return nil
+            }
         } else if let colon = rest.lastIndex(of: ":"), rest.filter({ $0 == ":" }).count == 1 {
             host = String(rest[..<colon])
-            port = Int(rest[rest.index(after: colon)...])
+            guard let parsed = Int(rest[rest.index(after: colon)...]) else { return nil }
+            port = parsed
         } else {
             host = String(rest)
         }
