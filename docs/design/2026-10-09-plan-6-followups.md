@@ -8,9 +8,11 @@
 - **Port ayrıştırma:** `Int("+22")` kabul ediliyor.
 - **Arama:** Çok kelimeli puanlama toplamsal; dağınık eşleşme tabanı 200+ boşlukta diğer alanlar katmanıyla eşitlenebilir; 500 ms duvar saati sınaması yüklü CI'da kararsız olabilir.
 - **Favoriler:** 51. favori sessizce atılıyor ve gizli favoriler üst sınıra sayılıyor; yüklemede normalleştirme yok; ASCII dışı büyük/küçük harf yinelemeleri dedupe edilmiyor; sınır/bozuk veri/`fellBack`/`uploadKey`/yazılmış harf biçimi testleri eksik.
-- **ssh -G önbelleği:** `clear` sonrası bekleyenler (stale waiters) ssh çalıştırabilir (acquire sonrası nesil koruması eklenmeli); geçici hatalar (zaman aşımı/başlatma) temizlenene kadar önbellekte kalır; boş hata iletisi; `peak == 2`, clear-sonra-yükle ve `switchConfig` temizleme testleri eksik.
+- **ssh -G önbelleği:** Geçici hatalar (zaman aşımı/başlatma) yapılandırma değişene kadar önbellekte kalır (bilinçli); `peak == 2`, clear-sonra-yükle ve `switchConfig` temizleme testleri eksik.
 - **Grup alanı:** Uygulanmamış grup metni `hasPendingFormEdits`'e dahil değil; detaydaki uyarı hesabı her `body`'de tam geçiş yapıyor (belgeye göre önbelleğe alınabilir); IdentityFile okuması FIFO'da bloklanabilir (önceden var olan yardımcı).
 - **Silme:** Önceki bir tekrar silinince seçim indeksi kayıyor (önceden vardı).
+- **Yinelenen alias uyarısı ve Include:** Kök bloktan önce gelen herhangi bir `Include` satırı, alias'ı tanımlamasa ya da eşleşmeyen bir Host bloğunun içinde olsa bile kök bloğu "sonraki" sayar; doğrusu Include başına `includeResolver.includedDocuments(for:)` ile yalnızca o dosyaların adlarına bakmak.
+- **Hızlı Bağlan tekilleştirme:** `Host Web` ve `Host web` büyük/küçük harf katlanarak tek satıra iner (`savedAlias` sınırlamasıyla tutarlı; ssh ikisini ayrı host sayar).
 - **Küçük:** `connectionTests` doc yorumu yanlış yerde; araç çubuğunda boş `HStack` (görsel).
 
 ## Sürüm öncesi elle doğrulanmalı

@@ -63,8 +63,8 @@ struct QuickConnectView: View {
                         }
                     }
                     .frame(maxHeight: 320)
-                    .onChange(of: model.selectedIndex) {
-                        if let id = selectedEntry?.id { proxy.scrollTo(id) }
+                    .onChange(of: selectedEntry?.id) { _, id in
+                        if let id { proxy.scrollTo(id) }
                     }
                 }
             }

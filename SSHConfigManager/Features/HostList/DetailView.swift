@@ -113,7 +113,7 @@ private struct HostGroupRow: View {
             if !groups.isEmpty {
                 Menu(String(localized: "editor.group.suggestions")) {
                     ForEach(groups, id: \.self) { name in
-                        Button { groupText = name; model.setGroup(item, to: name) } label: { Text(verbatim: name) }
+                        Button { groupText = name; if name != savedGroup { model.setGroup(item, to: name) } } label: { Text(verbatim: name) }
                     }
                 }
                 .fixedSize()
