@@ -5,6 +5,7 @@ import Testing
 @testable import SSH_Config_Manager
 
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct ConnectionTestsModelTests {
     let builder = SSHCommandBuilder(configFile: URL(filePath: "/h/.ssh/config"), homeDirectory: URL(filePath: "/h"))
     let refused = ProcessResult(exitCode: 255, stdout: "", stderr: "ssh: connect to host h port 1: Connection refused\r\n", timedOut: false)
@@ -209,13 +210,13 @@ final class AliasGatedRunner: ProcessRunning, @unchecked Sendable {
     func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
         let alias = arguments.drop { $0 != "--" }.dropFirst().first ?? ""
         state.withLock { $0.runs += 1 }
-        entered.yield(alias)
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             let pass = state.withLock { state -> Bool in
                 if state.isOpen { return true }
-                state.pending.append((alias, continuation))
+                state.pending.append((alias, continuation))   // registered before the entry is announced
                 return false
             }
+            entered.yield(alias)
             if pass { continuation.resume() }
         }
         return result

@@ -51,8 +51,8 @@ struct KnownHostsModelTests {
         #expect(model.rows.map(\.id) == [1])
     }
 
-    /// The search folds case without locale rules: "I" must find "i" (a Turkish-locale lowercase would give a dotless "ı").
-    @Test func uppercaseIFindsLowercaseINoMatterTheLocale() throws {
+    /// The search uses locale-free `lowercased()` (no locale parameter to inject): "I" finds "i", never the dotless "ı" of a Turkish lowercase.
+    @Test func searchLowercasesAsciiWithoutLocaleRules() throws {
         let tmp = try TempDir()
         _ = try tmp.file(".ssh/known_hosts", "istanbul.example.com ssh-ed25519 \(Self.ed)\n")
         let model = KnownHostsModel(app: makeTestModel(tmp))

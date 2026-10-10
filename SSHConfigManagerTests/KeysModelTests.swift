@@ -4,6 +4,7 @@ import Testing
 @testable import SSH_Config_Manager
 
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct KeysModelTests {
     @Test func refreshListsKeysWithUsageAndAgentUnknown() async throws {
         let tmp = try TempDir()

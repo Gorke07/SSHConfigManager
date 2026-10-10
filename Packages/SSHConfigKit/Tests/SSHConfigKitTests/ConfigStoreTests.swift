@@ -3,6 +3,7 @@ import Testing
 @testable import SSHConfigKit
 
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct ConfigStoreTests {
     private func makeStore(_ tmp: TempDir, name: String = "config", watch: Bool = false, validator: ConfigValidator = ConfigValidator()) -> ConfigStore {
         ConfigStore(

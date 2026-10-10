@@ -5,6 +5,7 @@ import Testing
 @testable import SSH_Config_Manager
 
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct HostKeyRemovalTests {
     static let ed = KnownHostsModelTests.ed
     static let config = "Host web\n  HostName web.example.com\n"
@@ -93,16 +94,16 @@ struct HostKeyRemovalTests {
         #expect(model.errorMessage == String(localized: "connect.notSaved"))
     }
 
-    @Test func cancellingWhileResolvingDropsTheLateAnswer() async throws {
+    @Test(.timeLimit(.minutes(1))) func cancellingWhileResolvingDropsTheLateAnswer() async throws {
         let tmp = try TempDir()
         _ = try tmp.file(".ssh/known_hosts", Self.knownHosts)
-        let model = makeTestModel(tmp, config: Self.config, runner: DelayedRunner(
-            delay: .milliseconds(300),
-            result: ProcessResult(exitCode: 0, stdout: "hostname web.example.com\nport 22\n", stderr: "", timedOut: false)))
+        let runner = SequencedGateRunner(outputs: ["hostname web.example.com\nport 22\n"])
+        let model = makeTestModel(tmp, config: Self.config, runner: runner)
         let task = Task { await model.requestHostKeyRemoval(alias: "web") }
-        try await Task.sleep(for: .milliseconds(50))
+        await runner.waitForEntry(0)
         #expect(model.hostKeyRemoval?.phase == .resolving)
         model.cancelHostKeyRemoval()
+        runner.release(0)   // the late answer arrives after the cancel
         await task.value
         #expect(model.hostKeyRemoval == nil)
     }
@@ -110,24 +111,24 @@ struct HostKeyRemovalTests {
     @Test(.timeLimit(.minutes(1))) func aSecondRequestReplacesTheFirstAndTheFirstLateAnswerIsDropped() async throws {
         let tmp = try TempDir()
         _ = try tmp.file(".ssh/known_hosts", Self.knownHosts)
-        let runner = GatedRunner()
-        runner.setOutput("hostname web.example.com\nport 22\n")
+        // First ssh -G answers a host with no entries, the second one a host that has them.
+        let runner = SequencedGateRunner(outputs: ["hostname 10.9.9.9\nport 22\n", "hostname web.example.com\nport 22\n"])
         let model = makeTestModel(tmp, config: Self.config, runner: runner)
         let first = Task { await model.requestHostKeyRemoval(alias: "web") }
-        for await _ in runner.entries { break }
+        await runner.waitForEntry(0)
         let firstID = model.hostKeyRemoval?.id
         let second = Task { await model.requestHostKeyRemoval(alias: "web") }
-        var seen = 1
-        for await _ in runner.entries { seen += 1; if seen == 2 { break } }
+        await runner.waitForEntry(1)
         #expect(model.hostKeyRemoval?.id != firstID)
-        runner.open()   // both answers arrive; only the newest request may show its result
-        await first.value
+        runner.release(0)
+        await first.value   // the first answer (would be .nothingFound) arrives late and must be dropped
+        #expect(model.hostKeyRemoval?.phase == .resolving)
+        runner.release(1)
         await second.value
         guard case .confirm(let entries) = model.hostKeyRemoval?.phase else {
             Issue.record("expected confirm, got \(String(describing: model.hostKeyRemoval))"); return
         }
         #expect(entries.map(\.lineIndex) == [0])
-        #expect(model.hostKeyRemoval?.id != firstID)
     }
 
     @Test func switchingTheFileWhileConfirmingDeletesNothing() async throws {
@@ -265,5 +266,54 @@ final class CancellableRunner: ProcessRunning, @unchecked Sendable {
             throw CancellationError()
         }
         return ProcessResult(exitCode: 0, stdout: "hostname web.example.com\nport 22\n", stderr: "", timedOut: false)
+    }
+}
+
+/// Run n suspends until `release(n)` and then answers `outputs[n]`; `waitForEntry(n)` returns once run n has started.
+final class SequencedGateRunner: ProcessRunning, @unchecked Sendable {
+    private struct State {
+        var started = 0
+        var entered = Set<Int>()
+        var gates: [Int: CheckedContinuation<Void, Never>] = [:]
+        var released = Set<Int>()
+        var waiters: [Int: CheckedContinuation<Void, Never>] = [:]
+    }
+    private let state = Mutex(State())
+    private let outputs: [String]
+    init(outputs: [String]) { self.outputs = outputs }
+
+    func waitForEntry(_ index: Int) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let ready = state.withLock { state -> Bool in
+                if state.entered.contains(index) { return true }
+                state.waiters[index] = continuation
+                return false
+            }
+            if ready { continuation.resume() }
+        }
+    }
+
+    func release(_ index: Int) {
+        let gate = state.withLock { state -> CheckedContinuation<Void, Never>? in
+            state.released.insert(index)
+            return state.gates.removeValue(forKey: index)
+        }
+        gate?.resume()
+    }
+
+    func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
+        let index = state.withLock { state -> Int in defer { state.started += 1 }; return state.started }
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let (pass, waiter) = state.withLock { state -> (Bool, CheckedContinuation<Void, Never>?) in
+                state.entered.insert(index)
+                let waiter = state.waiters.removeValue(forKey: index)
+                if state.released.contains(index) { return (true, waiter) }
+                state.gates[index] = continuation   // registered before the waiter is told
+                return (false, waiter)
+            }
+            waiter?.resume()
+            if pass { continuation.resume() }
+        }
+        return ProcessResult(exitCode: 0, stdout: outputs[min(index, outputs.count - 1)], stderr: "", timedOut: false)
     }
 }

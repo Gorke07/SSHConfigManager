@@ -63,6 +63,7 @@ final class GatedRunner: ProcessRunning, @unchecked Sendable {
 }
 
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct EffectiveConfigCacheTests {
     let builder = SSHCommandBuilder(configFile: URL(filePath: "/h/.ssh/config"), homeDirectory: URL(filePath: "/h"))
 

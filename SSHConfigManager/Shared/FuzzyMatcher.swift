@@ -28,7 +28,7 @@ enum FuzzyMatcher {
             if character.isASCII { return character.lowercased() }
             switch character {
             case "ı", "İ": return "i"
-            default: return String(character).folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            default: return String(character).folding(options: [.caseInsensitive, .diacriticInsensitive], locale: locale)
             }
         }
     }

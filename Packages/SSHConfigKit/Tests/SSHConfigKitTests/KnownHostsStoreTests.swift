@@ -3,6 +3,7 @@ import Testing
 @testable import SSHConfigKit
 
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct KnownHostsStoreTests {
     static let ed = KnownHostsDocumentTests.ed
     static let text = "a.example.com ssh-ed25519 \(ed)\r\n# note\r\nb.example.com ssh-ed25519 \(ed)\r\nc.example.com ssh-ed25519 \(ed)"

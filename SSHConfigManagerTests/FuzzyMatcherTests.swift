@@ -43,6 +43,13 @@ struct FuzzyMatcherTests {
         #expect(match.aliasOffsets == [9, 10])
     }
 
+    /// Proves the injected locale is really used: "Ì" folds to "i" in en_US_POSIX but to the dotless "ı" in tr_TR.
+    @Test func foldUsesTheInjectedLocale() {
+        #expect(FuzzyMatcher.fold("Ì", locale: Locale(identifier: "en_US_POSIX")) == ["i"])
+        #expect(FuzzyMatcher.fold("Ì", locale: Locale(identifier: "tr_TR")) == ["ı"])
+        #expect(FuzzyMatcher.match(query: "Ìx", alias: "Ìx", others: [], locale: Locale(identifier: "tr_TR")) != nil)
+    }
+
     @Test func highlightingMakesMatchedCharactersBold() {
         let text = FuzzyMatcher.highlighted("prod", offsets: [0, 3])
         let bold = text.runs.filter { $0.inlinePresentationIntent == .stronglyEmphasized }.map { String(text[$0.range].characters) }
