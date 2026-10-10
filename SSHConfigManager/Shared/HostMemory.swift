@@ -18,21 +18,49 @@ final class HostMemory {
         self.defaults = defaults
         self.key = key
         let stored = defaults.dictionary(forKey: key)
-        favorites = stored?["favorites"] as? [String] ?? []
-        recents = stored?["recents"] as? [String] ?? []
+        let rawFavorites = stored?["favorites"]
+        let rawRecents = stored?["recents"]
+        favorites = Self.normalized(rawFavorites, cap: Self.maxFavorites)
+        recents = Self.normalized(rawRecents, cap: Self.maxRecents)
+        // Rewrite only when something was dropped from what was stored.
+        if stored != nil, (rawFavorites as? [String]) != favorites || (rawRecents as? [String]) != recents {
+            save()
+        }
+    }
+
+    /// Strings only, non-empty, exact duplicates removed (first wins), capped; anything else is dropped.
+    private static func normalized(_ raw: Any?, cap: Int) -> [String] {
+        guard let array = raw as? [Any] else { return [] }
+        var seen = Set<String>()
+        var result: [String] = []
+        for element in array {
+            guard let alias = element as? String, !alias.isEmpty, seen.insert(alias).inserted else { continue }
+            result.append(alias)
+            if result.count == cap { break }
+        }
+        return result
     }
 
     func isFavorite(_ alias: String) -> Bool {
         favorites.contains(alias)
     }
 
-    func toggleFavorite(_ alias: String) {
+    /// Removing always works. Adding at the cap first prunes favorites that are not in `existing`;
+    /// returns false when the list is still full.
+    @discardableResult
+    func toggleFavorite(_ alias: String, existing: Set<String>) -> Bool {
         if isFavorite(alias) {
             favorites.removeAll { $0 == alias }
-        } else if favorites.count < Self.maxFavorites {
-            favorites.append(alias)
+            save()
+            return true
         }
+        if favorites.count >= Self.maxFavorites {
+            favorites.removeAll { !existing.contains($0) }
+            guard favorites.count < Self.maxFavorites else { save(); return false }
+        }
+        favorites.append(alias)
         save()
+        return true
     }
 
     func recordConnection(_ alias: String) {

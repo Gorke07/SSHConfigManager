@@ -1884,6 +1884,13 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Terminal açılamadı: %@" } }
       }
     },
+    "favorite.limit %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "You can keep up to %@ favorites. Remove one first." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "En fazla %@ favori tutabilirsin. Önce birini çıkar." } }
+      }
+    },
     "connect.fellBack %@" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -292,7 +292,13 @@ final class AppModel {
     }
 
     func toggleFavorite(_ alias: String) {
-        memory.toggleFavorite(savedAlias(alias) ?? alias)
+        var existing = Set(savedConnectableHosts.map(\.entry.alias))
+        for host in store.document.hosts where !host.isPattern { existing.insert(host.alias) }
+        let target = savedAlias(alias) ?? alias
+        if !memory.toggleFavorite(target, existing: existing) {
+            let limit = String(HostMemory.maxFavorites)
+            errorMessage = String(localized: "favorite.limit \(limit)")
+        }
     }
 
     /// "Upload to Server…": `ssh-copy-id -i <pub> [-F <config>] -- <alias>` in the chosen terminal (interactive).
