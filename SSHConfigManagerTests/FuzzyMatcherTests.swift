@@ -77,4 +77,15 @@ struct FuzzyMatcherTests {
             }
         }
     }
+
+    @Test func pathologicalAliasIsFast() {
+        let alias = Array(repeating: "a", count: 40).joined(separator: "-")
+        let clock = ContinuousClock()
+        var result: FuzzyMatch?
+        let elapsed = clock.measure { result = FuzzyMatcher.match(query: "aaaaaaaaaaaaaaaab", alias: alias, others: []) }
+        #expect(result == nil)
+        #expect(elapsed < .milliseconds(500))
+        let scattered = FuzzyMatcher.match(query: "aaaaaaaaaaaaaaaa", alias: alias, others: [])
+        #expect(scattered != nil)
+    }
 }

@@ -77,13 +77,17 @@ enum FuzzyMatcher {
             return (800, Array(0..<word.count))
         }
         // Word starts: each character continues the previous match or sits at a word start (backtracking).
+        var failed = Set<Int>()
         func search(_ n: Int, _ position: Int) -> [Int]? {
             if n == word.count { return [] }
             guard position < characters.count else { return nil }
+            let key = n * (characters.count + 1) + position
+            if failed.contains(key) { return nil }
             for index in position..<characters.count where characters[index] == word[n] {
                 guard (n > 0 && index == position) || isWordStart(index, in: folded) else { continue }
                 if let rest = search(n + 1, index + 1) { return [index] + rest }
             }
+            failed.insert(key)
             return nil
         }
         if let found = search(0, 0) { return (600, found) }
