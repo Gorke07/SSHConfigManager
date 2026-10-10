@@ -22,12 +22,6 @@ final class EffectiveConfigCache {
         self.runner = runner
     }
 
-    /// ASCII case folding for ssh *values* (ssh -G lowercases host names, yes/no) and lint names —
-    /// never for alias identity: ssh matches Host patterns case-sensitively.
-    nonisolated static func asciiFolded(_ text: String) -> String {
-        String(String.UnicodeScalarView(text.unicodeScalars.map { (65...90).contains($0.value) ? Unicode.Scalar($0.value + 32)! : $0 }))
-    }
-
     func options(for alias: String) -> EffectiveOptions? { results[alias] }
     func failure(for alias: String) -> String? { failures[alias] }
 

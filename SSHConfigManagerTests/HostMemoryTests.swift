@@ -8,8 +8,8 @@ struct HostMemoryTests {
     @Test func recentsAreMostRecentFirstUniqueAndCapped() throws {
         let tmp = try TempDir()
         let memory = HostMemory(defaults: tmp.defaults, key: "hostMemory.config")
-        for alias in ["a", "b", "c", "d", "e", "f", "B"] { memory.recordConnection(alias) }
-        #expect(memory.recents == ["B", "f", "e", "d", "c"])
+        for alias in ["a", "b", "c", "d", "e", "f", "b", "B"] { memory.recordConnection(alias) }
+        #expect(memory.recents == ["B", "b", "f", "e", "d"])
         let reloaded = HostMemory(defaults: tmp.defaults, key: "hostMemory.config")
         #expect(reloaded.recents == memory.recents)
     }

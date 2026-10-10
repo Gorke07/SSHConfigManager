@@ -21,7 +21,7 @@ struct ProxyChainView: View {
         let options = cache.options(for: alias)
         let command = options?.first("proxycommand")
         // ssh -G may print "proxycommand none" or omit it: both mean no ProxyCommand.
-        let usesCommand = command.map { EffectiveConfigCache.asciiFolded($0) != "none" } ?? false
+        let usesCommand = command.map { $0.asciiLowercased != "none" } ?? false
         let nodes = nodes
         Group {
             if usesCommand {

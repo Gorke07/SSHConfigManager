@@ -54,7 +54,8 @@ public struct HostDraftValidator: Sendable {
         } else if draft.patterns.contains(where: { $0.unicodeScalars.contains(where: LineTokenizer.isSpace) }) {
             issues.append(.aliasHasWhitespace)
         } else {
-            // ssh lowercases host names before matching, so duplicates are case-insensitive.
+            // ssh matches Host patterns case-sensitively; a new alias that differs from an existing one only in
+            // ASCII case is still rejected as a likely mistake (spec §8 lint policy), not because ssh folds case.
             let taken = Set(document.hosts
                 .filter { $0.headerLine != header && !$0.isPattern }
                 .flatMap(\.patterns)

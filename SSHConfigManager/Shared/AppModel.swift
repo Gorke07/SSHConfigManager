@@ -388,7 +388,7 @@ final class AppModel {
         if let firstInclude = document.includes.map(\.line).min() {
             for host in store.includedHosts {
                 let plain = host.entry.patterns.filter { !$0.hasPrefix("!") && !$0.contains("*") && !$0.contains("?") }
-                for name in plain.map(EffectiveConfigCache.asciiFolded) {
+                for name in plain.map(\.asciiLowercased) {
                     if let header = firstBlocks[name], header > firstInclude { firstBlocks[name] = -1 }
                 }
             }
