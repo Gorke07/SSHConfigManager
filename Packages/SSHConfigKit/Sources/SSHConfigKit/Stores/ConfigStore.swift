@@ -55,7 +55,8 @@ public final class ConfigStore {
     @ObservationIgnored private var writer: SafeFileWriter
     @ObservationIgnored private let watchForChanges: Bool
     @ObservationIgnored private let validator: ConfigValidator
-    @ObservationIgnored private let includeResolver: IncludeResolver
+    /// The resolver the store follows Includes with (read-only, so other readers resolve identically).
+    @ObservationIgnored public let includeResolver: IncludeResolver
     @ObservationIgnored private var watcher: FileWatcher?
     @ObservationIgnored private var loadGeneration = 0
     /// Called after the file was (re)loaded from disk or saved, i.e. whenever the saved state may have changed.

@@ -18,6 +18,7 @@ struct DetailView: View {
         case .host:
             VStack(spacing: 0) {
                 ConnectionBar(model: model, alias: model.connectableAlias(for: item), showsSaveHint: model.isUnsavedHost(item))
+                EffectiveSettingsView(model: model, alias: model.connectableAlias(for: item), isUnsaved: model.isUnsavedHost(item))
                 Divider()
                 HostEditorContainer(model: model)
                     .id(model.editorToken)
@@ -26,6 +27,7 @@ struct DetailView: View {
             if let host = SidebarBuilder.includedHost(for: item, in: model.store.includedHosts) {
                 VStack(spacing: 0) {
                     ConnectionBar(model: model, alias: model.connectableAlias(for: item))
+                    EffectiveSettingsView(model: model, alias: model.connectableAlias(for: item), isUnsaved: false)
                     Divider()
                     IncludedHostView(host: host, displayPath: model.settings.displayPath(for: host.file))
                 }

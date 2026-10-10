@@ -1,0 +1,89 @@
+import SSHConfigKit
+import SwiftUI
+
+/// Below the connection bar: what ssh will use for this host (ssh -G) and where each value comes from,
+/// then the ProxyJump chain. Only hosts of the saved file qualify, because ssh reads the saved file.
+struct EffectiveSettingsView: View {
+    let model: AppModel
+    /// The saved alias, or nil when the host is not (yet) in the saved file.
+    let alias: String?
+    let isUnsaved: Bool
+
+    @State private var expanded = false
+    @State private var showAll = false
+    @State private var resolved: ResolvedConfig?
+
+    var body: some View {
+        if let alias {
+            VStack(alignment: .leading, spacing: 8) {
+                DisclosureGroup(String(localized: "effective.title"), isExpanded: $expanded) {
+                    settings(for: alias)
+                }
+                ProxyChainView(model: model, alias: alias)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .task(id: "\(alias)\u{0}\(model.effectiveConfig.generation)") {
+                await model.effectiveConfig.load(alias, using: model.commandBuilder)
+                resolved = model.resolvedConfig(forSavedAlias: alias)
+            }
+        } else if isUnsaved {
+            Text(String(localized: "effective.unsaved"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+        }
+    }
+
+    @ViewBuilder
+    private func settings(for alias: String) -> some View {
+        let cache = model.effectiveConfig
+        if let failure = cache.failure(for: alias) {
+            Text(String(localized: "effective.failed \(failure)"))
+                .foregroundStyle(.secondary)
+        } else if let options = cache.options(for: alias) {
+            let rows = EffectiveSettingsBuilder.rows(
+                alias: alias, options: options, resolved: resolved ?? ResolvedConfig(),
+                home: model.settings.homeDirectory, showAll: showAll)
+            VStack(alignment: .leading, spacing: 6) {
+                Toggle(String(localized: "effective.showAll"), isOn: $showAll)
+                    .toggleStyle(.checkbox)
+                Grid(alignment: .topLeading, horizontalSpacing: 12, verticalSpacing: 4) {
+                    ForEach(rows) { row in
+                        GridRow {
+                            Text(verbatim: row.key).font(.body.monospaced())
+                            VStack(alignment: .leading, spacing: 0) {
+                                ForEach(Array(row.values.enumerated()), id: \.offset) { _, value in
+                                    Text(verbatim: value).textSelection(.enabled)
+                                }
+                            }
+                            Text(label(for: row.source)).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .padding(.top, 4)
+        } else {
+            ProgressView().controlSize(.small)
+        }
+    }
+
+    private func label(for source: EffectiveSettingSource) -> String {
+        switch source {
+        case .thisBlock:
+            return String(localized: "effective.source.thisBlock")
+        case .otherHost(let patterns):
+            let joined = patterns.joined(separator: " ")
+            return String(localized: "effective.source.otherHost \(joined)")
+        case .global:
+            return String(localized: "effective.source.global")
+        case .include(let file, _):
+            return String(localized: "effective.source.include \(file)")
+        case .defaultValue:
+            return String(localized: "effective.source.default")
+        case .uncertain:
+            return String(localized: "effective.source.uncertain")
+        }
+    }
+}

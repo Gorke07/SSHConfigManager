@@ -186,6 +186,16 @@ final class AppModel {
         savedHosts.aliases[alias.lowercased()]
     }
 
+    /// Resolver result for a host of the saved file (Includes followed in place, with the store's own resolver).
+    func resolvedConfig(forSavedAlias alias: String) -> ResolvedConfig? {
+        guard let saved = savedAlias(alias) else { return nil }
+        let document = store.savedDocument
+        let header = document.hosts.first { !$0.isPattern && $0.alias == saved }?.headerLine
+        let resolver = store.includeResolver
+        return ConfigResolver.resolve(alias: saved, document: document, targetHeader: header,
+                                      includes: { resolver.includedDocuments(for: $0) })
+    }
+
     /// The alias to connect to for a sidebar item: nil for patterns, Match blocks, missing hosts
     /// and hosts that are not in the saved file yet.
     func connectableAlias(for item: SidebarItem) -> String? {

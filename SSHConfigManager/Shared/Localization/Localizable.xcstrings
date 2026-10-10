@@ -1841,6 +1841,118 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "ssh reads %@, not the known_hosts file this app manages." } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "ssh bu uygulamanın yönettiği known_hosts dosyasını değil, %@ dosyasını okuyor." } }
       }
+    },
+    "effective.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Effective Settings" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Etkin Ayarlar" } }
+      }
+    },
+    "effective.showAll" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show All" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Tümünü Göster" } }
+      }
+    },
+    "effective.unsaved" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Shown after the host is saved: ssh reads the saved file." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Host kaydedildikten sonra gösterilir: ssh kaydedilmiş dosyayı okur." } }
+      }
+    },
+    "effective.failed %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Could not read the effective settings: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Etkin ayarlar okunamadı: %@" } }
+      }
+    },
+    "effective.source.thisBlock" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This host" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu host" } }
+      }
+    },
+    "effective.source.otherHost %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Host %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Host %@" } }
+      }
+    },
+    "effective.source.global" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Top of the file" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dosyanın başı" } }
+      }
+    },
+    "effective.source.include %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Included: %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dahil edilen: %@" } }
+      }
+    },
+    "effective.source.default" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Default" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Varsayılan" } }
+      }
+    },
+    "effective.source.uncertain" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Match block or default" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Match bloğu ya da varsayılan" } }
+      }
+    },
+    "chain.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Jump Chain" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Atlama Zinciri" } }
+      }
+    },
+    "chain.thisMac" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This Mac" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu Mac" } }
+      }
+    },
+    "chain.cycle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "(loop)" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "(döngü)" } }
+      }
+    },
+    "chain.proxyCommand" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Uses ProxyCommand; the chain is not shown." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "ProxyCommand kullanıyor; zincir gösterilmez." } }
+      }
+    },
+    "chain.test" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Test Chain" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Zinciri Test Et" } }
+      }
+    },
+    "chain.skipped" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Skipped" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Atlandı" } }
+      }
     }
   },
   "version" : "1.0"

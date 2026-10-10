@@ -112,3 +112,5 @@ Elle denemede gerçek anahtarlarınıza dokunmamak için yeni anahtarları `dene
 - [ ] `prd web` gibi kısaltmalar doğru host'u ilk sırada buluyor; eşleşen harfler kalın.
 - [ ] ⌥↩ komutu panoya kopyalıyor; ⌘S favoriye ekleyip çıkarıyor; satırda yıldız görünüyor.
 - [ ] Seçili host'un altında `kullanıcı@adres:port · … üzerinden` önizlemesi kısa sürede beliriyor.
+- [ ] Bir host'un detayında "Etkin Ayarlar" ssh -G değerlerini ve her birinin kaynağını (Bu host / Host * / Dosyanın başı / Dahil edilen / Varsayılan) gösteriyor; "Tümünü Göster" kalan ayarları açıyor.
+- [ ] ProxyJump kullanan host'ta `Bu Mac → bastion → host` zinciri görünüyor; "Zinciri Test Et" sırayla test ediyor, başarısız halkadan sonrakiler "Atlandı".

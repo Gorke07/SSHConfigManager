@@ -22,7 +22,7 @@ final class EffectiveConfigCache {
         self.runner = runner
     }
 
-    static func key(_ alias: String) -> String {
+    nonisolated static func key(_ alias: String) -> String {
         String(String.UnicodeScalarView(alias.unicodeScalars.map { (65...90).contains($0.value) ? Unicode.Scalar($0.value + 32)! : $0 }))
     }
 
