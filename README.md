@@ -67,7 +67,7 @@ Config dosyası, uygulamanın tek doğruluk kaynağıdır. Uygulama host bilgile
 
 ## Kurulum
 
-En son `.dmg` dosyasını açın ve **SSH Config Manager**'ı Uygulamalar klasörüne sürükleyin.
+[Releases](https://github.com/Gorke07/SSHConfigManager/releases/latest) sayfasından en son `SSH-Config-Manager-<sürüm>.dmg` dosyasını indirin, açın ve **SSH Config Manager**'ı Uygulamalar klasörüne sürükleyin. Uygulama Developer ID ile imzalı ve Apple tarafından notarize edilmiştir; Gatekeeper uyarısı vermeden açılır.
 
 İlk bağlantıda macOS, uygulamanın terminalinizi kontrol etmesi için izin ister. Bağlanmak için bu izin gerekir. İzni daha sonra **Sistem Ayarları → Gizlilik ve Güvenlik → Otomasyon** bölümünden değiştirebilirsiniz.
 

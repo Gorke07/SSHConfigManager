@@ -39,6 +39,9 @@ codesign --verify --deep --strict --verbose=2 "$APP"
 # Capture first: `grep -q` exiting early would SIGPIPE codesign and trip pipefail.
 ENTITLEMENTS=$(codesign -d --entitlements - "$APP" 2>/dev/null)
 grep -q "com.apple.security.automation.apple-events" <<<"$ENTITLEMENTS"
+if grep -q "com.apple.security.get-task-allow" <<<"$ENTITLEMENTS"; then
+  echo "app requests com.apple.security.get-task-allow; notarization would reject it" >&2; exit 1
+fi
 SIGNATURE=$(codesign -d --verbose=2 "$APP" 2>&1)
 grep -q "flags=.*runtime" <<<"$SIGNATURE"
 if [[ "$IDENTITY" != "-" ]]; then
