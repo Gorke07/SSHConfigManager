@@ -53,6 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             })
         }
+        model.mainWindowIsKey = NSApp.keyWindow?.identifier?.rawValue.hasPrefix("main") == true
         // The launch Apple Event only exists from here on (it is nil in applicationWillFinishLaunching).
         if LaunchContext.currentLaunchIsLoginItem() { startInMenuBar() }
     }

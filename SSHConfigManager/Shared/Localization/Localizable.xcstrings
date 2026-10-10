@@ -1163,6 +1163,13 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Anahtarı sunucuya yükle" } }
       }
     },
+    "action.connect.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connect (⌘↩)" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bağlan (⌘↩)" } }
+      }
+    },
     "action.copySSHCommand" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -23,9 +23,11 @@ struct StatusSummaryTests {
         #expect(model.passesStatusFilter(.host(alias: "a", occurrence: 0)))
         #expect(!model.passesStatusFilter(.host(alias: "b", occurrence: 0)))
         #expect(!model.passesStatusFilter(.host(alias: "*", occurrence: 0)))   // no connectable alias
+        model.pendingDelete = .host(alias: "a", occurrence: 0)
         try tmp.file(".ssh/config", "Host a\n  Port 2\n")
         model.store.load()                     // saved file changed: results and the filter are cleared
         #expect(model.statusFilter == nil)
+        #expect(model.pendingDelete == nil)
         #expect(model.connectionTests.results.isEmpty)
     }
 

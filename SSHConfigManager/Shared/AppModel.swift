@@ -97,6 +97,7 @@ final class AppModel {
         connectionTests.clear()
         effectiveConfig.clear()
         statusFilter = nil
+        pendingDelete = nil
     }
 
     static func liveStore(url: URL, backups: BackupManager, backupKind: String) -> ConfigStore {

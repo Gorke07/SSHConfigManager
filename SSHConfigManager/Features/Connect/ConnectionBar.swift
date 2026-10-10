@@ -84,7 +84,7 @@ struct ConnectionBar: View {
                 if let alias { model.connect(alias: alias) }
             }
             .buttonStyle(.borderedProminent)
-            .help(String(localized: "action.connect") + " (⌘↩)")
+            .help(String(localized: "action.connect.help"))
             .disabled(alias == nil)
         }
     }
