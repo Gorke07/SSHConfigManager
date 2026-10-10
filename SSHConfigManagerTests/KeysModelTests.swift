@@ -18,6 +18,17 @@ struct KeysModelTests {
         #expect(row.key.encryption == .unencrypted)
     }
 
+    @Test func keyOperationsInvalidateTheLint() async throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host web\n")
+        let before = model.lintRevision
+        await model.keys.refresh()
+        #expect(model.lintRevision > before)
+        let afterRefresh = model.lintRevision
+        _ = await model.keys.generate(type: .ed25519, fileName: "k", comment: "c", passphrase: "", assignTo: nil)
+        #expect(model.lintRevision > afterRefresh)
+    }
+
     @Test func suggestedNamesNeverCollide() async throws {
         let tmp = try TempDir()
         let model = makeTestModel(tmp, config: "Host web\n")

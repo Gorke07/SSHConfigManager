@@ -118,11 +118,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch alert.runModal() {
         case .alertFirstButtonReturn:
             model.applyPendingGroupDraft()
-            if model.hasBlockedFormEdits {
-                // Saving would silently drop the fields that have problems.
+            if model.hasBlockedFormEdits || model.hasPendingGroupDraft {
+                // Saving would silently drop the fields that have problems (or a group that could not be applied;
+                // its own error message is already showing).
                 openMainWindow?()
                 NSApp.activate()
-                model.errorMessage = String(localized: "quit.pendingForm")
+                if model.hasBlockedFormEdits { model.errorMessage = String(localized: "quit.pendingForm") }
                 return .terminateCancel
             }
             Task { @MainActor in

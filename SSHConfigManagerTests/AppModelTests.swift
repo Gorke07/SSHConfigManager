@@ -609,6 +609,32 @@ struct AppModelTests {
         #expect(model.groupDraft == nil)
     }
 
+    @Test func aGroupDraftThatCannotBeAppliedStaysPendingWithAnError() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n")
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        model.select(a)
+        model.groupDraft = "bad\u{1B}group"
+        model.applyPendingGroupDraft()
+        #expect(model.errorMessage != nil)
+        #expect(model.hasPendingGroupDraft)
+        #expect(!model.hasBlockedFormEdits)
+        #expect(!model.store.hasUnsavedChanges)
+    }
+
+    @Test func aGroupDraftForAHostThatIsGoneIsDropped() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\nHost b\n")
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        model.select(a)
+        model.groupDraft = "x"
+        try model.store.apply { try $0.removeHost(at: SidebarBuilder.hostEntry(for: a, in: $0)!.headerLine) }
+        #expect(!model.hasPendingGroupDraft)
+        #expect(!model.hasPendingFormEdits)
+        model.applyPendingGroupDraft()
+        #expect(model.groupDraft == nil)
+    }
+
 }
 
 private final class ReadCounter: @unchecked Sendable {

@@ -39,8 +39,10 @@ struct MainWindow: View {
                 }
                 .disabled(model.store.loadState != .loaded)
             }
-            ToolbarItem(placement: .status) {
-                StatusSummaryView(model: model)
+            if !model.statusCounts.isEmpty {
+                ToolbarItem(placement: .status) {
+                    StatusSummaryView(model: model)
+                }
             }
             ToolbarItem(placement: .status) {
                 if model.store.hasUnsavedChanges {
@@ -82,6 +84,8 @@ struct MainWindow: View {
                     model.applyPendingGroupDraft()
                     if model.hasBlockedFormEdits {
                         confirmSaveWithPending = true
+                    } else if model.hasPendingGroupDraft {
+                        // The draft could not be applied; its error is showing. Do not save without it.
                     } else {
                         saveFlow = SaveFlowModel(store: model.store)
                     }

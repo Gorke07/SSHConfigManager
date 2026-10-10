@@ -52,7 +52,7 @@ struct StatusSummaryView: View {
 
     var body: some View {
         let counts = model.statusCounts
-        // The toolbar item itself is omitted by MainWindow while there are no results.
+        // MainWindow adds this view's toolbar item only while there are results; no guard here.
         HStack(spacing: 8) {
             ForEach(StatusCategory.allCases, id: \.self) { category in
                 if let count = counts[category], count > 0 {

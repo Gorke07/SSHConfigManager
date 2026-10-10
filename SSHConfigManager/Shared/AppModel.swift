@@ -414,7 +414,10 @@ final class AppModel {
     /// Sets or (nil/blank) removes the host's `# group:` line as an unsaved edit. The open editor
     /// keeps its fields: it finds its block by alias and occurrence and compares only directives.
     func setGroup(_ item: SidebarItem, to name: String?) {
-        guard let entry = SidebarBuilder.hostEntry(for: item, in: store.document) else { return }
+        guard let entry = SidebarBuilder.hostEntry(for: item, in: store.document) else {
+            groupDraft = nil   // the host is gone: nothing to apply the draft to
+            return
+        }
         let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
             try store.apply { try $0.setGroup(ofHostAt: entry.headerLine, to: trimmed?.isEmpty == false ? trimmed : nil) }
@@ -549,7 +552,11 @@ final class AppModel {
 
     /// Writes a pending group draft into the document (an unsaved edit), like pending form edits survive a save.
     func applyPendingGroupDraft() {
-        guard hasPendingGroupDraft, let item = selection else { return }
+        guard let item = selection else { groupDraft = nil; return }
+        guard hasPendingGroupDraft else {
+            if SidebarBuilder.hostEntry(for: item, in: store.document) == nil { groupDraft = nil }
+            return
+        }
         setGroup(item, to: groupDraft)
     }
 
@@ -557,7 +564,8 @@ final class AppModel {
     var hasBlockedFormEdits: Bool { activeEditor?.hasPendingChanges ?? false }
 
     var hasPendingGroupDraft: Bool {
-        guard let draft = groupDraft, let item = selection else { return false }
+        guard let draft = groupDraft, let item = selection,
+              SidebarBuilder.hostEntry(for: item, in: store.document) != nil else { return false }
         return draft.trimmingCharacters(in: .whitespacesAndNewlines) != savedGroup(for: item)
     }
 
