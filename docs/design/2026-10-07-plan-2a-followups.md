@@ -2,9 +2,9 @@
 
 Bu listedeki açık maddeler Plan 8'de kapatıldı (`2026-10-10-plan-8-old-followups.md`; madde madde durum: `2026-10-10-plan-8-triage.md`). Yalnızca elle doğrulanması gerekenler kaldı.
 
-## Kullanıcının kararı gerekiyor
+## Karar verildi
 
-- **Paket adının Türkçesi (2A-9):** Menü çubuğundaki uygulama adı (`CFBundleName`/`CFBundleDisplayName`) Türkçe arayüzde de "SSH Config Manager". Değiştirmek Dock/Finder adını da değiştirir; `InfoPlist.xcstrings`'teki commit edilmemiş değişiklikle birlikte karar verilmeli.
+- **Paket adının Türkçesi (2A-9):** Uygulama adı her dilde "SSH Config Manager" olarak kalıyor (kullanıcı kararı, 2026-10-10). `CFBundleName`/`CFBundleDisplayName` yerelleştirilmiyor; Dock, Finder ve menü çubuğu adı değişmez. Uygulama içindeki `app.title` metni ayrı bir konudur.
 
 ## Elle doğrulanmalı
 
