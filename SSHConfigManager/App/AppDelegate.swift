@@ -31,6 +31,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// One-shot guard that closes a main window SwiftUI still shows on a login launch.
     private var loginLaunchGuard: (any NSObjectProtocol)?
 
+    /// Before the first window draws, so a dark choice does not flash light at launch.
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        guard !TestEnvironment.isRunningTests else { return }
+        model.settings.appearance.apply()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !TestEnvironment.isRunningTests else { return }
         panelController = QuickConnectPanelController(

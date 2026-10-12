@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SSHConfigKit
 import Testing
@@ -17,6 +18,31 @@ struct AppModelTests {
         let reloaded = AppSettings(defaults: UserDefaults(suiteName: tmp.defaultsSuiteName)!, homeDirectory: tmp.url)
         #expect(reloaded.configPath == "~/dotfiles/ssh/config")
         #expect(reloaded.backupCount == 50)
+    }
+
+    @Test func appearanceDefaultsToSystemAndPersists() throws {
+        let tmp = try TempDir()
+        #expect(AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url).appearance == .system)
+        AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url).setAppearance(.dark)
+        #expect(AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url).appearance == .dark)
+        tmp.defaults.set("sepia", forKey: "appearance")   // unknown value from a newer or older build
+        #expect(AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url).appearance == .system)
+    }
+
+    @Test func darkBackgroundIsASoftBlackAndLightKeepsTheSystemColor() throws {
+        let dark = try #require(NSAppearance(named: .darkAqua))
+        var components: (r: CGFloat, g: CGFloat, b: CGFloat) = (0, 0, 0)
+        dark.performAsCurrentDrawingAppearance {
+            let color = NSColor.appBackground.usingColorSpace(.sRGB)!
+            components = (color.redComponent, color.greenComponent, color.blueComponent)
+        }
+        // Lighter than pure black, still dark, and a touch cool (blue above red).
+        #expect(components.r > 0.1 && components.r < 0.16)
+        #expect(components.b > components.r)
+        let light = try #require(NSAppearance(named: .aqua))
+        light.performAsCurrentDrawingAppearance {
+            #expect(NSColor.appBackground.usingColorSpace(.sRGB) == NSColor.windowBackgroundColor.usingColorSpace(.sRGB))
+        }
     }
 
     @Test func expandAndDisplayPaths() throws {

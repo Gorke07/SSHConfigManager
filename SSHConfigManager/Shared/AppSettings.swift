@@ -14,6 +14,7 @@ final class AppSettings {
         static let knownHostsPath = "knownHostsPath"
         static let backupCount = "backupCount"
         static let terminal = "terminal"
+        static let appearance = "appearance"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -23,6 +24,7 @@ final class AppSettings {
     private(set) var knownHostsPath: String
     private(set) var backupCount: Int
     private(set) var terminal: TerminalChoice
+    private(set) var appearance: AppAppearance
 
     init(defaults: UserDefaults = .standard, homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser) {
         self.defaults = defaults
@@ -33,6 +35,7 @@ final class AppSettings {
         knownHostsPath = storedKnownHosts.flatMap { Self.isValidConfigPath($0) ? $0 : nil } ?? Self.defaultKnownHostsPath
         backupCount = Self.clamp(defaults.object(forKey: Keys.backupCount) as? Int ?? Self.defaultBackupCount)
         terminal = TerminalChoice(rawValue: defaults.string(forKey: Keys.terminal) ?? "") ?? .terminal
+        appearance = AppAppearance(rawValue: defaults.string(forKey: Keys.appearance) ?? "") ?? .system
     }
 
     var configURL: URL { Self.expand(configPath, home: homeDirectory) }
@@ -57,6 +60,11 @@ final class AppSettings {
     func setTerminal(_ choice: TerminalChoice) {
         terminal = choice
         defaults.set(choice.rawValue, forKey: Keys.terminal)
+    }
+
+    func setAppearance(_ choice: AppAppearance) {
+        appearance = choice
+        defaults.set(choice.rawValue, forKey: Keys.appearance)
     }
 
     /// Shows paths under the home directory with a leading "~".
