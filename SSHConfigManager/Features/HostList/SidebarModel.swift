@@ -94,13 +94,13 @@ enum SidebarBuilder {
 
     static func hostEntry(for item: SidebarItem, in document: ConfigDocument) -> HostEntry? {
         guard case .host(let alias, let occurrence) = item else { return nil }
-        let candidates = document.hosts.filter { $0.alias == alias }
+        let candidates = document.hosts(named: alias)
         return candidates.indices.contains(occurrence) ? candidates[occurrence] : nil
     }
 
     static func item(forHeader header: Int, in document: ConfigDocument) -> SidebarItem? {
         guard let entry = document.hostEntry(at: header) else { return nil }
-        let occurrence = document.hosts.filter { $0.alias == entry.alias && $0.headerLine < header }.count
+        let occurrence = document.hosts(named: entry.alias).prefix { $0.headerLine < header }.count
         return .host(alias: entry.alias, occurrence: occurrence)
     }
 

@@ -1,7 +1,11 @@
+import Synchronization
+
 /// Line-based, lossless model of an ssh_config file. Untouched lines render
 /// exactly as they were read.
 public struct ConfigDocument: Equatable, Sendable {
-    public internal(set) var lines: [ConfigLine]
+    public internal(set) var lines: [ConfigLine] {
+        didSet { derived = Derived() }
+    }
     public internal(set) var hasTrailingNewline: Bool
     /// True when the first non-empty line ends with "\r"; new lines follow this convention.
     public let usesCRLF: Bool
@@ -45,4 +49,22 @@ public struct ConfigDocument: Equatable, Sendable {
 
     /// Appended to every newly created line ("\r" for CRLF files).
     var lineEndingSuffix: String { usesCRLF ? "\r" : "" }
+
+    /// Values computed from `lines` on first use. Any change to `lines` installs a fresh box, so copies share
+    /// it only while their lines are the same; views can read `hosts` per row without rescanning the file.
+    var derived = Derived()
+
+    final class Derived: Sendable {
+        struct Values {
+            var hosts: [HostEntry]?
+            var hostsByAlias: [String: [HostEntry]]?
+        }
+
+        let values = Mutex(Values())
+    }
+
+    /// The cache is not part of the value.
+    public static func == (lhs: ConfigDocument, rhs: ConfigDocument) -> Bool {
+        lhs.lines == rhs.lines && lhs.hasTrailingNewline == rhs.hasTrailingNewline && lhs.usesCRLF == rhs.usesCRLF
+    }
 }

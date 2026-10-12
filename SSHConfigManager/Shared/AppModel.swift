@@ -133,8 +133,19 @@ final class AppModel {
     /// Drops the memoized lint (key files can change without the document changing).
     func invalidateLint() {
         lintCache = nil
+        includeNamesCache = nil
         lintRevision += 1
     }
+
+    /// For refreshes that may or may not have touched key files (the Keys window): no new lint pass
+    /// when every key file the last pass read is unchanged.
+    func invalidateLintIfKeyFilesChanged() {
+        if lintKeyStamps == nil || keyFilesChangedSinceLint() { invalidateLint() }
+    }
+
+    /// Names each Include directive (by its paths) defines, read from disk once per set of included hosts
+    /// rather than on every keystroke. Include files changing on disk change `includedHosts` (activation refresh).
+    @ObservationIgnored private var includeNamesCache: (included: [IncludedHost], names: [[String]: Set<String>])?
 
     static func liveStore(url: URL, backups: BackupManager, backupKind: String) -> ConfigStore {
         ConfigStore(fileURL: url, writer: SafeFileWriter(backups: backups), backupKind: backupKind)
@@ -610,19 +621,34 @@ final class AppModel {
         let matchAll = Set(document.matches.filter {
             $0.criteria.trimmingCharacters(in: .whitespaces).asciiLowercased == "all"
         }.map(\.headerLine))
-        // The block an Include line sits in: the nearest header above it.
+        let headers = (Array(hostHeaders.keys) + Array(matchHeaders)).sorted()
+        // The block an Include line sits in: the nearest header above it (binary search, not a scan per directive).
         func scope(of line: Int) -> HostEntry?? {
-            let nearest = (Array(hostHeaders.keys) + Array(matchHeaders)).filter { $0 < line }.max()
-            guard let nearest else { return .some(nil) }       // top level
+            var low = 0, high = headers.count
+            while low < high {
+                let mid = (low + high) / 2
+                if headers[mid] < line { low = mid + 1 } else { high = mid }
+            }
+            guard low > 0 else { return .some(nil) }           // top level
+            let nearest = headers[low - 1]
             if let host = hostHeaders[nearest] { return .some(host) }
             if matchAll.contains(nearest) { return .some(nil) }
             return nil                                          // inside a Match block: condition unknown, ignored
         }
+        let included = store.includedHosts
+        if includeNamesCache?.included != included { includeNamesCache = (included, [:]) }
         for directive in directives where directive.line < lastHeader {
             guard let blockScope = scope(of: directive.line) else { continue }
-            var defined: Set<String> = []
-            var visited: Set<String> = []
-            collectNames(of: directive, resolver: resolver, depth: 0, visited: &visited, into: &defined)
+            let defined: Set<String>
+            if let cached = includeNamesCache?.names[directive.paths] {
+                defined = cached
+            } else {
+                var names: Set<String> = []
+                var visited: Set<String> = []
+                collectNames(of: directive, resolver: resolver, depth: 0, visited: &visited, into: &names)
+                includeNamesCache?.names[directive.paths] = names
+                defined = names
+            }
             for key in defined {
                 guard let header = firstBlocks[key], header > directive.line, header != -1 else { continue }
                 if let host = blockScope {
