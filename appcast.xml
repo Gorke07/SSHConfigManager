@@ -1,0 +1,33 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>SSH Config Manager</title>
+        <item>
+            <title>0.3.0</title>
+            <pubDate>Mon, 12 Oct 2026 09:56:31 +0300</pubDate>
+            <link>https://github.com/messcenter/SSHConfigManager/releases</link>
+            <sparkle:version>3</sparkle:version>
+            <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description xml:lang="en" sparkle:format="markdown"><![CDATA[### New features
+
+- **Automatic updates:** The app finds new versions itself with [Sparkle](https://sparkle-project.org), shows their release notes and installs them in one click. An update is installed only after its EdDSA and Developer ID signatures check out.
+  - **Check for Updates…** is in the app menu and in Settings → General → Updates.
+  - The same section has the automatic check and automatic download and install options, and shows the installed version.
+  - Permission for automatic checks is asked on the second launch; the app then checks once a day.
+- **About window:** The third-party licenses now include Sparkle's.
+
+]]></description>
+            <description xml:lang="tr" sparkle:format="markdown"><![CDATA[### Yeni özellikler
+
+- **Otomatik güncelleme:** Uygulama yeni sürümleri [Sparkle](https://sparkle-project.org) ile kendisi bulur, sürüm notlarını gösterir ve tek tıkla kurar. Güncellemeler EdDSA ve Developer ID imzalarıyla doğrulanmadan kurulmaz.
+  - Uygulama menüsünde ve Ayarlar → Genel → Güncellemeler bölümünde **Güncellemeleri Denetle…** komutu var.
+  - Aynı bölümde otomatik denetleme ve otomatik indirip kurma seçenekleri ile kurulu sürüm görünür.
+  - Otomatik denetleme için izin ikinci açılışta istenir; denetim günde bir kez yapılır.
+- **Hakkında penceresi:** Üçüncü taraf lisanslarına Sparkle'ın lisansı eklendi.
+
+]]></description>
+            <enclosure url="https://github.com/messcenter/SSHConfigManager/releases/download/v0.3.0/SSH-Config-Manager-0.3.0.dmg" length="6491636" type="application/octet-stream" sparkle:edSignature="Rh5HFoaEmtr9aA7eXScvP+1FeMn5qy4NEDhFg65l3KN63NrqucTTFBjKBLXE6QoQKTkja7c1R2tW5oCz+x7oBA=="/>
+        </item>
+    </channel>
+</rss>
