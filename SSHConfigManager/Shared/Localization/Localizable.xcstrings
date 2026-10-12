@@ -533,6 +533,20 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Değiştir" } }
       }
     },
+    "toolbar.settings" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Settings" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Ayarlar" } }
+      }
+    },
+    "toolbar.settings.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Settings (⌘,)" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Ayarlar (⌘,)" } }
+      }
+    },
     "toolbar.keys" : {
       "extractionState" : "manual",
       "localizations" : {
