@@ -31,5 +31,9 @@
 	<string>26.0</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>SSH Config Manager opens your terminal and runs ssh for the host you choose.</string>
+	<key>SUFeedURL</key>
+	<string>https://raw.githubusercontent.com/messcenter/SSHConfigManager/main/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>GFXYw2ssANJ5TUQhNXiUmYlg1LCjIEVWVhnmq/Z2ZFE=</string>
 </dict>
 </plist>

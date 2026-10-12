@@ -22,6 +22,9 @@ packages:
   KeyboardShortcuts:
     url: https://github.com/sindresorhus/KeyboardShortcuts
     from: 2.0.0
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.10.0
 targets:
   SSHConfigManager:
     type: application
@@ -36,6 +39,7 @@ targets:
     dependencies:
       - package: SSHConfigKit
       - package: KeyboardShortcuts
+      - package: Sparkle
     info:
       path: SSHConfigManager/Info.plist
       properties:
@@ -46,6 +50,10 @@ targets:
         CFBundleVersion: "2"
         LSApplicationCategoryType: public.app-category.developer-tools
         LSMinimumSystemVersion: "26.0"
+        # Sparkle: the appcast lists releases; updates must be signed with the EdDSA key matching SUPublicEDKey
+        # (private key in the release Mac's login keychain, account "sshcm"; see docs/design/release.md).
+        SUFeedURL: https://raw.githubusercontent.com/messcenter/SSHConfigManager/main/appcast.xml
+        SUPublicEDKey: GFXYw2ssANJ5TUQhNXiUmYlg1LCjIEVWVhnmq/Z2ZFE=
         # Localized (en, tr) by SSHConfigManager/Shared/Localization/InfoPlist.xcstrings, built from the sources above.
         NSAppleEventsUsageDescription: SSH Config Manager opens your terminal and runs ssh for the host you choose.
     entitlements:

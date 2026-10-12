@@ -13,6 +13,13 @@ struct AboutPanelTests {
         #expect(text.contains("Copyright (c) Sindre Sorhus"))
     }
 
+    @Test func creditsIncludeSparklesBundledLicense() {
+        let text = AboutPanel.credits.string
+        #expect(text.contains("Sparkle"))
+        #expect(text.contains("Copyright (c) 2006-2013 Andy Matuschak."))
+        #expect(text.contains("EXTERNAL LICENSES"))
+    }
+
     @Test func userCancelIsRecognised() {
         #expect(AppLog.isUserCancel(CocoaError(.userCancelled)))
         #expect(AppLog.isUserCancel(NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError)))
