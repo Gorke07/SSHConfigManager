@@ -2,6 +2,20 @@
 
 Bu projedeki önemli değişiklikler bu dosyada tutulur; İngilizcesi [CHANGELOG.en.md](CHANGELOG.en.md) dosyasındadır ve iki dosya aynı değişiklikleri listeler. Biçim [Keep a Changelog](https://keepachangelog.com/tr-TR/1.1.0/) yapısını izler, sürümler [Semantic Versioning](https://semver.org/lang/tr/) kurallarına uyar.
 
+## [0.3.1] - 2026-10-12
+
+### Arayüz iyileştirmeleri
+
+Liquid Glass kullanımı Apple'ın güncel [Liquid Glass benimseme](https://developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass) ve [Materials](https://developer.apple.com/design/human-interface-guidelines/materials) yönergelerine göre gözden geçirildi.
+
+- **Görünüm seçici:** Ayarlar → Genel → Görünüm artık glass bir kontrol. Seçili segmentin glass zemini tıklanan seçeneğe kayarak geçer.
+- **Yumuşak tema geçişi:** Görünüm değiştirildiğinde açık pencerelerin hepsi, başlık çubukları dahil, eski temadan yenisine yumuşakça geçer. "Hareketi azalt" açıksa değişiklik anında uygulanır.
+- **Bantlar:** Uyarı bantları tek bir glass grubunda yumuşakça belirir ve kaybolur. Bant içindeki butonlar glass yerine çerçeveli; glass üstüne glass binmiyor.
+- **Bağlantı durumu:** Test başlayınca durum kapsülü yumuşakça belirir, sonuç gelince rengi animasyonla değişir.
+- **Toolbar:** Ana pencerenin toolbar'ı ayrı glass gruplarına bölündü: Host ekle, araçlar (Tümünü Test Et, Known Hosts, Anahtarlar, Ayarlar) ve Kaydet.
+- **Karşılama ekranı:** Kart, içerik katmanına uygun standart bir materyal kullanıyor. Glass yalnızca adım butonlarında kaldı.
+- **Bölüm başlığı:** Ayarlar → Dosyalar'daki "known_hosts File" başlığı diğer başlıklar gibi büyük harfle başlıyor (İngilizce arayüz).
+
 ## [0.3.0] - 2026-10-12
 
 ### Yeni özellikler
@@ -92,6 +106,7 @@ Büyük config dosyalarında (2.000 Host bloğu, 50.000 satırlık known_hosts, 
 - **Gruplar:** `# group:` yorumlarıyla host gruplama.
 - İngilizce ve Türkçe arayüz.
 
+[0.3.1]: https://github.com/messcenter/SSHConfigManager/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/messcenter/SSHConfigManager/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/messcenter/SSHConfigManager/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/messcenter/SSHConfigManager/releases/tag/v0.1.0

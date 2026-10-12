@@ -2,6 +2,20 @@
 
 Notable changes to this project are recorded here; this is the English edition of [CHANGELOG.md](CHANGELOG.md) (Turkish), and the two list the same changes. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.3.1] - 2026-10-12
+
+### Interface improvements
+
+Liquid Glass use was reviewed against Apple's current [Adopting Liquid Glass](https://developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass) and [Materials](https://developer.apple.com/design/human-interface-guidelines/materials) guidelines.
+
+- **Appearance picker:** Settings → General → Appearance is now a glass control. The glass behind the selected segment slides to the option you click.
+- **Smooth theme change:** Changing the appearance cross-fades every open window, title bars included, from the old look to the new one. With Reduce Motion on, the change applies at once.
+- **Banners:** Warning banners appear and disappear smoothly in one glass group. Buttons inside a banner are bordered instead of glass, so glass no longer sits on glass.
+- **Connection status:** The status capsule appears smoothly when a test starts, and its color animates when the result arrives.
+- **Toolbar:** The main window's toolbar is split into separate glass groups: Add Host, the tools (Test All, Known Hosts, Keys, Settings) and Save.
+- **Welcome screen:** The card uses a standard material that suits the content layer. Glass stays on the step buttons only.
+- **Section header:** The "known_hosts File" header in Settings → Files is capitalized like the other headers.
+
 ## [0.3.0] - 2026-10-12
 
 ### New features
@@ -92,6 +106,7 @@ First release.
 - **Groups:** Host groups with `# group:` comments.
 - English and Turkish interface.
 
+[0.3.1]: https://github.com/messcenter/SSHConfigManager/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/messcenter/SSHConfigManager/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/messcenter/SSHConfigManager/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/messcenter/SSHConfigManager/releases/tag/v0.1.0
