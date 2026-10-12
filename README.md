@@ -15,6 +15,10 @@
   <img src="https://img.shields.io/badge/dil-English%20%7C%20T%C3%BCrk%C3%A7e-4ade80" alt="English | Türkçe">
 </p>
 
+<p align="center">
+  <a href="README.en.md">English</a> · <b>Türkçe</b>
+</p>
+
 ---
 
 Config dosyası, uygulamanın tek doğruluk kaynağıdır. Uygulama host bilgilerini başka bir yerde saklamaz. Dosyayı açıp hiçbir şeyi değiştirmeden kaydettiğinizde dosya bayt bayt aynı kalır. Bir host'u düzenlediğinizde ise yalnızca o satırlar değişir; yorumlar, girintiler, `Include` ve `Match` blokları olduğu gibi korunur.
@@ -114,7 +118,7 @@ Bu komut imzalı ve notarize edilmiş `build/SSH-Config-Manager-<sürüm>.dmg` d
 SSHConfigManager/
 ├── project.yml                 XcodeGen tanımı (sürüm, imza, Info.plist)
 ├── SSHConfigManager/           SwiftUI uygulaması
-│   ├── App/                    Uygulama, menüler, menü çubuğu
+│   ├── App/                    Uygulama, menüler, menü çubuğu, güncellemeler
 │   ├── Features/               HostList, HostDetail, QuickConnect, Connect,
 │   │                           KnownHosts, Keys, Settings
 │   └── Shared/                 AppModel, ayarlar, yerelleştirme (String Catalog)
@@ -150,7 +154,8 @@ Arayüz İngilizce (kaynak dil) ve Türkçe olarak hazırlanmıştır. Uygulama 
 
 | Belge | İçerik |
 |---|---|
+| [Değişiklik günlüğü](CHANGELOG.md) | Her sürümdeki değişiklikler ([English](CHANGELOG.en.md)) |
 | [Tasarım dokümanı](docs/design/2026-10-07-ssh-config-manager-design.md) | Amaç, mimari, güvenli düzenleme kuralları |
 | [Arayüz geliştirmeleri v1.1](docs/design/2026-10-09-ui-improvements-design.md) | Hızlı bağlanma, etkin ayarlar, gruplar |
 | [El ile test listesi](docs/design/manual-test-checklist.md) | Sürüm öncesi elle yapılacak kontroller |
-| [Sürüm alma](docs/design/release.md) | İmzalama, notarize, `.dmg` |
+| [Sürüm alma](docs/design/release.md) | İmzalama, notarize, `.dmg`, güncellemeler |
