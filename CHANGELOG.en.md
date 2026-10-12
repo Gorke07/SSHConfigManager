@@ -9,7 +9,7 @@ Notable changes to this project are recorded here; this is the English edition o
 Liquid Glass use was reviewed against Apple's current [Adopting Liquid Glass](https://developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass) and [Materials](https://developer.apple.com/design/human-interface-guidelines/materials) guidelines.
 
 - **Appearance picker:** Settings → General → Appearance is now a glass control. The glass behind the selected segment slides to the option you click.
-- **Smooth theme change:** Changing the appearance cross-fades every open window, title bars included, from the old look to the new one. With Reduce Motion on, the change applies at once.
+- **Smooth theme change:** Changing the appearance cross-fades every open window to the new look in one piece; the sidebar, toolbar and glass change together with the forms. The fade starts once the glass has slid to the new option. With Reduce Motion on, the change applies at once. No screen recording permission is needed.
 - **Banners:** Warning banners appear and disappear smoothly in one glass group. Buttons inside a banner are bordered instead of glass, so glass no longer sits on glass.
 - **Connection status:** The status capsule appears smoothly when a test starts, and its color animates when the result arrives.
 - **Toolbar:** The main window's toolbar is split into separate glass groups: Add Host, the tools (Test All, Known Hosts, Keys, Settings) and Save.

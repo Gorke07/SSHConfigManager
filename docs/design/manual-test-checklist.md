@@ -139,6 +139,7 @@ Elle denemede gerçek anahtarlarınıza dokunmamak için yeni anahtarları `dene
 ## 0.3.1 — Liquid Glass rötuşları
 
 - [ ] Ayarlar → Genel → Görünüm: seçili segmentin glass zemini tıklanan seçeneğe kayarak geçiyor; tüm açık pencereler (ana pencere, Ayarlar, Known Hosts) eski temadan yenisine yumuşakça geçiyor, başlık çubukları dahil.
+- [ ] Geçiş sırasında hiçbir bölge (sidebar, toolbar, glass butonlar) diğerlerinden önce değişmiyor; seçenekler arasında art arda hızlı tıklayınca pencerede donmuş görüntü kalmıyor ve son seçim uygulanıyor. Ekran kaydı izni istenmiyor.
 - [ ] Sistem Ayarları → Erişilebilirlik → Ekran → "Hareketi azalt" açıkken aynı seçim animasyonsuz ve geçişsiz uygulanıyor.
 - [ ] "Saydamlığı azalt" açıkken seçili segment ve bantlar opak çiziliyor, metin okunaklı.
 - [ ] VoiceOver: Görünüm kontrolü "Görünüm" olarak okunuyor, seçili segment "seçili" olarak duyuruluyor; Tab ile segmentler arasında gezilip Boşluk ile seçilebiliyor (Klavye ile gezinme açıkken).

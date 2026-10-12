@@ -9,7 +9,7 @@ Bu projedeki önemli değişiklikler bu dosyada tutulur; İngilizcesi [CHANGELOG
 Liquid Glass kullanımı Apple'ın güncel [Liquid Glass benimseme](https://developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass) ve [Materials](https://developer.apple.com/design/human-interface-guidelines/materials) yönergelerine göre gözden geçirildi.
 
 - **Görünüm seçici:** Ayarlar → Genel → Görünüm artık glass bir kontrol. Seçili segmentin glass zemini tıklanan seçeneğe kayarak geçer.
-- **Yumuşak tema geçişi:** Görünüm değiştirildiğinde açık pencerelerin hepsi, başlık çubukları dahil, eski temadan yenisine yumuşakça geçer. "Hareketi azalt" açıksa değişiklik anında uygulanır.
+- **Yumuşak tema geçişi:** Görünüm değiştirildiğinde açık pencerelerin hepsi tek parça halinde yeni temaya geçer; sidebar, toolbar ve glass öğeler formlarla aynı anda değişir. Geçiş, glass zemin seçeneğe kaydıktan sonra başlar. "Hareketi azalt" açıksa değişiklik anında uygulanır. Ekran kaydı izni gerekmez.
 - **Bantlar:** Uyarı bantları tek bir glass grubunda yumuşakça belirir ve kaybolur. Bant içindeki butonlar glass yerine çerçeveli; glass üstüne glass binmiyor.
 - **Bağlantı durumu:** Test başlayınca durum kapsülü yumuşakça belirir, sonuç gelince rengi animasyonla değişir.
 - **Toolbar:** Ana pencerenin toolbar'ı ayrı glass gruplarına bölündü: Host ekle, araçlar (Tümünü Test Et, Known Hosts, Anahtarlar, Ayarlar) ve Kaydet.
