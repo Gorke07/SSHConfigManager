@@ -25,6 +25,10 @@ final class SaveFlowModel: Identifiable {
     /// Why the disk version cannot be compared (nil when it can): shown instead of a diff.
     private(set) var conflictUnreadableMessage: String?
     private(set) var conflictDiff: [DiffHunk] = []
+    /// The text the review (or the conflict diff) showed; a document changed since (another window) is reviewed again.
+    @ObservationIgnored private var reviewedText: String?
+    /// Fingerprint of `conflictDiskText` (nil: no file), the only disk state Overwrite may replace.
+    @ObservationIgnored private var conflictFingerprint: FileFingerprint?
 
     init(store: ConfigStore, probeAlias: String? = nil) {
         self.store = store
@@ -38,11 +42,17 @@ final class SaveFlowModel: Identifiable {
 
     func prepare() async {
         phase = .preparing
+        reviewedText = store.document.render()
         phase = .review(await store.prepareSave(probeAlias: probeAlias))
     }
 
     func confirm() async {
         guard canConfirm else { return }
+        // The document changed while the sheet was open: show the new diff instead of saving unseen changes.
+        guard store.document.render() == reviewedText else {
+            await prepare()
+            return
+        }
         await save(overwriting: false)
     }
 
@@ -54,7 +64,7 @@ final class SaveFlowModel: Identifiable {
             phase = .failed(read.message ?? "")
             return
         }
-        if current != conflictDiskText {
+        if current != conflictDiskText || store.document.render() != reviewedText {
             snapshotConflict()
             return
         }
@@ -78,29 +88,39 @@ final class SaveFlowModel: Identifiable {
     }
 
     /// The disk text (a missing file counts as empty), or why it cannot be read: not valid UTF-8, or the read error.
-    private static func readDisk(_ store: ConfigStore) -> (text: String?, message: String?) {
-        guard FileManager.default.fileExists(atPath: store.fileURL.path) else { return ("", nil) }
+    /// `fingerprint` is that of the bytes read (nil: no file).
+    private static func readDisk(_ store: ConfigStore) -> (text: String?, message: String?, fingerprint: FileFingerprint?) {
+        guard FileManager.default.fileExists(atPath: store.fileURL.path) else { return ("", nil, nil) }
         let data: Data
         do { data = try Data(contentsOf: store.fileURL) } catch {
-            return (nil, Messages.text(for: ConfigLoadState.unreadable(error.localizedDescription)))
+            return (nil, Messages.text(for: ConfigLoadState.unreadable(error.localizedDescription)), nil)
         }
+        let fingerprint = FileFingerprint(data: data)
         guard let text = String(validating: data, as: UTF8.self) else {
-            return (nil, Messages.text(for: ConfigLoadState.notUTF8))
+            return (nil, Messages.text(for: ConfigLoadState.notUTF8), fingerprint)
         }
-        return (text, nil)
+        return (text, nil, fingerprint)
     }
 
     private func snapshotConflict() {
         let read = Self.readDisk(store)
+        let mine = store.document.render()
         conflictDiskText = read.text
+        conflictFingerprint = read.fingerprint
         conflictUnreadableMessage = read.message
-        conflictDiff = read.text == nil ? [] : LineDiff.hunks(old: read.text ?? "", new: store.document.render())
+        reviewedText = mine
+        conflictDiff = read.text == nil ? [] : LineDiff.hunks(old: read.text ?? "", new: mine)
     }
 
     private func save(overwriting: Bool) async {
         phase = .saving
         do {
-            try await store.save(overwritingExternalChanges: overwriting, probeAlias: probeAlias)
+            if overwriting {
+                // Overwrite only the disk version the user reviewed, even if it changes while ssh -G validates.
+                try await store.save(overwritingDiskVersion: conflictFingerprint, probeAlias: probeAlias)
+            } else {
+                try await store.save(probeAlias: probeAlias)
+            }
             phase = .done
         } catch ConfigStoreError.conflict {
             snapshotConflict()

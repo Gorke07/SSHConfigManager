@@ -45,4 +45,35 @@ struct ConfigValidatorTests {
         let fake = FakeRunner { _ in ProcessResult(exitCode: 15, stdout: "", stderr: "", timedOut: true) }
         #expect(try await ConfigValidator(runner: fake).validate("", probeAlias: "a") == .timedOut)
     }
+
+    @Test(arguments: ["a,b", "-jump", "web$1"])
+    func probeThatIsNoValidDestinationFallsBackToLocalhost(alias: String) async throws {
+        let fake = FakeRunner { args in
+            args.last == "localhost"
+                ? ProcessResult(exitCode: 0, stdout: "", stderr: "", timedOut: false)
+                : ProcessResult(exitCode: 255, stdout: "", stderr: "hostname contains invalid characters\n", timedOut: false)
+        }
+        #expect(try await ConfigValidator(runner: fake).validate("Host \(alias)\n", probeAlias: alias) == .valid)
+        #expect(fake.calls.map(\.last) == [alias, "localhost"])
+    }
+
+    @Test func fallbackProbeStillReportsFileErrors() async throws {
+        let fake = FakeRunner { _ in
+            ProcessResult(exitCode: 255, stdout: "", stderr: "hostname contains invalid characters\n", timedOut: false)
+        }
+        let outcome = try await ConfigValidator(runner: fake).validate("Host a,b\n", probeAlias: "a,b")
+        #expect(outcome == .invalid(message: "hostname contains invalid characters"))
+        #expect(fake.calls.count == 2)
+    }
+
+    @Test func realSshAcceptsAFileWhoseFirstAliasIsNoDestination() async throws {
+        #expect(try await validator.validate("Host a,b\n  User u\n", probeAlias: "a,b") == .valid)
+        #expect(try await validator.validate("Host -jump\n  Bogus x\n", probeAlias: "-jump") != .valid)
+    }
+
+    @Test func otherFailuresDoNotRetry() async throws {
+        let fake = FakeRunner { _ in ProcessResult(exitCode: 255, stdout: "", stderr: "Bad port\n", timedOut: false) }
+        _ = try await ConfigValidator(runner: fake).validate("", probeAlias: "a")
+        #expect(fake.calls.count == 1)
+    }
 }

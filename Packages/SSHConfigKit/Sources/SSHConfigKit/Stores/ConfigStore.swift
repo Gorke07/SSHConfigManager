@@ -132,9 +132,16 @@ public final class ConfigStore {
         if !fm.fileExists(atPath: directory.path) {
             try fm.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         }
-        if !fm.fileExists(atPath: fileURL.path) {
-            guard fm.createFile(atPath: fileURL.path, contents: Data(), attributes: [.posixPermissions: 0o600]) else {
-                throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: fileURL.path])
+        // A dangling symlink (`config -> ~/dotfiles/ssh/config`, target missing) gets its target created; the
+        // link stays. The target's directory is not created: a missing one is reported instead.
+        let target = try SafeFileWriter.destination(of: fileURL)
+        if !fm.fileExists(atPath: target.path) {
+            let targetDirectory = target.deletingLastPathComponent()
+            guard fm.fileExists(atPath: targetDirectory.path) else {
+                throw CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey: targetDirectory.path])
+            }
+            guard fm.createFile(atPath: target.path, contents: Data(), attributes: [.posixPermissions: 0o600]) else {
+                throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: target.path])
             }
         }
         load()
@@ -186,14 +193,28 @@ public final class ConfigStore {
     /// Validates with `ssh -G`, then writes via `SafeFileWriter` (conflict check, backup, atomic rename).
     /// Does nothing when there is nothing to write.
     public func save(overwritingExternalChanges: Bool = false, probeAlias: String? = nil) async throws {
+        try await save(overwriting: overwritingExternalChanges, reviewed: nil, probeAlias: probeAlias)
+    }
+
+    /// Like `save()`, but replaces an externally changed file, provided the file still matches `reviewed`:
+    /// the fingerprint of the disk version the user saw (nil: the file did not exist). A newer external
+    /// edit (even one made while `ssh -G` validates) throws `.conflict` instead of being overwritten.
+    public func save(overwritingDiskVersion reviewed: FileFingerprint?, probeAlias: String? = nil) async throws {
+        try await save(overwriting: true, reviewed: .some(reviewed), probeAlias: probeAlias)
+    }
+
+    /// `reviewed` nil: `overwriting` ignores the disk state; `.some`: the disk must match that fingerprint.
+    private func save(overwriting: Bool, reviewed: FileFingerprint??, probeAlias: String?) async throws {
         guard loadState == .loaded else { throw ConfigStoreError.notEditable }
         guard !isSaving else { throw ConfigStoreError.saveInProgress }
-        guard hasUnsavedChanges || overwritingExternalChanges else { return }
+        guard hasUnsavedChanges || overwriting else { return }
         isSaving = true
         defer { isSaving = false }
 
         let text = document.render()
-        let expected = diskFingerprint   // captured before the await: an external edit during validation must conflict
+        // Captured before the await: an external edit during validation must conflict.
+        let expected = reviewed ?? diskFingerprint
+        let ignoreConflict = overwriting && reviewed == nil
         let generation = loadGeneration
 
         let outcome = await validate(text, probeAlias: probeAlias)
@@ -207,7 +228,7 @@ public final class ConfigStore {
 
         do {
             try writer.write(text, to: fileURL, expected: expected,
-                             ignoreConflict: overwritingExternalChanges, backupKind: backupKind)
+                             ignoreConflict: ignoreConflict, backupKind: backupKind)
         } catch SafeFileWriterError.conflict {
             externalChangePending = true
             throw ConfigStoreError.conflict

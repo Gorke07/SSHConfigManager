@@ -565,4 +565,85 @@ struct ConfigStoreTests {
         store.fileDidChange()
         #expect(notified == 1)
     }
+
+    @Test func createFileFollowsADanglingSymlink() throws {
+        let tmp = try TempDir()
+        try FileManager.default.createDirectory(at: tmp.url.appending(path: "dotfiles/ssh"), withIntermediateDirectories: true)
+        let link = tmp.url.appending(path: "config")
+        try FileManager.default.createSymbolicLink(atPath: link.path, withDestinationPath: "dotfiles/ssh/config")
+        let store = makeStore(tmp)
+        #expect(store.loadState == .missing)
+
+        try store.createFile()
+
+        #expect(store.loadState == .loaded)
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: link.path) == "dotfiles/ssh/config")
+        #expect(FileManager.default.fileExists(atPath: tmp.url.appending(path: "dotfiles/ssh/config").path))
+    }
+
+    @Test func createFileFailsWhenTheSymlinkTargetDirectoryIsMissing() throws {
+        let tmp = try TempDir()
+        let link = tmp.url.appending(path: "config")
+        try FileManager.default.createSymbolicLink(atPath: link.path, withDestinationPath: "dotfiles/ssh/config")
+        let store = makeStore(tmp)
+
+        #expect(throws: CocoaError.self) { try store.createFile() }
+
+        #expect(store.loadState == .missing)
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: link.path) == "dotfiles/ssh/config")
+        #expect(!FileManager.default.fileExists(atPath: tmp.url.appending(path: "dotfiles").path))
+    }
+
+    @Test func overwritingTheReviewedDiskVersionRefusesANewerExternalEdit() async throws {
+        let tmp = try TempDir()
+        try tmp.file("config", "Host a\n  User u\n")
+        let store = makeStore(tmp, validator: ConfigValidator(runner: FakeRunner { _ in
+            ProcessResult(exitCode: 0, stdout: "", stderr: "", timedOut: false)
+        }))
+        try addPort(store)
+        let reviewed = try tmp.file("config", "Host a\n  User reviewed\n")
+        let reviewedFingerprint = try FileFingerprint.of(fileAt: reviewed)
+        try tmp.file("config", "Host a\n  User newer\n")
+
+        await #expect(throws: ConfigStoreError.conflict) {
+            try await store.save(overwritingDiskVersion: reviewedFingerprint)
+        }
+        #expect(try tmp.read("config") == "Host a\n  User newer\n")
+        #expect(store.externalChangePending)
+
+        try await store.save(overwritingDiskVersion: try FileFingerprint.of(fileAt: reviewed))
+        #expect(try tmp.read("config") == "Host a\n  User u\n  Port 2222\n")
+        #expect(!store.externalChangePending)
+    }
+
+    @Test func overwritingTheReviewedDiskVersionRefusesAnEditMadeDuringValidation() async throws {
+        let tmp = try TempDir()
+        let url = try tmp.file("config", "Host a\n  User u\n")
+        let runner = GatedRunner()
+        let store = makeStore(tmp, validator: ConfigValidator(runner: runner))
+        try addPort(store)
+        try tmp.file("config", "Host a\n  User reviewed\n")
+        let reviewed = try FileFingerprint.of(fileAt: url)
+
+        let save = Task { try await store.save(overwritingDiskVersion: reviewed) }
+        await runner.waitUntilEntered()
+        try tmp.file("config", "Host a\n  User during-validation\n")
+        runner.release()
+
+        await #expect(throws: ConfigStoreError.conflict) { try await save.value }
+        #expect(try tmp.read("config") == "Host a\n  User during-validation\n")
+    }
+
+    @Test func overwritingAReviewedMissingFileRecreatesIt() async throws {
+        let tmp = try TempDir()
+        let url = try tmp.file("config", "Host a\n")
+        let store = makeStore(tmp, validator: ConfigValidator(runner: FakeRunner { _ in
+            ProcessResult(exitCode: 0, stdout: "", stderr: "", timedOut: false)
+        }))
+        try addPort(store)
+        try FileManager.default.removeItem(at: url)
+
+        try await store.save(overwritingDiskVersion: nil)
+        #expect(try tmp.read("config") == "Host a\n    Port 2222\n")
+    }
 }

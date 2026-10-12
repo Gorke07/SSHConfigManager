@@ -105,4 +105,27 @@ struct SafeFileWriterTests {
         #expect(try tmp.read("ro/config") == "old")
         #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path) == ["config"])
     }
+
+    @Test func writeThroughDanglingSymlinkCreatesTheTargetAndKeepsTheLink() throws {
+        let tmp = try TempDir()
+        let dotfiles = tmp.url.appending(path: "dotfiles/ssh", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: dotfiles, withIntermediateDirectories: true)
+        let link = tmp.url.appending(path: "config")
+        try FileManager.default.createSymbolicLink(atPath: link.path, withDestinationPath: "dotfiles/ssh/config")
+
+        try writer(tmp).write("Host a\n", to: link, expected: nil, backupKind: "config")
+
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: link.path) == "dotfiles/ssh/config")
+        #expect(try tmp.read("dotfiles/ssh/config") == "Host a\n")
+    }
+
+    @Test func writeThroughDanglingSymlinkIntoMissingDirectoryFails() throws {
+        let tmp = try TempDir()
+        let link = tmp.url.appending(path: "config")
+        try FileManager.default.createSymbolicLink(atPath: link.path, withDestinationPath: tmp.url.appending(path: "gone/config").path)
+        #expect(throws: SafeFileWriterError.self) {
+            try writer(tmp).write("Host a\n", to: link, expected: nil, ignoreConflict: true, backupKind: "config")
+        }
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: link.path).hasSuffix("gone/config"))
+    }
 }
