@@ -123,6 +123,8 @@ final class BackupsModel {
                 }
                 throw error
             }
+            // The user agreed to discard the form, so an unapplied group name goes too.
+            model.groupDraft = nil
             model.resetEditor()
         case .knownHosts:
             // Switched file (the backup belongs to another file), a backup no longer listed, or a reload

@@ -119,6 +119,9 @@ final class AppModel {
         if store.loadRevision != lastLoadRevision {
             lastLoadRevision = store.loadRevision
             groupDraft = nil
+            // Rebuild the form from the reloaded file here, not in a view: the main window may be closed
+            // (menu bar only) and would otherwise reopen on the old values. Blocked edits stay (stale guard).
+            if !hasBlockedFormEdits { resetEditor() }
         }
         invalidateLint()
     }

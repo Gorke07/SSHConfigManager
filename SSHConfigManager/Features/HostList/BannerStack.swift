@@ -40,7 +40,7 @@ struct BannerStack: View {
                         model.errorMessage = Messages.text(for: error)
                     }
                 }
-                Button(String(localized: "banner.missing.choose")) { openSettings() }
+                Button(String(localized: "banner.missing.choose")) { SettingsTab.files.select(); openSettings() }
             }
         case .notUTF8:
             BannerRow(icon: "exclamationmark.triangle", tint: .red, message: Messages.text(for: ConfigLoadState.notUTF8) ?? "") {
@@ -48,7 +48,7 @@ struct BannerStack: View {
             }
         case .unreadable(let detail):
             BannerRow(icon: "exclamationmark.triangle", tint: .red, message: Messages.text(for: ConfigLoadState.unreadable(detail)) ?? "") {
-                Button(String(localized: "banner.missing.choose")) { openSettings() }
+                Button(String(localized: "banner.missing.choose")) { SettingsTab.files.select(); openSettings() }
             }
         case .byteOrderMark:
             BannerRow(icon: "exclamationmark.triangle", tint: .orange, message: String(localized: "banner.bom")) {

@@ -90,11 +90,13 @@ struct KeysWindow: View {
             if keys.pendingNewKey { sheet = .new; keys.pendingNewKey = false }
         }
         .sheet(item: $sheet) { item in
+            // A sheet closes only itself: an operation finishing late must not close a sheet opened after it.
+            let close = { if sheet?.id == item.id { sheet = nil } }
             switch item {
-            case .new: NewKeySheet(keys: keys, assignableAliases: app.assignableAliases) { sheet = nil }
-            case .addToAgent(let row): AddToAgentSheet(keys: keys, row: row) { sheet = nil }
-            case .changePassphrase(let row): ChangePassphraseSheet(keys: keys, row: row) { sheet = nil }
-            case .upload(let row): UploadKeySheet(app: app, row: row) { sheet = nil }
+            case .new: NewKeySheet(keys: keys, assignableAliases: app.assignableAliases, close: close)
+            case .addToAgent(let row): AddToAgentSheet(keys: keys, row: row, close: close)
+            case .changePassphrase(let row): ChangePassphraseSheet(keys: keys, row: row, close: close)
+            case .upload(let row): UploadKeySheet(app: app, row: row, close: close)
             }
         }
         .confirmationDialog(

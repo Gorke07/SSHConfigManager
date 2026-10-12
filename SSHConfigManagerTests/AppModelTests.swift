@@ -207,6 +207,20 @@ struct AppModelTests {
         #expect(model.editorToken != token)
     }
 
+    @Test func reloadFromDiskRebuildsTheEditorWithoutAView() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n  User old\n")
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        model.select(a)
+        let first = try #require(model.editor(for: a))
+        // Main window closed (no view observes diskText); the file changes and the store reloads.
+        _ = try tmp.file(".ssh/config", "Host a\n  User new\n")
+        model.store.load()
+        let reopened = try #require(model.editor(for: a))
+        #expect(reopened !== first)
+        #expect(reopened.fields["User"] == "new")
+    }
+
     @Test func editorSurvivesWindowCloseAndKeepsPendingEdits() throws {
         let tmp = try TempDir()
         let model = makeTestModel(tmp, config: "Host a\nHost b\n")

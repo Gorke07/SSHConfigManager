@@ -38,6 +38,7 @@ struct NewKeySheet: View {
             HStack {
                 Spacer()
                 Button(String(localized: "action.cancel"), role: .cancel) { finish() }.keyboardShortcut(.cancelAction)
+                    .disabled(keys.isWorking)   // a running ssh-keygen/ssh-add cannot be cancelled
                 Button(String(localized: "keys.form.create")) {
                     Task {
                         if await keys.generate(type: type, fileName: fileName, comment: comment,
@@ -85,6 +86,7 @@ struct AddToAgentSheet: View {
             HStack {
                 Spacer()
                 Button(String(localized: "action.cancel"), role: .cancel) { finish() }.keyboardShortcut(.cancelAction)
+                    .disabled(keys.isWorking)   // a running ssh-keygen/ssh-add cannot be cancelled
                 Button(String(localized: "keys.form.add")) {
                     Task { if await keys.addToAgent(row, passphrase: passphrase) { finish() } }
                 }
@@ -129,6 +131,7 @@ struct ChangePassphraseSheet: View {
             HStack {
                 Spacer()
                 Button(String(localized: "action.cancel"), role: .cancel) { finish() }.keyboardShortcut(.cancelAction)
+                    .disabled(keys.isWorking)   // a running ssh-keygen/ssh-add cannot be cancelled
                 Button(String(localized: "keys.form.change")) {
                     Task { if await keys.changePassphrase(row, old: old, new: new) { finish() } }
                 }
