@@ -34,6 +34,7 @@ struct ConnectionBar: View {
     let model: AppModel
     let alias: String?
     var showsSaveHint = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -58,6 +59,20 @@ struct ConnectionBar: View {
         GlassEffectContainer(spacing: 8) {
             row
         }
+        // The status capsule materializes when a test starts and re-tints when the result arrives.
+        .animation(reduceMotion ? nil : .smooth(duration: 0.3), value: statusPhase)
+    }
+
+    private enum StatusPhase: Equatable {
+        case running
+        case finished(ConnectionStatus)
+    }
+
+    /// What the status capsule shows; drives the bar's animation.
+    private var statusPhase: StatusPhase? {
+        guard let alias else { return nil }
+        if model.connectionTests.running.contains(alias) { return .running }
+        return model.connectionTests.results[alias].map { .finished($0.status) }
     }
 
     private var row: some View {
@@ -71,6 +86,7 @@ struct ConnectionBar: View {
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .glassEffect(.regular.tint(tint.opacity(0.18)), in: .capsule)
+                        .glassEffectTransition(.materialize)
                 }
                 if let detail = model.connectionTests.results[alias]?.detail, !detail.isEmpty {
                     Text(verbatim: detail).font(.caption).foregroundStyle(.secondary).lineLimit(1).textSelection(.enabled)
