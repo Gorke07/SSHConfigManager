@@ -135,3 +135,14 @@ Elle denemede gerçek anahtarlarınıza dokunmamak için yeni anahtarları `dene
 - [ ] ⌥⌘S paneli başka bir uygulamanın üstünde açılınca o uygulama ön planda kalıyor (ana pencere öne gelmiyor), arama alanına yazılabiliyor ve ↩ ile bağlanılabiliyor.
 - [ ] Girişte açılışta (menü çubuğu modu) ilk 3 saniye içinde menü çubuğundan 'Ana pencereyi aç' ya da Dock'tan açılan pencere kapanmıyor; SwiftUI'nin kendi açtığı pencere hâlâ kapanıyor.
 - [ ] Menü çubuğu penceresi ya da Hızlı Bağlan paneli açıkken Dock ikonu görünmüyor; yalnızca ana/Ayarlar/Yedekler penceresi açıkken görünüyor.
+
+## 0.3.1 — Liquid Glass rötuşları
+
+- [ ] Ayarlar → Genel → Görünüm: seçili segmentin glass zemini tıklanan seçeneğe kayarak geçiyor; tüm açık pencereler (ana pencere, Ayarlar, Known Hosts) eski temadan yenisine yumuşakça geçiyor, başlık çubukları dahil.
+- [ ] Sistem Ayarları → Erişilebilirlik → Ekran → "Hareketi azalt" açıkken aynı seçim animasyonsuz ve geçişsiz uygulanıyor.
+- [ ] "Saydamlığı azalt" açıkken seçili segment ve bantlar opak çiziliyor, metin okunaklı.
+- [ ] VoiceOver: Görünüm kontrolü "Görünüm" olarak okunuyor, seçili segment "seçili" olarak duyuruluyor; Tab ile segmentler arasında gezilip Boşluk ile seçilebiliyor (Klavye ile gezinme açıkken).
+- [ ] Config dosyası silinip geri getirilince bant glass olarak beliriyor ve kayboluyor; bant içindeki butonlar glass değil, çerçeveli.
+- [ ] Test'e basınca bağlantı çubuğundaki durum kapsülü beliriyor, sonuç gelince rengi yumuşakça değişiyor.
+- [ ] Ana pencere toolbar'ında Ekle, araçlar (Tümünü Test Et, Known Hosts, Anahtarlar, Ayarlar) ve Kaydet ayrı glass gruplarında.
+- [ ] Boş config'te karşılama kartı glass değil, standart materyal; adım numaraları düz daire, adım butonları glass.
