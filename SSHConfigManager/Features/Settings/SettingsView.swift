@@ -99,15 +99,16 @@ struct SettingsView: View {
 
     @ViewBuilder private var general: some View {
         Section(String(localized: "settings.appearance")) {
-            Picker(String(localized: "settings.appearance"), selection: Binding(
-                get: { model.settings.appearance },
-                set: { model.settings.setAppearance($0); $0.apply() }
-            )) {
-                ForEach(AppAppearance.allCases, id: \.self) { choice in
-                    Label(choice.localizedName, systemImage: choice.symbolName).tag(choice)
-                }
+            // An HStack, not LabeledContent: the label centres on the taller glass control instead of its baseline.
+            HStack {
+                Text(String(localized: "settings.appearance"))
+                Spacer()
+                AppearancePicker(selection: Binding(
+                    get: { model.settings.appearance },
+                    set: { model.settings.setAppearance($0); $0.apply(animated: true) }
+                ))
+                .accessibilityLabel(String(localized: "settings.appearance"))
             }
-            .pickerStyle(.segmented)
             Toggle(String(localized: "settings.showsInDock"), isOn: Binding(
                 get: { model.settings.showsInDock },
                 set: { model.settings.setShowsInDock($0); DockIcon.settingChanged(model.settings) }
