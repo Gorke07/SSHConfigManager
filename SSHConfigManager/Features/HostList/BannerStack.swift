@@ -87,8 +87,11 @@ private struct BannerRow<Actions: View>: View {
             Text(message).frame(maxWidth: .infinity, alignment: .leading)
             actions()
         }
+        .buttonStyle(.glass)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(tint.opacity(0.12))
+        .glassEffect(.regular.tint(tint.opacity(0.15)), in: .rect(cornerRadius: 14))
+        .padding(.horizontal, 10)
+        .padding(.top, 6)
     }
 }

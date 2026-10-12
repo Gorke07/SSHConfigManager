@@ -37,12 +37,17 @@ final class QuickConnectPanelController: NSObject, NSWindowDelegate {
             panel.standardWindowButton($0)?.isHidden = true
         }
         panel.delegate = self
+        // A clear window under a Liquid Glass panel, like Spotlight; the glass shape draws the edge and shadow.
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
         panel.contentView = NSHostingView(rootView: QuickConnectView(
             model: model,
             showsFooter: false,
             dismiss: { [weak self] in self?.close() },
             openMainWindow: openMainWindow,
-            openSettings: openSettings))
+            openSettings: openSettings)
+            .glassEffect(.regular, in: .rect(cornerRadius: 22)))
     }
 
     func toggle() {
