@@ -50,23 +50,37 @@ struct EffectiveSettingsView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Toggle(String(localized: "effective.showAll"), isOn: $model.effectiveSettingsShowAll)
                     .toggleStyle(.checkbox)
-                Grid(alignment: .topLeading, horizontalSpacing: 12, verticalSpacing: 4) {
-                    ForEach(rows) { row in
-                        GridRow {
-                            Text(verbatim: row.key).font(.body.monospaced())
-                            VStack(alignment: .leading, spacing: 0) {
-                                ForEach(Array(row.values.enumerated()), id: \.offset) { _, value in
-                                    Text(verbatim: value).textSelection(.enabled)
-                                }
-                            }
-                            Text(label(for: row.source)).foregroundStyle(.secondary)
-                        }
-                    }
+                // Shown as is while it fits; otherwise it scrolls inside a bounded height. Unbounded, the
+                // expanded list raised the detail column's minimum height above the window's and the split
+                // view fell back to its ideal height (thousands of points), so the window showed a blank slice.
+                ViewThatFits(in: .vertical) {
+                    grid(rows)
+                    ScrollView { grid(rows).frame(maxWidth: .infinity, alignment: .leading) }
                 }
+                .frame(minHeight: 0, maxHeight: Self.maxListHeight)
             }
             .padding(.top, 4)
         } else {
             ProgressView().controlSize(.small)
+        }
+    }
+
+    /// Tallest the expanded list gets before it scrolls.
+    static let maxListHeight: CGFloat = 260
+
+    private func grid(_ rows: [EffectiveSettingRow]) -> some View {
+        Grid(alignment: .topLeading, horizontalSpacing: 12, verticalSpacing: 4) {
+            ForEach(rows) { row in
+                GridRow {
+                    Text(verbatim: row.key).font(.body.monospaced())
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(row.values.enumerated()), id: \.offset) { _, value in
+                            Text(verbatim: value).textSelection(.enabled)
+                        }
+                    }
+                    Text(label(for: row.source)).foregroundStyle(.secondary)
+                }
+            }
         }
     }
 

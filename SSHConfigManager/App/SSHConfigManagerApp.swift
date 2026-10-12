@@ -7,7 +7,7 @@ struct SSHConfigManagerApp: App {
     var body: some Scene {
         Window(String(localized: "app.title"), id: "main") {
             MainWindow(model: appDelegate.model)
-                .frame(minWidth: 760, minHeight: 480)
+                .frame(minWidth: 760, minHeight: 560)
                 .registersMainWindowOpener(appDelegate)
                 .themedBackground()
         }
