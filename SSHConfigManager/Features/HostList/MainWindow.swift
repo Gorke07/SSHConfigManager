@@ -38,6 +38,8 @@ struct MainWindow: View {
                 }
                 .disabled(model.store.loadState != .loaded)
             }
+            // Liquid Glass groups neighbouring items on one background: Add, then the tools, then Save.
+            ToolbarSpacer(.fixed, placement: .primaryAction)
             if !model.statusCounts.isEmpty {
                 ToolbarItem(placement: .status) {
                     StatusSummaryView(model: model)
@@ -83,6 +85,7 @@ struct MainWindow: View {
                 }
                 .help(String(localized: "toolbar.settings.help"))
             }
+            ToolbarSpacer(.fixed, placement: .primaryAction)
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     // An unapplied group draft is applied first; only blocked form edits need the warning.

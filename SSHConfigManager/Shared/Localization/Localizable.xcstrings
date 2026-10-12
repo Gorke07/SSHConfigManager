@@ -1957,7 +1957,7 @@
     "settings.knownHostsFile" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "known_hosts file" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "known_hosts File" } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "known_hosts dosyası" } }
       }
     },

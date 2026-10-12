@@ -6,12 +6,6 @@ struct OnboardingView: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        GlassEffectContainer {
-            steps
-        }
-    }
-
-    private var steps: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(String(localized: "onboarding.title")).font(.title2.bold())
             step(1, title: String(localized: "onboarding.addHost")) {
@@ -24,7 +18,9 @@ struct OnboardingView: View {
             step(3, title: String(localized: "onboarding.uploadKey")) { openWindow(id: "keys") }
         }
         .padding(32)
-        .glassEffect(in: .rect(cornerRadius: 24))
+        // Content layer: a standard material card. Liquid Glass stays on the step buttons only, so glass never
+        // sits on glass (Apple HIG, Materials).
+        .background(.regularMaterial, in: .rect(cornerRadius: 24))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -33,7 +29,7 @@ struct OnboardingView: View {
             Text(verbatim: String(number))
                 .font(.headline)
                 .frame(width: 28, height: 28)
-                .glassEffect(in: .circle)
+                .background(.fill.secondary, in: .circle)
                 .accessibilityHidden(true)
             Button(title, action: action)
                 .buttonStyle(.glass)

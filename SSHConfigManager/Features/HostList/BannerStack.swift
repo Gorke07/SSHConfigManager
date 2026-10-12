@@ -6,19 +6,22 @@ struct BannerStack: View {
     @Binding var showExternalDiff: Bool
     @Environment(\.openSettings) private var openSettings
     @State private var confirmReload = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let banners = BannerBuilder.banners(for: model.store)
-        Group {
-            if !banners.isEmpty {
-                VStack(spacing: 0) {
-                    ForEach(banners) { banner in
-                        row(for: banner)
-                        Divider()
-                    }
+        // One container: the cards render together and materialize in and out as file state changes. Its spacing
+        // stays below the 6 pt gap between cards so neighbouring cards do not merge at rest.
+        GlassEffectContainer(spacing: 2) {
+            VStack(spacing: 0) {
+                ForEach(banners) { banner in
+                    row(for: banner)
+                        .glassEffectTransition(.materialize)
                 }
             }
+            .padding(.bottom, banners.isEmpty ? 0 : 6)
         }
+        .animation(reduceMotion ? nil : .smooth(duration: 0.3), value: banners)
         .confirmationDialog(String(localized: "banner.external.reload.confirm.title"), isPresented: $confirmReload) {
             Button(String(localized: "banner.external.reload.confirm.action"), role: .destructive) { reload() }
         }
@@ -87,7 +90,8 @@ private struct BannerRow<Actions: View>: View {
             Text(message).frame(maxWidth: .infinity, alignment: .leading)
             actions()
         }
-        .buttonStyle(.glass)
+        // Bordered, not glass: the card is already glass and glass must not sit on glass.
+        .buttonStyle(.bordered)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .glassEffect(.regular.tint(tint.opacity(0.15)), in: .rect(cornerRadius: 14))
