@@ -67,7 +67,7 @@ Config dosyası, uygulamanın tek doğruluk kaynağıdır. Uygulama host bilgile
 
 ## Kurulum
 
-[Releases](https://github.com/Gorke07/SSHConfigManager/releases/latest) sayfasından en son `SSH-Config-Manager-<sürüm>.dmg` dosyasını indirin, açın ve **SSH Config Manager**'ı Uygulamalar klasörüne sürükleyin. Uygulama Developer ID ile imzalı ve Apple tarafından notarize edilmiştir; Gatekeeper uyarısı vermeden açılır.
+[Releases](https://github.com/messcenter/SSHConfigManager/releases/latest) sayfasından en son `SSH-Config-Manager-<sürüm>.dmg` dosyasını indirin, açın ve **SSH Config Manager**'ı Uygulamalar klasörüne sürükleyin. Uygulama Developer ID ile imzalı ve Apple tarafından notarize edilmiştir; Gatekeeper uyarısı vermeden açılır.
 
 İlk bağlantıda macOS, uygulamanın terminalinizi kontrol etmesi için izin ister. Bağlanmak için bu izin gerekir. İzni daha sonra **Sistem Ayarları → Gizlilik ve Güvenlik → Otomasyon** bölümünden değiştirebilirsiniz.
 
@@ -76,7 +76,7 @@ Config dosyası, uygulamanın tek doğruluk kaynağıdır. Uygulama host bilgile
 **Gereksinimler:** macOS 26, Xcode 27, [XcodeGen](https://github.com/yonaskolb/XcodeGen) ve `python3`.
 
 ```bash
-git clone https://github.com/Gorke07/SSHConfigManager.git
+git clone https://github.com/messcenter/SSHConfigManager.git
 cd SSHConfigManager
 xcodegen generate
 open SSHConfigManager.xcodeproj
