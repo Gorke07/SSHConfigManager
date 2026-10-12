@@ -10,7 +10,7 @@ private struct MainWindowOpener: ViewModifier {
     func body(content: Content) -> some View {
         content.onAppear {
             appDelegate.windowOpener = {
-                NSApp.setActivationPolicy(.regular)
+                DockIcon.showForWindow(appDelegate.model.settings)
                 openWindow(id: "main")
                 NSApp.activate()
             }

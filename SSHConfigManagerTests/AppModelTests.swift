@@ -29,6 +29,13 @@ struct AppModelTests {
         #expect(AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url).appearance == .system)
     }
 
+    @Test func dockIconIsShownByDefaultAndTheChoicePersists() throws {
+        let tmp = try TempDir()
+        #expect(AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url).showsInDock)
+        AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url).setShowsInDock(false)
+        #expect(!AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url).showsInDock)
+    }
+
     @Test func darkBackgroundIsASoftBlackAndLightKeepsTheSystemColor() throws {
         let dark = try #require(NSAppearance(named: .darkAqua))
         var components: (r: CGFloat, g: CGFloat, b: CGFloat) = (0, 0, 0)

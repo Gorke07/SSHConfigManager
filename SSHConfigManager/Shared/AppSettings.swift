@@ -15,6 +15,7 @@ final class AppSettings {
         static let backupCount = "backupCount"
         static let terminal = "terminal"
         static let appearance = "appearance"
+        static let showsInDock = "showsInDock"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -25,6 +26,8 @@ final class AppSettings {
     private(set) var backupCount: Int
     private(set) var terminal: TerminalChoice
     private(set) var appearance: AppAppearance
+    /// Off: menu bar only, no Dock icon even while a window is open.
+    private(set) var showsInDock: Bool
 
     init(defaults: UserDefaults = .standard, homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser) {
         self.defaults = defaults
@@ -36,6 +39,7 @@ final class AppSettings {
         backupCount = Self.clamp(defaults.object(forKey: Keys.backupCount) as? Int ?? Self.defaultBackupCount)
         terminal = TerminalChoice(rawValue: defaults.string(forKey: Keys.terminal) ?? "") ?? .terminal
         appearance = AppAppearance(rawValue: defaults.string(forKey: Keys.appearance) ?? "") ?? .system
+        showsInDock = defaults.object(forKey: Keys.showsInDock) as? Bool ?? true
     }
 
     var configURL: URL { Self.expand(configPath, home: homeDirectory) }
@@ -65,6 +69,11 @@ final class AppSettings {
     func setAppearance(_ choice: AppAppearance) {
         appearance = choice
         defaults.set(choice.rawValue, forKey: Keys.appearance)
+    }
+
+    func setShowsInDock(_ value: Bool) {
+        showsInDock = value
+        defaults.set(value, forKey: Keys.showsInDock)
     }
 
     /// Shows paths under the home directory with a leading "~".

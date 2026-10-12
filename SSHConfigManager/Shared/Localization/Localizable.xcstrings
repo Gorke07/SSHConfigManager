@@ -1681,6 +1681,20 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Koyu" } }
       }
     },
+    "settings.showsInDock" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show in Dock" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dock'ta göster" } }
+      }
+    },
+    "settings.showsInDock.note" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The app lives in the menu bar only: no Dock icon, even while a window is open. Open windows from the menu bar icon." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Uygulama yalnızca menü çubuğunda çalışır: pencere açıkken bile Dock simgesi görünmez. Pencereleri menü çubuğu simgesinden açabilirsiniz." } }
+      }
+    },
     "settings.configFile" : {
       "extractionState" : "manual",
       "localizations" : {

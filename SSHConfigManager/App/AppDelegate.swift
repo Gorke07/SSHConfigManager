@@ -61,7 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let window = object as? NSWindow, Self.isAppWindow(window) else { return }
                 // A pending login-launch guard closes the main window instead of showing the Dock icon.
                 if self.loginLaunchGuard != nil, window.identifier?.rawValue.hasPrefix("main") == true { return }
-                NSApp.setActivationPolicy(.regular)
+                DockIcon.showForWindow(self.model.settings)
             }
         })
         // Include files can be edited outside the app without the root file changing.
@@ -111,7 +111,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// A normal window that warrants a Dock icon: main-capable, and neither the quick connect
     /// panel nor the menu bar extra's window (both are panels).
-    private static func isAppWindow(_ window: NSWindow) -> Bool {
+    static func isAppWindow(_ window: NSWindow) -> Bool {
         window.canBecomeMain && !(window is NSPanel)
             && window.styleMask.contains(.titled) && window.level == .normal
             && !String(describing: type(of: window)).contains("MenuBarExtra")

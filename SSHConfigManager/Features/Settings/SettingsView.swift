@@ -107,7 +107,13 @@ struct SettingsView: View {
                 }
             }
             .pickerStyle(.segmented)
-        }
+            Toggle(String(localized: "settings.showsInDock"), isOn: Binding(
+                get: { model.settings.showsInDock },
+                set: { model.settings.setShowsInDock($0); DockIcon.settingChanged(model.settings) }
+            ))
+            if !model.settings.showsInDock {
+                Text(String(localized: "settings.showsInDock.note")).font(.footnote).foregroundStyle(.secondary)
+            }
         }
 
         Section(String(localized: "settings.connection")) {
