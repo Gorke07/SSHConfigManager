@@ -26,6 +26,7 @@ struct SettingsView: View {
     @State private var pendingPath: String?
     @State private var invalidMessage: String?
     @State private var loginItem = LoginItemToggle(item: MainAppLoginItem())
+    @State private var pendingAppearance: Task<Void, Never>?
 
     @AppStorage(SettingsTab.storageKey) private var tab: SettingsTab = .general
 
@@ -105,7 +106,7 @@ struct SettingsView: View {
                 Spacer()
                 AppearancePicker(selection: Binding(
                     get: { model.settings.appearance },
-                    set: { model.settings.setAppearance($0); $0.apply(animated: true) }
+                    set: { model.settings.setAppearance($0); applyAppearanceAfterSlide() }
                 ))
                 .accessibilityLabel(String(localized: "settings.appearance"))
             }
@@ -224,6 +225,19 @@ struct SettingsView: View {
                 Text(String(localized: "settings.backups.count \(count)"))
             }
             Button(String(localized: "settings.backups.show")) { openWindow(id: "backups") }
+        }
+    }
+
+    /// The theme cross-fades once the picker's glass thumb has mostly settled, so the fade's first frame already
+    /// shows the new selection. Quick repeated clicks apply only the last choice.
+    private func applyAppearanceAfterSlide() {
+        pendingAppearance?.cancel()
+        // With Reduce Motion the thumb does not slide, so there is nothing to wait for.
+        let delay: Duration = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? .zero : .milliseconds(200)
+        pendingAppearance = Task {
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled else { return }
+            await model.settings.appearance.applyWithTransition()
         }
     }
 
