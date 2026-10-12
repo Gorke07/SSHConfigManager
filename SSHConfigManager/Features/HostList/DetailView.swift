@@ -82,10 +82,11 @@ private struct HostEditorContainer: View {
                     if let entry = SidebarBuilder.hostEntry(for: editor.item, in: model.store.document) {
                         // Patterns have no group; they get the IdentityFile checks only.
                         if !entry.isPattern { HostGroupRow(model: model, item: editor.item) }
-                        LintIssuesList(issues: model.lintIssues(for: editor.item))
+                        LintIssuesList(issues: model.lintIssues(for: editor.item).filter(\.isHostWarning))
                         Divider()
                     }
-                    HostEditorView(editor: editor, homeDirectory: model.settings.homeDirectory, keys: model.keys) { model.resetEditor() }
+                    HostEditorView(editor: editor, homeDirectory: model.settings.homeDirectory, keys: model.keys,
+                                   unencryptedKeys: model.unencryptedIdentityFiles(for: editor.item)) { model.resetEditor() }
                 }
             } else {
                 ContentUnavailableView(String(localized: "edit.hostNotFound"), systemImage: "questionmark")

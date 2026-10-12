@@ -8,8 +8,8 @@ struct SidebarView: View {
     var body: some View {
         let sections = SidebarBuilder.sections(
             document: model.store.document, included: model.store.includedHosts, search: model.searchText)
-        // One lint pass per render, not one per row.
-        let lint = model.lintIssueMap()
+        // One lint pass per render, not one per row. Key hints stay on the editor's IdentityFile rows.
+        let lint = model.lintIssueMap().mapValues { $0.filter(\.isHostWarning) }
         let onlyUnnamed = sections.hostGroups.allSatisfy { $0.name == nil }
         let filterName = model.statusFilter?.localizedName
         List(selection: Binding(get: { model.selection }, set: { new in

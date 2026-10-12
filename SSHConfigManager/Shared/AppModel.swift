@@ -650,6 +650,14 @@ final class AppModel {
         return lintIssueMap()[item] ?? []
     }
 
+    /// IdentityFile values (as written) of this host that name a private key without a passphrase.
+    /// The editor marks those rows; the sidebar and the detail header leave this hint out.
+    func unencryptedIdentityFiles(for item: SidebarItem) -> Set<String> {
+        Set(lintIssues(for: item).compactMap {
+            if case .unencryptedKey(let path) = $0 { path } else { nil }
+        })
+    }
+
     /// The group the selected host's block has in the document.
     func savedGroup(for item: SidebarItem) -> String {
         guard let entry = SidebarBuilder.hostEntry(for: item, in: store.document) else { return "" }
@@ -903,5 +911,13 @@ private final class KeyReadMemo: @unchecked Sendable {
         let value = reader(url)
         cache[url] = value
         return value
+    }
+}
+
+extension HostIssue {
+    /// A host-level warning (sidebar badge, detail header). A key without a passphrase is a hint on its
+    /// IdentityFile row instead: the host itself works, and the same key would otherwise warn on every host using it.
+    var isHostWarning: Bool {
+        if case .unencryptedKey = self { false } else { true }
     }
 }

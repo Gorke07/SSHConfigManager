@@ -579,6 +579,16 @@ struct AppModelTests {
         #expect(model.store.document.hosts.count == 1)
     }
 
+    @Test func unencryptedKeysAreRowHintsNotHostWarnings() throws {
+        let tmp = try TempDir()
+        _ = try tmp.file(".ssh/id_a", "x")
+        let model = makeTestModel(tmp, config: "Host a\n  IdentityFile ~/.ssh/id_a\n  IdentityFile ~/.ssh/missing\n")
+        model.keyEncryptionReader = { _ in .unencrypted }
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        #expect(model.unencryptedIdentityFiles(for: a) == ["~/.ssh/id_a"])
+        #expect(model.lintIssues(for: a).filter(\.isHostWarning) == [.missingIdentityFile("~/.ssh/missing")])
+    }
+
     @Test func invalidateLintForcesAFreshRead() throws {
         let tmp = try TempDir()
         let model = makeTestModel(tmp, config: "Host a\n  IdentityFile ~/.ssh/id_a\n")
