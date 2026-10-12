@@ -152,7 +152,7 @@ final class AppModel {
     }
 
     static func liveKnownHostsStore(url: URL, backups: BackupManager, backupKind: String) -> KnownHostsStore {
-        KnownHostsStore(fileURL: url, writer: SafeFileWriter(backups: backups), backupKind: backupKind)
+        KnownHostsStore(fileURL: url, writer: SafeFileWriter(backups: backups), backupKind: backupKind, loadsInBackground: true)
     }
 
     /// "config" for ~/.ssh/config; otherwise a stable per-path kind so backups of different files never mix.

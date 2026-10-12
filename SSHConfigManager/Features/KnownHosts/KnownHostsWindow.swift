@@ -9,8 +9,11 @@ struct KnownHostsWindow: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if let message = Messages.knownHostsLoadText(for: model.app.knownHosts.loadState) {
+        // Computed once per render: the table and the empty overlay share it.
+        let rows = model.rows
+        let loadingFirstTime = model.isLoadingFirstTime
+        return VStack(spacing: 0) {
+            if !loadingFirstTime, let message = Messages.knownHostsLoadText(for: model.app.knownHosts.loadState) {
                 Text(verbatim: message)
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -18,7 +21,7 @@ struct KnownHostsWindow: View {
                     .padding(10)
                     .background(.quaternary)
             }
-            Table(model.rows, selection: $model.selection) {
+            Table(rows, selection: $model.selection) {
                 TableColumn(String(localized: "knownHosts.column.host")) { row in
                     HStack(spacing: 4) {
                         if row.isUnparsable {
@@ -41,7 +44,9 @@ struct KnownHostsWindow: View {
                     .width(min: 60, ideal: 110)
             }
             .overlay {
-                if model.rows.isEmpty {
+                if loadingFirstTime {
+                    ProgressView()
+                } else if rows.isEmpty {
                     ContentUnavailableView(String(localized: "knownHosts.empty"), systemImage: "checkmark.shield")
                 }
             }

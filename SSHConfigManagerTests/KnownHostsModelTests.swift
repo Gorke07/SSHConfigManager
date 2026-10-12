@@ -233,4 +233,58 @@ struct KnownHostsModelTests {
         model.searchText = "db.example.com:22"
         #expect(model.rows.isEmpty)
     }
+
+    private func storage(_ rows: [KnownHostRow]) -> UnsafeRawPointer? {
+        rows.withUnsafeBufferPointer { UnsafeRawPointer($0.baseAddress) }
+    }
+
+    /// Rows (a SHA-256 per key) are built once per revision, and the search result once per query.
+    @Test func rowsAreBuiltOncePerRevisionAndQuery() throws {
+        let tmp = try TempDir()
+        let model = make(tmp)
+        let all = model.allRows
+        #expect(storage(model.allRows) == storage(all))
+        #expect(storage(model.rows) == storage(all))
+        model.selection = [0]
+        _ = model.canRemoveSelection
+        #expect(storage(model.allRows) == storage(all))
+        model.searchText = "web."
+        let searched = model.rows
+        #expect(searched.map(\.id) == [0])
+        #expect(storage(model.rows) == storage(searched))
+        #expect(storage(model.allRows) == storage(all))
+    }
+
+    @Test func cachedRowsFollowReloadsAndStoreSwaps() throws {
+        let tmp = try TempDir()
+        let model = make(tmp)
+        model.searchText = "example.com"
+        #expect(model.rows.map(\.id) == [0, 1, 2])
+        try tmp.file(".ssh/known_hosts", "new.example.com ssh-ed25519 \(Self.ed)\n")
+        model.app.knownHosts.load()
+        #expect(model.rows.map(\.hosts) == ["new.example.com"])
+        let otherURL = try tmp.file("other_known_hosts", "other.example.com ssh-ed25519 \(Self.ed)\nx.example.com ssh-ed25519 \(Self.ed)\n")
+        #expect(model.app.switchKnownHosts(to: otherURL.path))
+        #expect(model.rows.map(\.hosts) == ["other.example.com", "x.example.com"])
+        model.searchText = ""
+        #expect(model.allRows.count == 2)
+    }
+
+    /// While a background read runs, the rows on screen may be about to change: delete waits for it.
+    @Test func deleteIsOffWhileTheFileIsBeingRead() async throws {
+        let tmp = try TempDir()
+        let model = make(tmp)
+        model.selection = [0]
+        #expect(model.canRemoveSelection)
+        model.app.knownHosts.reload()
+        #expect(model.app.knownHosts.isLoading)
+        #expect(!model.canRemoveSelection)
+        model.requestRemoveSelection()
+        #expect(model.pendingRemoval == nil)
+        #expect(!model.isLoadingFirstTime)   // a reload keeps showing the previous rows
+        await model.app.knownHosts.waitForLoad()
+        #expect(model.rows.map(\.id) == [0, 1, 2, 3, 4])
+        model.selection = [0]
+        #expect(model.canRemoveSelection)
+    }
 }
