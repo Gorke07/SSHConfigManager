@@ -3,6 +3,41 @@
     <channel>
         <title>SSH Config Manager</title>
         <item>
+            <title>0.3.1</title>
+            <pubDate>Mon, 12 Oct 2026 10:47:37 +0300</pubDate>
+            <link>https://github.com/messcenter/SSHConfigManager/releases</link>
+            <sparkle:version>4</sparkle:version>
+            <sparkle:shortVersionString>0.3.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <description xml:lang="en" sparkle:format="markdown"><![CDATA[### Interface improvements
+
+Liquid Glass use was reviewed against Apple's current [Adopting Liquid Glass](https://developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass) and [Materials](https://developer.apple.com/design/human-interface-guidelines/materials) guidelines.
+
+- **Appearance picker:** Settings → General → Appearance is now a glass control. The glass behind the selected segment slides to the option you click.
+- **Smooth theme change:** Changing the appearance cross-fades every open window to the new look in one piece; the sidebar, toolbar and glass change together with the forms. The fade starts once the glass has slid to the new option. With Reduce Motion on, the change applies at once. No screen recording permission is needed.
+- **Banners:** Warning banners appear and disappear smoothly in one glass group. Buttons inside a banner are bordered instead of glass, so glass no longer sits on glass.
+- **Connection status:** The status capsule appears smoothly when a test starts, and its color animates when the result arrives.
+- **Toolbar:** The main window's toolbar is split into separate glass groups: Add Host, the tools (Test All, Known Hosts, Keys, Settings) and Save.
+- **Welcome screen:** The card uses a standard material that suits the content layer. Glass stays on the step buttons only.
+- **Section header:** The "known_hosts File" header in Settings → Files is capitalized like the other headers.
+
+]]></description>
+            <description xml:lang="tr" sparkle:format="markdown"><![CDATA[### Arayüz iyileştirmeleri
+
+Liquid Glass kullanımı Apple'ın güncel [Liquid Glass benimseme](https://developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass) ve [Materials](https://developer.apple.com/design/human-interface-guidelines/materials) yönergelerine göre gözden geçirildi.
+
+- **Görünüm seçici:** Ayarlar → Genel → Görünüm artık glass bir kontrol. Seçili segmentin glass zemini tıklanan seçeneğe kayarak geçer.
+- **Yumuşak tema geçişi:** Görünüm değiştirildiğinde açık pencerelerin hepsi tek parça halinde yeni temaya geçer; sidebar, toolbar ve glass öğeler formlarla aynı anda değişir. Geçiş, glass zemin seçeneğe kaydıktan sonra başlar. "Hareketi azalt" açıksa değişiklik anında uygulanır. Ekran kaydı izni gerekmez.
+- **Bantlar:** Uyarı bantları tek bir glass grubunda yumuşakça belirir ve kaybolur. Bant içindeki butonlar glass yerine çerçeveli; glass üstüne glass binmiyor.
+- **Bağlantı durumu:** Test başlayınca durum kapsülü yumuşakça belirir, sonuç gelince rengi animasyonla değişir.
+- **Toolbar:** Ana pencerenin toolbar'ı ayrı glass gruplarına bölündü: Host ekle, araçlar (Tümünü Test Et, Known Hosts, Anahtarlar, Ayarlar) ve Kaydet.
+- **Karşılama ekranı:** Kart, içerik katmanına uygun standart bir materyal kullanıyor. Glass yalnızca adım butonlarında kaldı.
+- **Bölüm başlığı:** Ayarlar → Dosyalar'daki "known_hosts File" başlığı diğer başlıklar gibi büyük harfle başlıyor (İngilizce arayüz).
+
+]]></description>
+            <enclosure url="https://github.com/messcenter/SSHConfigManager/releases/download/v0.3.1/SSH-Config-Manager-0.3.1.dmg" length="6553007" type="application/octet-stream" sparkle:edSignature="q//kzrQLX5qi52McyBCP52ng48ZEXDhc3BwXMaviSY4zo8NvCnfIq7ElJA0QMKSIcc5UozhWtFIBQliVoEC2CQ=="/>
+        </item>
+        <item>
             <title>0.3.0</title>
             <pubDate>Mon, 12 Oct 2026 09:56:31 +0300</pubDate>
             <link>https://github.com/messcenter/SSHConfigManager/releases</link>
