@@ -95,7 +95,7 @@ struct AppModelTests {
         let a = SidebarItem.host(alias: "a", occurrence: 0)
         model.select(a)
         let editor = try #require(model.editor(for: a))
-        editor.fields["Port"] = "abc"
+        editor.fields["Port"] = "99999"
         #expect(!editor.commit())
         #expect(model.hasPendingFormEdits)
         #expect(!model.store.hasUnsavedChanges)
@@ -187,7 +187,7 @@ struct AppModelTests {
         model.select(a)
         let token = model.editorToken
         let editor = try #require(model.editor(for: a))
-        editor.fields["Port"] = "abc"
+        editor.fields["Port"] = "99999"
         #expect(!editor.commit())
         #expect(model.hasPendingFormEdits)
 
@@ -228,7 +228,7 @@ struct AppModelTests {
         model.select(a)
         let first = try #require(model.editor(for: a))
         #expect(model.editor(for: a) === first)
-        first.fields["Port"] = "abc"
+        first.fields["Port"] = "99999"
         #expect(!first.commit())
 
         // Window closed and reopened: the view asks again with the same token.
@@ -236,7 +236,7 @@ struct AppModelTests {
         #expect(again === first)
         #expect(again.hasPendingChanges)
         #expect(model.hasPendingFormEdits)
-        #expect(again.fields["Port"] == "abc")
+        #expect(again.fields["Port"] == "99999")
     }
 
     @Test func selectingOrResettingDropsTheEditor() throws {
@@ -246,7 +246,7 @@ struct AppModelTests {
         let b = SidebarItem.host(alias: "b", occurrence: 0)
         model.select(a)
         let first = try #require(model.editor(for: a))
-        first.fields["Port"] = "abc"
+        first.fields["Port"] = "99999"
         _ = first.commit()
         model.select(b)
         #expect(model.activeEditor == nil)
@@ -764,7 +764,7 @@ struct AppModelTests {
     private func blockedEditor(_ model: AppModel, _ item: SidebarItem) throws {
         model.select(item)
         let editor = try #require(model.editor(for: item))
-        editor.fields["Port"] = "abc"
+        editor.fields["Port"] = "99999"
         #expect(!editor.commit())
         #expect(model.hasPendingFormEdits)
     }

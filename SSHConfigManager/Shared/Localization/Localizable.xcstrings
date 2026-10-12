@@ -673,6 +673,13 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "“%@” için bir değer gerekli." } }
       }
     },
+    "issue.valueStartsComment %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The “%@” value contains “#” at the start of a word; ssh reads the rest as a comment. Put that part in double quotes." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "“%@” değerinde bir sözcüğün başında “#” var; ssh gerisini yorum olarak okur. O kısmı çift tırnak içine alın." } }
+      }
+    },
     "issue.identityFileMissing %@" : {
       "extractionState" : "manual",
       "localizations" : {

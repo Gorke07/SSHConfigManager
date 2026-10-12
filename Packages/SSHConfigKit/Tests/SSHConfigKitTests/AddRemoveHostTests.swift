@@ -159,4 +159,16 @@ struct EditGuardTests {
         #expect(throws: ConfigEditError.invalidAlias(alias)) { try doc.duplicateHost(at: 0, newAlias: alias) }
         #expect(doc.render() == Self.source)
     }
+
+    @Test func removeLastHostOfCRLFFileWithoutFinalNewlineLeavesNoBareCR() throws {
+        var doc = ConfigDocument(parsing: "Host a\r\n  User x\r\n\r\nHost b\r\n  User y")
+        try doc.removeHost(at: 3)
+        #expect(doc.render() == "Host a\r\n  User x")
+    }
+
+    @Test func removeLastHostOfCRLFFileWithFinalNewlineKeepsCRLF() throws {
+        var doc = ConfigDocument(parsing: "Host a\r\n  User x\r\n\r\nHost b\r\n  User y\r\n")
+        try doc.removeHost(at: 3)
+        #expect(doc.render() == "Host a\r\n  User x\r\n")
+    }
 }

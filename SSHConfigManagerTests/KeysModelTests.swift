@@ -71,7 +71,7 @@ struct KeysModelTests {
         let item = SidebarItem.host(alias: "web", occurrence: 0)
         model.select(item)
         let editor = try #require(model.editor(for: item))
-        editor.fields["Port"] = "abc"
+        editor.fields["Port"] = "99999"
         #expect(!editor.commit())
         #expect(model.hasPendingFormEdits)
         #expect(await model.keys.generate(type: .ed25519, fileName: "deploy", comment: "c", passphrase: "", assignTo: "web") == false)
@@ -208,7 +208,7 @@ struct KeysModelTests {
         let keys = model.keys
         let task = Task { await keys.generate(type: .ed25519, fileName: "deploy", comment: "c", passphrase: "", assignTo: "web") }
         await keygen.waitUntilEntered()          // ssh-keygen is running (suspended); the main actor is free
-        editor.fields["Port"] = "abc"            // dirty the form while the key is being made
+        editor.fields["Port"] = "99999"            // dirty the form while the key is being made
         #expect(!editor.commit())
         keygen.release()
         #expect(await task.value == true)
