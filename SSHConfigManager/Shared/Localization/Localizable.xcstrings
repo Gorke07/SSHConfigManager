@@ -1828,6 +1828,41 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Giriş Öğelerini Aç" } }
       }
     },
+    "settings.updates" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Updates" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Güncellemeler" } }
+      }
+    },
+    "settings.updates.automaticCheck" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Automatically check for updates" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Güncellemeleri otomatik denetle" } }
+      }
+    },
+    "settings.updates.automaticDownload" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Automatically download and install updates" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Güncellemeleri otomatik indir ve yükle" } }
+      }
+    },
+    "settings.updates.version %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Version %@" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Sürüm %@" } }
+      }
+    },
+    "update.check" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Check for Updates…" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Güncellemeleri Denetle…" } }
+      }
+    },
     "settings.language" : {
       "extractionState" : "manual",
       "localizations" : {

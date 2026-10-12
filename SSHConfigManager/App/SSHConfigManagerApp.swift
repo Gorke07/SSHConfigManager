@@ -15,10 +15,12 @@ struct SSHConfigManagerApp: App {
             HostCommandMenu(model: appDelegate.model, openMainWindow: { appDelegate.openMainWindow?() })
             CommandGroup(replacing: .appInfo) {
                 Button(String(localized: "about.menu")) { AboutPanel.show() }
+                Button(String(localized: "update.check")) { appDelegate.updater.checkForUpdates() }
+                    .disabled(!appDelegate.updater.canCheckForUpdates)
             }
         }
         Settings {
-            SettingsView(model: appDelegate.model)
+            SettingsView(model: appDelegate.model, updater: appDelegate.updater)
                 .registersMainWindowOpener(appDelegate)
                 .themedBackground()
         }

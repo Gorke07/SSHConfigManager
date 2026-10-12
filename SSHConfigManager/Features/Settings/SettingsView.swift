@@ -17,6 +17,7 @@ enum SettingsTab: String {
 
 struct SettingsView: View {
     @Bindable var model: AppModel
+    let updater: AppUpdater
     @Environment(\.openWindow) private var openWindow
     private enum ImportTarget { case config, knownHosts }
     @State private var importing = false
@@ -41,7 +42,7 @@ struct SettingsView: View {
             }
         }
         .frame(width: 640)
-        .onAppear { loginItem.refresh() }
+        .onAppear { loginItem.refresh(); updater.refreshSettings() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in loginItem.refresh() }
         .fileImporter(
             isPresented: $importing,
@@ -139,6 +140,23 @@ struct SettingsView: View {
                 Text(message).font(.footnote).foregroundStyle(.red)
             }
             KeyboardShortcuts.Recorder(String(localized: "settings.shortcut"), name: .quickConnect)
+        }
+
+        Section(String(localized: "settings.updates")) {
+            Toggle(String(localized: "settings.updates.automaticCheck"), isOn: Binding(
+                get: { updater.automaticallyChecksForUpdates },
+                set: { updater.setAutomaticallyChecksForUpdates($0) }
+            ))
+            Toggle(String(localized: "settings.updates.automaticDownload"), isOn: Binding(
+                get: { updater.automaticallyDownloadsUpdates },
+                set: { updater.setAutomaticallyDownloadsUpdates($0) }
+            ))
+            .disabled(!updater.automaticallyChecksForUpdates)
+            let version = AppUpdater.currentVersion
+            LabeledContent(String(localized: "settings.updates.version \(version)")) {
+                Button(String(localized: "update.check")) { updater.checkForUpdates() }
+                    .disabled(!updater.canCheckForUpdates)
+            }
         }
 
         Section(String(localized: "settings.language")) {

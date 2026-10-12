@@ -69,6 +69,8 @@ Config dosyası, uygulamanın tek doğruluk kaynağıdır. Uygulama host bilgile
 
 [Releases](https://github.com/messcenter/SSHConfigManager/releases/latest) sayfasından en son `SSH-Config-Manager-<sürüm>.dmg` dosyasını indirin, açın ve **SSH Config Manager**'ı Uygulamalar klasörüne sürükleyin. Uygulama Developer ID ile imzalı ve Apple tarafından notarize edilmiştir; Gatekeeper uyarısı vermeden açılır.
 
+Uygulama yeni sürümleri kendisi bulur ve kurar ([Sparkle](https://sparkle-project.org)). İkinci açılışta otomatik denetleme için izin ister; bu seçenek ve otomatik indirme, **Ayarlar → Genel → Güncellemeler** bölümünden değiştirilebilir. **Güncellemeleri Denetle…** komutu uygulama menüsünde ve aynı bölümde bulunur. Otomatik güncelleme 0.3.0 ile geldi; daha eski bir sürümü kullanıyorsanız bir kez elle güncellemeniz gerekir.
+
 İlk bağlantıda macOS, uygulamanın terminalinizi kontrol etmesi için izin ister. Bağlanmak için bu izin gerekir. İzni daha sonra **Sistem Ayarları → Gizlilik ve Güvenlik → Otomasyon** bölümünden değiştirebilirsiniz.
 
 ## Kaynaktan derleme
@@ -104,7 +106,7 @@ TEAM_ID=<TEAMID> NOTARY_PROFILE=sshcm-notary \
 scripts/build-release.sh
 ```
 
-Bu komut imzalı ve notarize edilmiş `build/SSH-Config-Manager-<sürüm>.dmg` dosyasını üretir. `SIGN_IDENTITY` verilmezse yalnızca bu Mac'te denemek için ad-hoc imzalı bir kopya üretilir. Ayrıntılar ve sürüm öncesi kontrol listesi için [docs/design/release.md](docs/design/release.md) dosyasına bakın.
+Bu komut imzalı ve notarize edilmiş `build/SSH-Config-Manager-<sürüm>.dmg` dosyasını üretir, `appcast.xml` dosyasına (Sparkle güncelleme beslemesi) yeni sürümü `CHANGELOG.en.md` ve `CHANGELOG.md`'deki İngilizce ve Türkçe notlarıyla ekler ve yayımlama komutlarını yazdırır. `SIGN_IDENTITY` verilmezse yalnızca bu Mac'te denemek için ad-hoc imzalı bir kopya üretilir. Ayrıntılar ve sürüm öncesi kontrol listesi için [docs/design/release.md](docs/design/release.md) dosyasına bakın.
 
 ## Proje yapısı
 
@@ -131,12 +133,13 @@ SSHConfigManager/
 └── docs/design/                Tasarım dokümanları, planlar, el ile test listesi
 ```
 
-Uygulamanın tek dış bağımlılığı [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) paketidir (MIT). `SSHConfigKit` paketinin hiç dış bağımlılığı yoktur.
+Uygulamanın dış bağımlılıkları [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) (MIT) ve [Sparkle](https://github.com/sparkle-project/Sparkle) (MIT) paketleridir. `SSHConfigKit` paketinin hiç dış bağımlılığı yoktur.
 
 ## Gizlilik ve izinler
 
 - Uygulama sandbox dışında çalışır, çünkü `~/.ssh` dizinine erişmesi, `ssh`/`ssh-keygen` çalıştırması ve terminalleri Apple Events ile kontrol etmesi gerekir.
 - Hiçbir veriyi dışarı göndermez. Ayarlar, favoriler ve son bağlanılanlar yalnızca bu Mac'teki `UserDefaults` içinde tutulur.
+- Tek ağ isteği güncelleme denetimidir: uygulama GitHub'daki `appcast.xml` dosyasını okur, yeni sürüm varsa DMG'yi GitHub Releases'ten indirir. Sistem bilgisi gönderilmez. Güncellemeler EdDSA imzası ve Developer ID imzasıyla doğrulanmadan kurulmaz.
 - Config dosyasına uygulamaya özgü tek ekleme, isteğe bağlı `# group:` yorum satırlarıdır.
 
 ## Yerelleştirme

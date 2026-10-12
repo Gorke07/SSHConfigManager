@@ -6,6 +6,7 @@ import SSHConfigKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let model: AppModel = AppDelegate.makeModel()
+    let updater = AppUpdater()
     /// Set by every scene (registersMainWindowOpener); reopens it when the Dock icon is clicked or after a failed quit-save.
     var windowOpener: (() -> Void)?
     /// Opening the main window on the user's behalf (menu bar, Dock, panel, quit-save) also disarms the login

@@ -1,6 +1,16 @@
 # Değişiklik Günlüğü
 
-Bu projedeki önemli değişiklikler bu dosyada tutulur. Biçim [Keep a Changelog](https://keepachangelog.com/tr-TR/1.1.0/) yapısını izler, sürümler [Semantic Versioning](https://semver.org/lang/tr/) kurallarına uyar.
+Bu projedeki önemli değişiklikler bu dosyada tutulur; İngilizcesi [CHANGELOG.en.md](CHANGELOG.en.md) dosyasındadır ve iki dosya aynı değişiklikleri listeler. Biçim [Keep a Changelog](https://keepachangelog.com/tr-TR/1.1.0/) yapısını izler, sürümler [Semantic Versioning](https://semver.org/lang/tr/) kurallarına uyar.
+
+## [Yayımlanmamış]
+
+### Yeni özellikler
+
+- **Otomatik güncelleme:** Uygulama yeni sürümleri [Sparkle](https://sparkle-project.org) ile kendisi bulur, sürüm notlarını gösterir ve tek tıkla kurar. Güncellemeler EdDSA ve Developer ID imzalarıyla doğrulanmadan kurulmaz.
+  - Uygulama menüsünde ve Ayarlar → Genel → Güncellemeler bölümünde **Güncellemeleri Denetle…** komutu var.
+  - Aynı bölümde otomatik denetleme ve otomatik indirip kurma seçenekleri ile kurulu sürüm görünür.
+  - Otomatik denetleme için izin ikinci açılışta istenir; denetim günde bir kez yapılır.
+- **Hakkında penceresi:** Üçüncü taraf lisanslarına Sparkle'ın lisansı eklendi.
 
 ## [0.2.0] - 2026-10-12
 
@@ -82,5 +92,6 @@ Büyük config dosyalarında (2.000 Host bloğu, 50.000 satırlık known_hosts, 
 - **Gruplar:** `# group:` yorumlarıyla host gruplama.
 - İngilizce ve Türkçe arayüz.
 
+[Yayımlanmamış]: https://github.com/messcenter/SSHConfigManager/compare/v0.2.0...HEAD
 [0.2.0]: https://github.com/messcenter/SSHConfigManager/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/messcenter/SSHConfigManager/releases/tag/v0.1.0
