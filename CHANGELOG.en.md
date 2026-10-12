@@ -2,7 +2,7 @@
 
 Notable changes to this project are recorded here; this is the English edition of [CHANGELOG.md](CHANGELOG.md) (Turkish), and the two list the same changes. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.3.0] - 2026-10-12
 
 ### New features
 
@@ -92,6 +92,6 @@ First release.
 - **Groups:** Host groups with `# group:` comments.
 - English and Turkish interface.
 
-[Unreleased]: https://github.com/messcenter/SSHConfigManager/compare/v0.2.0...HEAD
+[0.3.0]: https://github.com/messcenter/SSHConfigManager/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/messcenter/SSHConfigManager/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/messcenter/SSHConfigManager/releases/tag/v0.1.0

@@ -2,7 +2,7 @@
 
 Bu projedeki önemli değişiklikler bu dosyada tutulur; İngilizcesi [CHANGELOG.en.md](CHANGELOG.en.md) dosyasındadır ve iki dosya aynı değişiklikleri listeler. Biçim [Keep a Changelog](https://keepachangelog.com/tr-TR/1.1.0/) yapısını izler, sürümler [Semantic Versioning](https://semver.org/lang/tr/) kurallarına uyar.
 
-## [Yayımlanmamış]
+## [0.3.0] - 2026-10-12
 
 ### Yeni özellikler
 
@@ -92,6 +92,6 @@ Büyük config dosyalarında (2.000 Host bloğu, 50.000 satırlık known_hosts, 
 - **Gruplar:** `# group:` yorumlarıyla host gruplama.
 - İngilizce ve Türkçe arayüz.
 
-[Yayımlanmamış]: https://github.com/messcenter/SSHConfigManager/compare/v0.2.0...HEAD
+[0.3.0]: https://github.com/messcenter/SSHConfigManager/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/messcenter/SSHConfigManager/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/messcenter/SSHConfigManager/releases/tag/v0.1.0
