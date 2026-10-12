@@ -54,9 +54,24 @@ struct ConnectionBar: View {
     }
 
     private var buttons: some View {
+        // One container so neighbouring glass shapes blend and morph together.
+        GlassEffectContainer(spacing: 8) {
+            row
+        }
+    }
+
+    private var row: some View {
         HStack {
             if let alias {
-                ConnectionStatusBadge(model: model.connectionTests, alias: alias, showsTitle: true, showsDetailInHelp: false)
+                let tests = model.connectionTests
+                if tests.running.contains(alias) || tests.results[alias] != nil {
+                    let tint = tests.running.contains(alias) ? Color.clear
+                        : tests.results[alias].map { ConnectionStatusStyle.style(for: $0.status).tint } ?? .clear
+                    ConnectionStatusBadge(model: tests, alias: alias, showsTitle: true, showsDetailInHelp: false)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .glassEffect(.regular.tint(tint.opacity(0.18)), in: .capsule)
+                }
                 if let detail = model.connectionTests.results[alias]?.detail, !detail.isEmpty {
                     Text(verbatim: detail).font(.caption).foregroundStyle(.secondary).lineLimit(1).textSelection(.enabled)
                 }
@@ -64,6 +79,8 @@ struct ConnectionBar: View {
                     Button(String(localized: "action.removeKnownHost")) {
                         model.startHostKeyRemoval(alias: alias)
                     }
+                    .buttonStyle(.glass)
+                    .tint(.red)
                 }
             }
             Spacer()
@@ -73,7 +90,8 @@ struct ConnectionBar: View {
                 Button { model.toggleFavorite(alias) } label: {
                     Image(systemName: isFavorite ? "star.fill" : "star").foregroundStyle(isFavorite ? .yellow : .secondary)
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
                 .help(title)
                 .accessibilityLabel(title)
             }
@@ -81,11 +99,12 @@ struct ConnectionBar: View {
                 guard let alias else { return }
                 Task { await model.test(alias: alias) }
             }
+            .buttonStyle(.glass)
             .disabled(alias == nil || model.connectionTests.running.contains(alias ?? ""))
             Button(String(localized: "action.connect")) {
                 if let alias { Task { await model.connect(alias: alias) } }
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.glassProminent)
             .help(String(localized: "action.connect.help"))
             .disabled(alias == nil || model.launchInFlight)
         }

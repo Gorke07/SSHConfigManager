@@ -139,9 +139,10 @@ struct QuickConnectView: View {
             Spacer()
             Text(verbatim: entry.group.map { "\($0) · \(entry.subtitle)" } ?? entry.subtitle).foregroundStyle(.secondary).lineLimit(1)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 6)
         .padding(.vertical, 6)
-        .background(selected ? Color.accentColor.opacity(0.2) : Color.clear)
+        .modifier(RowHighlight(selected: selected))
+        .padding(.horizontal, 6)
         .contentShape(Rectangle())
         .onTapGesture {
             model.select(entry)
@@ -151,8 +152,48 @@ struct QuickConnectView: View {
 
     private func footerButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(title, action: action)
-            .buttonStyle(.plain)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
+            .buttonStyle(MenuItemButtonStyle())
+    }
+}
+
+/// Host rows: the keyboard selection keeps its accent tint; the pointer adds a light highlight like a menu row.
+/// Hover state lives here, not in QuickConnectView, so moving the pointer does not recompute the entry list.
+private struct RowHighlight: ViewModifier {
+    let selected: Bool
+    @State private var hovering = false
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(selected ? Color.accentColor.opacity(0.2) : hovering ? Color.primary.opacity(0.08) : Color.clear))
+            .onHover { hovering = $0 }
+    }
+}
+
+/// Footer actions drawn like native menu items: full width, accent highlight with white text under the pointer.
+private struct MenuItemButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        MenuItemLabel(configuration: configuration)
+    }
+}
+
+private struct MenuItemLabel: View {
+    let configuration: ButtonStyleConfiguration
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var hovering = false
+
+    var body: some View {
+        let highlighted = hovering && isEnabled
+        configuration.label
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .foregroundStyle(highlighted ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(highlighted ? Color.accentColor.opacity(configuration.isPressed ? 0.8 : 1) : Color.clear))
+            .contentShape(Rectangle())
+            .onHover { hovering = $0 }
     }
 }

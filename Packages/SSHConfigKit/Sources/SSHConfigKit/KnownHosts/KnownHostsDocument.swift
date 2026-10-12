@@ -74,7 +74,9 @@ public struct KnownHostsDocument: Sendable {
 
     static func classify(_ content: String, lineIndex: Int) -> KnownHostsLineKind {
         if content.unicodeScalars.first == "\u{FEFF}" { return .unparsable }
-        let tokens = content.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
+        let tokens = isASCII(content)
+            ? content.utf8.split(whereSeparator: { $0 == 0x20 || $0 == 0x09 }).map { String(Substring($0)) }
+            : content.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
         guard let first = tokens.first else { return .blank }
         if first.unicodeScalars.first == "#" { return .comment }
 
@@ -99,7 +101,7 @@ public struct KnownHostsDocument: Sendable {
     static func parseNames(_ field: String) -> [KnownHostName]? {
         if field.unicodeScalars.first == "|" {
             // Hashed names are always alone on the line: |1|salt|hash
-            let parts = field.split(separator: "|", omittingEmptySubsequences: false)
+            let parts = split(field, on: "|")
             guard parts.count == 4, parts[0].isEmpty, parts[1] == "1",
                   let salt = Data(base64Encoded: String(parts[2])), !salt.isEmpty,
                   let hash = Data(base64Encoded: String(parts[3])), !hash.isEmpty
@@ -107,7 +109,7 @@ public struct KnownHostsDocument: Sendable {
             return [.hashed(salt: salt, hash: hash)]
         }
         var names: [KnownHostName] = []
-        for part in field.split(separator: ",", omittingEmptySubsequences: false) {
+        for part in split(field, on: ",") {
             guard let address = parseAddress(String(part)) else { return nil }
             names.append(.plain(address))
         }
@@ -116,7 +118,9 @@ public struct KnownHostsDocument: Sendable {
 
     static func parseAddress(_ text: String) -> KnownHostAddress? {
         guard !text.isEmpty else { return nil }
-        let isPattern = text.unicodeScalars.first == "!" || text.contains("*") || text.contains("?")
+        let isPattern = isASCII(text)
+            ? text.utf8.first == UInt8(ascii: "!") || text.utf8.contains { $0 == UInt8(ascii: "*") || $0 == UInt8(ascii: "?") }
+            : text.unicodeScalars.first == "!" || text.contains("*") || text.contains("?")
         if text.unicodeScalars.first == "[" {
             guard let close = text.firstIndex(of: "]") else { return nil }
             let host = String(text[text.index(after: text.startIndex)..<close])
@@ -128,5 +132,17 @@ public struct KnownHostsDocument: Sendable {
             return KnownHostAddress(host: host, port: port, isPattern: isPattern, isBracketed: true)
         }
         return KnownHostAddress(host: text, port: 22, isPattern: isPattern)
+    }
+
+    /// In ASCII text every byte is one Character (a line holds no "\r\n"), so byte-level splitting and
+    /// searching give exactly the Character-level results, several times faster.
+    static func isASCII(_ text: String) -> Bool {
+        text.utf8.allSatisfy { $0 < 0x80 }
+    }
+
+    /// `split(separator:omittingEmptySubsequences: false)` on an ASCII separator, byte-level for ASCII text.
+    static func split(_ text: String, on separator: Unicode.Scalar) -> [Substring] {
+        guard isASCII(text) else { return text.split(separator: Character(separator), omittingEmptySubsequences: false) }
+        return text.utf8.split(separator: UInt8(ascii: separator), omittingEmptySubsequences: false).map { Substring($0) }
     }
 }

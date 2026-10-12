@@ -145,4 +145,30 @@ struct UpdateHostTests {
         #expect(throws: ConfigEditError.controlCharacter) { try doc.updateHost(at: 0, to: draft) }
         #expect(Array(doc.render().utf8) == Array(text.utf8))
     }
+
+    @Test func typingAValueWithAHashKeyByKeyDoesNotStackComments() throws {
+        var doc = ConfigDocument(parsing: "Host a\n  LocalCommand x\n")
+        for value in ["x ", "x #", "x #b", "x #bc"] {
+            var draft = HostDraft(try #require(doc.hostEntry(at: 0)))
+            draft.directives[0].value = value
+            try doc.updateHost(at: 0, to: draft)
+        }
+        #expect(doc.render() == "Host a\n  LocalCommand x #bc\n")
+    }
+
+    @Test func quotedPatternWithSpaceSurvivesEdits() throws {
+        let text = "Host \"my host\"\n  User u\n"
+        let out = try update(text) { set(&$0, "User", "v") }
+        #expect(out == "Host \"my host\"\n  User v\n")
+        let renamed = try update(text) { $0.patterns.append("x") }
+        #expect(renamed == "Host \"my host\" x\n  User u\n")
+        #expect(ConfigDocument(parsing: renamed).hosts[0].patterns == ["my host", "x"])
+    }
+
+    @Test func newPatternWithSpaceIsStillRejected() {
+        var doc = ConfigDocument(parsing: "Host a\n")
+        #expect(throws: ConfigEditError.invalidAlias("b c")) {
+            try doc.updateHost(at: 0, to: HostDraft(patterns: ["a", "b c"]))
+        }
+    }
 }

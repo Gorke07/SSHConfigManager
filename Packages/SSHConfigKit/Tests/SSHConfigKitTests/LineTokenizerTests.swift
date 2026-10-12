@@ -77,4 +77,19 @@ struct LineTokenizerTests {
         #expect("IdentityFile".asciiLowercased == "identityfile")
         #expect("İstanbul".asciiLowercased == "İstanbul")
     }
+
+    @Test func startsCommentFindsUnquotedHashAtWordStart() {
+        #expect(LineTokenizer.startsComment("x #bc"))
+        #expect(LineTokenizer.startsComment("#x"))
+        #expect(LineTokenizer.startsComment("\"a\" #b"))
+        #expect(!LineTokenizer.startsComment("x#bc"))
+        #expect(!LineTokenizer.startsComment("\"x #bc\""))
+        #expect(!LineTokenizer.startsComment(""))
+    }
+
+    @Test func replacingWithACommentStartingValueDropsTheOldComment() throws {
+        let parts = try #require(LineTokenizer.classify("  LocalCommand x #b\r").parts)
+        #expect(LineTokenizer.replacingValue(in: parts, with: "x #bc") == "  LocalCommand x #bc\r")
+        #expect(LineTokenizer.replacingValue(in: parts, with: "y") == "  LocalCommand y #b\r")
+    }
 }

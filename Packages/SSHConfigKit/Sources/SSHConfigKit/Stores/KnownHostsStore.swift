@@ -23,21 +23,31 @@ public final class KnownHostsStore {
     /// Incremented on every load and write; selections are only valid for the revision they were made in.
     public private(set) var revision = 0
     public private(set) var isWatching = false
+    /// A background read is running: `document` is still the previous one (empty before the first load).
+    public private(set) var isLoading = false
+    /// Initial loads and file-change reloads read and parse off the main actor (`reload()`).
+    public let loadsInBackground: Bool
 
     @ObservationIgnored private var writer: SafeFileWriter
     @ObservationIgnored private var diskFingerprint: FileFingerprint?
     @ObservationIgnored private var watcher: FileWatcherGroup?
+    /// Bumped by every load; a background read publishes only if no newer load started meanwhile.
+    @ObservationIgnored private var loadGeneration = 0
+    @ObservationIgnored private var loadTask: Task<Void, Never>?
+    @ObservationIgnored private var pendingReadIsFull = false
 
     public init(
         fileURL: URL,
         writer: SafeFileWriter = SafeFileWriter(backups: BackupManager(rootDirectory: BackupManager.defaultRoot)),
         watchForChanges: Bool = true,
-        backupKind: String = "known_hosts"
+        backupKind: String = "known_hosts",
+        loadsInBackground: Bool = false
     ) {
         self.fileURL = fileURL
         self.writer = writer
         self.backupKind = backupKind
-        load()
+        self.loadsInBackground = loadsInBackground
+        if loadsInBackground { reload() } else { load() }
         if watchForChanges { startWatching() }
     }
 
@@ -49,25 +59,79 @@ public final class KnownHostsStore {
         writer = SafeFileWriter(backups: backups)
     }
 
+    /// Reads and parses on the calling (main) actor. Supersedes a background read still running.
     public func load() {
-        revision += 1
+        loadGeneration += 1
+        loadTask = nil
+        isLoading = false
+        apply(Self.read(fileURL))
+    }
+
+    /// Reads and parses off the main actor, then publishes like `load()`. A newer load of either kind
+    /// wins: a stale read is dropped, so it never overwrites a newer document.
+    /// `onlyIfChanged`: publish only when the file's bytes differ from the loaded ones (watcher events).
+    public func reload(onlyIfChanged: Bool = false) {
+        // Replacing a full read keeps it full: what it would have published must still be published.
+        let onlyIfChanged = onlyIfChanged && !(loadTask != nil && pendingReadIsFull)
+        pendingReadIsFull = !onlyIfChanged
+        loadGeneration += 1
+        let generation = loadGeneration
+        let url = fileURL
+        isLoading = true
+        loadTask = Task { [weak self] in
+            let result = await Task.detached(priority: .userInitiated) { Self.read(url) }.value
+            guard let self, generation == self.loadGeneration else { return }
+            self.loadTask = nil
+            self.isLoading = false
+            if onlyIfChanged && result.fingerprint == self.diskFingerprint { return }
+            self.apply(result)
+        }
+    }
+
+    /// Returns once no background read is running (including any that replaced the one awaited).
+    public func waitForLoad() async {
+        while let task = loadTask { await task.value }
+    }
+
+    /// What one read of the file produced; built off the main actor by `reload()`.
+    private enum ReadResult: Sendable {
+        case loaded(KnownHostsDocument, FileFingerprint)
+        /// `fingerprint` is kept for a file that exists but cannot be shown (not UTF-8).
+        case failed(ConfigLoadState, fingerprint: FileFingerprint?)
+
+        var fingerprint: FileFingerprint? {
+            switch self {
+            case .loaded(_, let fingerprint): fingerprint
+            case .failed(_, let fingerprint): fingerprint
+            }
+        }
+    }
+
+    private nonisolated static func read(_ url: URL) -> ReadResult {
         let data: Data
         do {
-            data = try Data(contentsOf: fileURL)
+            data = try Data(contentsOf: url)
         } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
-            reset(.missing)
-            return
+            return .failed(.missing, fingerprint: nil)
         } catch {
-            reset(.unreadable(error.localizedDescription))
-            return
+            return .failed(.unreadable(error.localizedDescription), fingerprint: nil)
         }
         guard let text = String(validating: data, as: UTF8.self) else {
-            reset(.notUTF8, fingerprint: FileFingerprint(data: data))
-            return
+            return .failed(.notUTF8, fingerprint: FileFingerprint(data: data))
         }
-        document = KnownHostsDocument(parsing: text)
-        diskFingerprint = FileFingerprint(data: data)
-        loadState = .loaded
+        return .loaded(KnownHostsDocument(parsing: text), FileFingerprint(data: data))
+    }
+
+    private func apply(_ result: ReadResult) {
+        revision += 1
+        switch result {
+        case .loaded(let parsed, let fingerprint):
+            document = parsed
+            diskFingerprint = fingerprint
+            loadState = .loaded
+        case .failed(let state, let fingerprint):
+            reset(state, fingerprint: fingerprint)
+        }
     }
 
     /// Removes lines of the document the user saw (`revision`). Refuses if it changed meanwhile.
@@ -102,6 +166,10 @@ public final class KnownHostsStore {
 
     func fileDidChange() {
         watcher?.refresh()   // the symlink or its target directory may have moved
+        if loadsInBackground {
+            reload(onlyIfChanged: true)
+            return
+        }
         let current = try? FileFingerprint.of(fileAt: fileURL)
         guard current != diskFingerprint else { return }
         load()

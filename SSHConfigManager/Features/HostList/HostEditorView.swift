@@ -5,6 +5,8 @@ struct HostEditorView: View {
     @Bindable var editor: HostEditorModel
     let homeDirectory: URL
     let keys: KeysModel
+    /// IdentityFile values whose private key has no passphrase; their rows get a lock-open hint.
+    var unencryptedKeys: Set<String> = []
     let reload: () -> Void
     @State private var importingIdentity = false
 
@@ -38,6 +40,12 @@ struct HostEditorView: View {
                     HStack {
                         TextField(String(localized: "editor.identityFiles"), text: identityBinding(index))
                             .labelsHidden()
+                        if editor.identityFiles.indices.contains(index), unencryptedKeys.contains(editor.identityFiles[index]) {
+                            Image(systemName: "lock.open.fill")
+                                .foregroundStyle(.orange)
+                                .help(String(localized: "keys.passphrase.noHelp"))
+                                .accessibilityLabel(String(localized: "keys.passphrase.noHelp"))
+                        }
                         Button(String(localized: "editor.remove"), systemImage: "minus.circle") {
                             if editor.identityFiles.indices.contains(index) { editor.identityFiles.remove(at: index) }
                         }

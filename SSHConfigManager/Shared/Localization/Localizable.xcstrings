@@ -533,6 +533,20 @@
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Değiştir" } }
       }
     },
+    "toolbar.settings" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Settings" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Ayarlar" } }
+      }
+    },
+    "toolbar.settings.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Settings (⌘,)" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Ayarlar (⌘,)" } }
+      }
+    },
     "toolbar.keys" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -657,6 +671,13 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "“%@” needs a value." } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "“%@” için bir değer gerekli." } }
+      }
+    },
+    "issue.valueStartsComment %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The “%@” value contains “#” at the start of a word; ssh reads the rest as a comment. Put that part in double quotes." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "“%@” değerinde bir sözcüğün başında “#” var; ssh gerisini yorum olarak okur. O kısmı çift tırnak içine alın." } }
       }
     },
     "issue.identityFileMissing %@" : {
@@ -1630,6 +1651,69 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Try Again" } },
         "tr" : { "stringUnit" : { "state" : "translated", "value" : "Tekrar Dene" } }
+      }
+    },
+    "settings.tab.general" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "General" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Genel" } }
+      }
+    },
+    "settings.tab.files" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Files" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dosyalar" } }
+      }
+    },
+    "settings.tab.backups" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Backups" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Yedekler" } }
+      }
+    },
+    "settings.appearance" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Appearance" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Görünüm" } }
+      }
+    },
+    "settings.appearance.system" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "System" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Sistem" } }
+      }
+    },
+    "settings.appearance.light" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Light" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Açık" } }
+      }
+    },
+    "settings.appearance.dark" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Dark" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Koyu" } }
+      }
+    },
+    "settings.showsInDock" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show in Dock" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Dock'ta göster" } }
+      }
+    },
+    "settings.showsInDock.note" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The app lives in the menu bar only: no Dock icon, even while a window is open. Open windows from the menu bar icon." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Uygulama yalnızca menü çubuğunda çalışır: pencere açıkken bile Dock simgesi görünmez. Pencereleri menü çubuğu simgesinden açabilirsiniz." } }
       }
     },
     "settings.configFile" : {

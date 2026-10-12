@@ -21,6 +21,8 @@ public struct ConfigValidator: Sendable {
         self.sshPath = sshPath
     }
 
+    static let fallbackProbe = "localhost"
+
     public func validate(_ text: String, probeAlias: String) async throws -> ValidationOutcome {
         let fm = FileManager.default
         let directory = fm.temporaryDirectory.appending(path: "sshcm-validate-\(UUID().uuidString)", directoryHint: .isDirectory)
@@ -32,8 +34,15 @@ public struct ConfigValidator: Sendable {
             throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: file.path])
         }
 
-        let result = try await runner.run(
+        var result = try await runner.run(
             sshPath, arguments: ["-G", "-F", file.path, "--", probeAlias], environment: [:], timeout: .seconds(5))
+        // A legal Host pattern need not be a legal destination (`a,b`, `-jump`, `web$1`): ssh rejects the
+        // probe itself before judging the file, so check the file through a probe it always accepts.
+        if !result.timedOut, result.exitCode != 0, probeAlias != Self.fallbackProbe,
+           result.stderr.contains("hostname contains invalid characters") {
+            result = try await runner.run(
+                sshPath, arguments: ["-G", "-F", file.path, "--", Self.fallbackProbe], environment: [:], timeout: .seconds(5))
+        }
         if result.timedOut { return .timedOut }
         if result.exitCode == 0 { return .valid }
         return .invalid(message: result.stderr

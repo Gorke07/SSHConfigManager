@@ -101,7 +101,21 @@ extension ConfigDocument {
         return HostEntry(headerLine: header, patterns: patterns, directives: directives(in: (header + 1)..<end))
     }
 
-    public var hosts: [HostEntry] { headerIndices.compactMap(hostEntry(at:)) }
+    /// Every Host block in file order; computed once per version of the document.
+    public var hosts: [HostEntry] {
+        if let cached = derived.values.withLock({ $0.hosts }) { return cached }
+        let computed = headerIndices.compactMap(hostEntry(at:))
+        derived.values.withLock { $0.hosts = computed }
+        return computed
+    }
+
+    /// The Host blocks whose first pattern is `alias`, in file order (the sidebar's occurrence numbering).
+    public func hosts(named alias: String) -> [HostEntry] {
+        if let cached = derived.values.withLock({ $0.hostsByAlias }) { return cached[alias] ?? [] }
+        let computed = Dictionary(grouping: hosts, by: \.alias)
+        derived.values.withLock { $0.hostsByAlias = computed }
+        return computed[alias] ?? []
+    }
 
     public var matches: [MatchEntry] {
         headerIndices.compactMap { header in

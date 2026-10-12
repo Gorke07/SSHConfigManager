@@ -23,7 +23,8 @@ extension ConfigDocument {
 
     /// Rejects drafts that would write a structurally broken or injected line
     /// (the same structural rules `HostDraftValidator` reports as issues).
-    func checkDraft(_ draft: HostDraft) throws {
+    /// `existingPatterns` (the edited block's own) may contain whitespace: they are written back quoted.
+    func checkDraft(_ draft: HostDraft, existingPatterns: Set<String> = []) throws {
         for pattern in draft.patterns where pattern.containsControlCharacter {
             throw ConfigEditError.controlCharacter
         }
@@ -32,7 +33,7 @@ extension ConfigDocument {
             throw ConfigEditError.controlCharacter
         }
         if draft.patterns.isEmpty { throw ConfigEditError.invalidAlias("") }
-        for pattern in draft.patterns { try checkAlias(pattern) }
+        for pattern in draft.patterns where !existingPatterns.contains(pattern) { try checkAlias(pattern) }
         for directive in draft.directives {
             guard DirectiveKeyRules.isValid(directive.key) else {
                 throw ConfigEditError.invalidDirectiveKey(directive.key)
@@ -56,7 +57,7 @@ extension ConfigDocument {
     public mutating func updateHost(at header: Int, to draft: HostDraft) throws {
         guard let entry = hostEntry(at: header) else { throw ConfigEditError.hostNotFound(header) }
 
-        try checkDraft(draft)
+        try checkDraft(draft, existingPatterns: Set(entry.patterns))
 
         let end = blockEnd(after: header)
 
@@ -66,7 +67,8 @@ extension ConfigDocument {
 
         if draft.patterns != entry.patterns, let parts = lines[header].parts {
             replacements[header] = ConfigLine(
-                raw: LineTokenizer.replacingValue(in: parts, with: draft.patterns.joined(separator: " ")))
+                raw: LineTokenizer.replacingValue(
+                    in: parts, with: draft.patterns.map(LineTokenizer.quotedIfNeeded).joined(separator: " ")))
         }
 
         var existingByKey: [String: [HostDirective]] = [:]
@@ -178,6 +180,11 @@ extension ConfigDocument {
         }
         if start == lines.count {
             while lines.last?.kind == .blank { lines.removeLast() }
+            // The new last line of a CRLF file without a final newline must not keep its "\r"
+            // (the reverse of `terminateLastLineForAppend`).
+            if usesCRLF, !hasTrailingNewline, let last = lines.last, last.raw.hasSuffix("\r") {
+                lines[lines.count - 1] = ConfigLine(raw: String(last.raw.dropLast()))
+            }
         }
         if lines.isEmpty { hasTrailingNewline = false }
     }

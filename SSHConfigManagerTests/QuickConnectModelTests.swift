@@ -215,4 +215,44 @@ struct QuickConnectModelTests {
         #expect(!model.copySelectedCommand())
         #expect(copied.isEmpty)
     }
+
+    private func storage(_ entries: [QuickConnectEntry]) -> UnsafeRawPointer? {
+        entries.withUnsafeBufferPointer { UnsafeRawPointer($0.baseAddress) }
+    }
+
+    /// The list is computed once per query and saved-hosts state: the view, the arrow keys and the preview reuse it.
+    @Test func entriesAreReusedUntilTheQueryChanges() throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\nHost b\nHost c\n")
+        let model = QuickConnectModel(app: app)
+        let first = model.entries
+        model.move(by: 1)
+        #expect(storage(model.entries) == storage(first))
+        model.query = "b"
+        #expect(model.entries.map(\.alias) == ["b"])
+        let searched = model.entries
+        model.select(searched[0])
+        #expect(storage(model.entries) == storage(searched))
+        model.query = ""
+        #expect(model.entries.map(\.alias) == ["a", "b", "c"])
+    }
+
+    @Test func cachedEntriesFollowFavoritesRecentsAndTheSavedFile() async throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\nHost b\nHost c\n")
+        let model = QuickConnectModel(app: app)
+        #expect(model.entries.map(\.alias) == ["a", "b", "c"])
+        app.toggleFavorite("c")
+        #expect(model.entries.map(\.alias) == ["c", "a", "b"])
+        #expect(model.entries.first?.isFavorite == true)
+        _ = await app.connect(alias: "b")
+        #expect(model.entries.map(\.alias) == ["c", "b", "a"])
+        model.query = "a"
+        #expect(model.entries.map(\.alias) == ["a"])
+        try tmp.file(".ssh/config", "Host a\nHost b\nHost c\nHost alpha\n")
+        app.store.load()   // the saved file changed on disk
+        #expect(model.entries.map(\.alias) == ["a", "alpha"])
+        model.query = ""
+        #expect(model.entries.map(\.alias) == ["c", "b", "a", "alpha"])
+    }
 }

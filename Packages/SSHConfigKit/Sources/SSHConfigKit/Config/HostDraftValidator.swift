@@ -10,6 +10,8 @@ public enum DraftIssue: Equatable, Sendable {
     case invalidDirectiveKey(String)
     case forbiddenDirectiveKey(String)
     case emptyDirectiveValue(String)
+    /// The value (of the directive with this key) has an unquoted `#` starting a word: ssh would read the rest as a comment.
+    case valueStartsComment(String)
     case identityFileMissing(String)
     /// A single-value directive (HostName, User, Port, ProxyJump, ForwardAgent) appears more than once in the draft:
     /// ssh uses the first value and ignores the rest (a warning; the lines stay in the file).
@@ -60,9 +62,11 @@ public struct HostDraftValidator: Sendable {
 
         if !issues.isEmpty { return issues }
 
+        // Patterns the block being edited already has (e.g. a quoted `Host "my host"`) never block editing.
+        let own = Set(header.flatMap { line in document.hosts.first { $0.headerLine == line } }.map { HostDraft($0).patterns } ?? [])
         if draft.patterns.isEmpty || draft.patterns.contains(where: \.isEmpty) {
             issues.append(.emptyAlias)
-        } else if draft.patterns.contains(where: { $0.unicodeScalars.contains(where: LineTokenizer.isSpace) }) {
+        } else if draft.patterns.contains(where: { !own.contains($0) && $0.unicodeScalars.contains(where: LineTokenizer.isSpace) }) {
             issues.append(.aliasHasWhitespace)
         } else {
             // Only aliases the draft adds are checked: patterns already in the block being edited are skipped, so
@@ -70,7 +74,6 @@ public struct HostDraftValidator: Sendable {
             // repeat within the draft) is a blocking duplicate. One that differs only in ASCII case from another
             // block's is a non-blocking warning: ssh matches Host patterns case-sensitively, so it is allowed,
             // but flagged as a likely mistake (spec §8).
-            let own = Set(header.flatMap { line in document.hosts.first { $0.headerLine == line } }.map { HostDraft($0).patterns } ?? [])
             let others = document.hosts.filter { $0.headerLine != header && !$0.isPattern }.flatMap(\.patterns)
             let takenExact = Set(others)
             let takenFolded = Set(others.map(\.asciiLowercased))
@@ -113,12 +116,12 @@ public struct HostDraftValidator: Sendable {
                 issues.append(.controlCharacter(directive.key))
                 continue
             }
+            if LineTokenizer.startsComment(ValueFormatter.encode(key: directive.key, value: directive.value)) {
+                issues.append(.valueStartsComment(directive.key))
+                continue
+            }
             if key == "port" {
-                // Port must be ASCII digits only and in range 1-65535
-                let isValidPort = !directive.value.isEmpty &&
-                    directive.value.unicodeScalars.allSatisfy { (48...57).contains($0.value) } &&
-                    (Int(directive.value).map { (1...65535).contains($0) } ?? false)
-                if !isValidPort { issues.append(.invalidPort(directive.value)) }
+                if !Self.isValidPort(directive.value) { issues.append(.invalidPort(directive.value)) }
                 continue
             }
             if directive.value.unicodeScalars.allSatisfy(LineTokenizer.isSpace) {
@@ -136,5 +139,16 @@ public struct HostDraftValidator: Sendable {
             issues.append(.duplicateFieldKey(key))
         }
         return issues
+    }
+
+    /// A number in 1...65535 (ASCII digits only), or a service name such as `ssh` (letters, digits, `-`, `_`,
+    /// starting with a letter), which ssh looks up in /etc/services.
+    static func isValidPort(_ value: String) -> Bool {
+        let scalars = value.unicodeScalars
+        guard let first = scalars.first else { return false }
+        let isDigit = { (c: Unicode.Scalar) in (48...57).contains(c.value) }
+        let isLetter = { (c: Unicode.Scalar) in (65...90).contains(c.value) || (97...122).contains(c.value) }
+        if scalars.allSatisfy(isDigit) { return Int(value).map { (1...65535).contains($0) } ?? false }
+        return isLetter(first) && scalars.allSatisfy { isLetter($0) || isDigit($0) || $0 == "-" || $0 == "_" }
     }
 }

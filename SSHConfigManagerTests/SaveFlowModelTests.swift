@@ -210,4 +210,97 @@ struct SaveFlowModelTests {
         #expect(!message.isEmpty)
         #expect(!message.hasSuffix(": "))
     }
+
+    @Test func documentChangedWhileReviewingIsReviewedAgainNotSaved() async throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\n  User u\n")
+        try addPort(app)
+        let flow = SaveFlowModel(store: app.store)
+        await flow.prepare()
+        #expect(flow.canConfirm)
+
+        // Another window edits the document while the sheet is open.
+        try app.store.apply { doc in
+            var draft = HostDraft(doc.hosts[0])
+            draft.directives.append(DraftDirective(key: "HostName", value: "unseen.example"))
+            try doc.updateHost(at: doc.hosts[0].headerLine, to: draft)
+        }
+        await flow.confirm()
+
+        #expect(try tmp.read(".ssh/config") == "Host a\n  User u\n")
+        guard case .review(let preparation) = flow.phase else { Issue.record("review bekleniyordu"); return }
+        #expect(preparation.hunks.flatMap(\.lines).contains { $0.text.contains("unseen.example") })
+
+        await flow.confirm()
+        #expect(flow.phase == .done)
+        #expect(try tmp.read(".ssh/config") == "Host a\n  User u\n  Port 2222\n  HostName unseen.example\n")
+    }
+
+    @Test func overwriteNeverClobbersAnEditMadeDuringValidation() async throws {
+        let tmp = try TempDir()
+        let config = tmp.url.appending(path: ".ssh/config")
+        // Validation runs: 1 prepare, 2 confirm (→ conflict), 3 overwrite: an editor saves meanwhile.
+        let runner = SideEffectRunner(onCall: 3) { try? Data("Host a\n  User newer\n".utf8).write(to: config) }
+        let app = makeTestModel(tmp, config: "Host a\n  User u\n", runner: runner)
+        try addPort(app)
+        try tmp.file(".ssh/config", "Host a\n  User vim\n")
+        let flow = SaveFlowModel(store: app.store)
+        await flow.prepare()
+        await flow.confirm()
+        #expect(flow.phase == .conflict)
+        #expect(flow.conflictDiskText == "Host a\n  User vim\n")
+
+        await flow.overwrite()
+
+        #expect(try tmp.read(".ssh/config") == "Host a\n  User newer\n")
+        #expect(flow.phase == .conflict)
+        #expect(flow.conflictDiskText == "Host a\n  User newer\n")
+
+        await flow.overwrite()
+        #expect(flow.phase == .done)
+        #expect(try tmp.read(".ssh/config") == "Host a\n  User u\n  Port 2222\n")
+    }
+
+    @Test func overwriteAfterTheDocumentChangedShowsTheNewDiffFirst() async throws {
+        let tmp = try TempDir()
+        let app = makeTestModel(tmp, config: "Host a\n  User u\n")
+        try addPort(app)
+        try tmp.file(".ssh/config", "Host a\n  User vim\n")
+        let flow = SaveFlowModel(store: app.store)
+        await flow.prepare()
+        await flow.confirm()
+        #expect(flow.phase == .conflict)
+
+        try app.store.apply { doc in
+            var draft = HostDraft(doc.hosts[0])
+            draft.directives.append(DraftDirective(key: "HostName", value: "unseen.example"))
+            try doc.updateHost(at: doc.hosts[0].headerLine, to: draft)
+        }
+        await flow.overwrite()
+        #expect(flow.phase == .conflict)
+        #expect(try tmp.read(".ssh/config") == "Host a\n  User vim\n")
+        #expect(flow.conflictHunks().flatMap(\.lines).contains { $0.text.contains("unseen.example") })
+
+        await flow.overwrite()
+        #expect(flow.phase == .done)
+    }
+}
+
+/// Answers `ssh -G` as valid; runs `action` during the `onCall`-th run (1-based), e.g. to edit the file mid-validation.
+private final class SideEffectRunner: ProcessRunning, @unchecked Sendable {
+    private let lock = NSLock()
+    private var calls = 0
+    private let onCall: Int
+    private let action: @Sendable () -> Void
+
+    init(onCall: Int, action: @escaping @Sendable () -> Void) {
+        self.onCall = onCall
+        self.action = action
+    }
+
+    func run(_ executable: URL, arguments: [String], environment: [String: String], timeout: Duration) async throws -> ProcessResult {
+        let call = lock.withLock { calls += 1; return calls }
+        if call == onCall { action() }
+        return FixedRunner.valid.result
+    }
 }

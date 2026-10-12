@@ -24,3 +24,15 @@ public struct HostDraft: Equatable, Sendable {
         directives = entry.directives.map { DraftDirective(key: $0.key, value: $0.value) }
     }
 }
+
+extension HostDraft {
+    /// The patterns as one editable line: patterns containing whitespace are quoted, as in the file.
+    public static func aliasText(for patterns: [String]) -> String {
+        patterns.map(LineTokenizer.quotedIfNeeded).joined(separator: " ")
+    }
+
+    /// Inverse of `aliasText(for:)`: splits on whitespace, double quotes group (as ssh reads `Host`).
+    public static func patterns(fromAliasText text: String) -> [String] {
+        LineTokenizer.arguments(of: text)
+    }
+}

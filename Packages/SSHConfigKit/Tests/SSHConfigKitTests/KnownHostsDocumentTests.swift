@@ -141,4 +141,13 @@ struct KnownHostsDocumentTests {
         let doc = KnownHostsDocument(parsing: "#\u{301} x\n")
         #expect(doc.lines.map(\.kind) == [.comment])
     }
+
+    /// The ASCII fast path must split exactly like Characters: a combining mark after a separator makes one
+    /// Character that is not a separator any more.
+    @Test func aCombiningMarkAfterASeparatorIsNotASeparator() {
+        #expect(KnownHostsDocument(parsing: "example.com \u{301}ssh-ed25519 \(Self.ed)\n").lines.map(\.kind) == [.unparsable])
+        let names = KnownHostsDocument(parsing: "a,\u{301}b ssh-ed25519 \(Self.ed)\n").entries.first?.names
+        #expect(names == [.plain(KnownHostAddress(host: "a,\u{301}b", port: 22, isPattern: false))])
+        #expect(KnownHostsDocument(parsing: "a.example.com,b.example.com ssh-ed25519 \(Self.ed)\n").entries.first?.names.count == 2)
+    }
 }

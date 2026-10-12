@@ -24,7 +24,9 @@ public struct SafeFileWriter: Sendable {
         backupKind: String
     ) throws {
         let fm = FileManager.default
-        let target = url.resolvingSymlinksInPath()
+        let target: URL
+        do { target = try Self.destination(of: url) }
+        catch { throw SafeFileWriterError.writeFailed(error.localizedDescription) }
 
         if !ignoreConflict {
             let current: FileFingerprint?
@@ -73,5 +75,23 @@ public struct SafeFileWriter: Sendable {
             try? fm.removeItem(at: temp)
             throw SafeFileWriterError.writeFailed(error.localizedDescription)
         }
+    }
+
+    /// The file a write to `url` must replace: symlinks are followed even when their target does not
+    /// exist yet (`resolvingSymlinksInPath` returns a dangling link unchanged, and replacing it would turn
+    /// `~/.ssh/config -> ~/dotfiles/ssh/config` into a regular file). Relative targets resolve against the
+    /// link's directory.
+    static func destination(of url: URL) throws -> URL {
+        var current = url.resolvingSymlinksInPath()
+        for _ in 0..<32 {
+            guard let link = try? FileManager.default.destinationOfSymbolicLink(atPath: current.path) else {
+                return current
+            }
+            let next = link.hasPrefix("/")
+                ? URL(filePath: link)
+                : current.deletingLastPathComponent().appending(path: link)
+            current = next.standardizedFileURL.resolvingSymlinksInPath()
+        }
+        throw POSIXError(.ELOOP)
     }
 }

@@ -181,14 +181,14 @@ struct HostEditorModelTests {
         let app = model(tmp, "Host web\n  User u\n")
         let editor = try #require(HostEditorModel(item: .host(alias: "web", occurrence: 0), store: app.store, homeDirectory: tmp.url))
         #expect(!editor.hasPendingChanges)
-        editor.fields["Port"] = "abc"
+        editor.fields["Port"] = "99999"
         #expect(!editor.commit())
         #expect(editor.hasPendingChanges)
         editor.fields["Port"] = "22"
         #expect(editor.commit())
         #expect(!editor.hasPendingChanges)
         // Reverting a blocked edit back to the baseline is not pending either.
-        editor.fields["Port"] = "abc"
+        editor.fields["Port"] = "99999"
         #expect(!editor.commit())
         editor.fields["Port"] = "22"
         #expect(editor.commit())
@@ -297,5 +297,45 @@ struct HostEditorModelTests {
         #expect(editor.commit())
         #expect(editor.issues.isEmpty)
         #expect(app.store.document.render() == "Host web\n  User u\n  Port 2200\n")
+    }
+
+    @Test func quotedPatternWithSpaceSurvivesUnrelatedEdits() throws {
+        let tmp = try TempDir()
+        let app = model(tmp, "Host \"my host\" other\n  User u\n")
+        let editor = try #require(HostEditorModel(item: .host(alias: "my host", occurrence: 0), store: app.store, homeDirectory: tmp.url))
+        #expect(editor.aliasText == "\"my host\" other")
+        editor.fields["User"] = "v"
+        #expect(editor.commit())
+        #expect(app.store.document.render() == "Host \"my host\" other\n  User v\n")
+
+        editor.aliasText = "\"my host\" renamed"
+        #expect(editor.commit())
+        #expect(app.store.document.hosts[0].patterns == ["my host", "renamed"])
+    }
+
+    @Test func servicePortNameDoesNotBlockEditing() throws {
+        let tmp = try TempDir()
+        let app = model(tmp, "Host web\n  Port ssh\n")
+        let editor = try #require(HostEditorModel(item: .host(alias: "web", occurrence: 0), store: app.store, homeDirectory: tmp.url))
+        editor.fields["User"] = "deploy"
+        #expect(editor.commit())
+        #expect(app.store.document.render() == "Host web\n  Port ssh\n  User deploy\n")
+    }
+
+    @Test func typingAHashThatStartsACommentIsBlockedAndNeverStacksComments() throws {
+        let tmp = try TempDir()
+        let app = model(tmp, "Host web\n  LocalCommand x\n")
+        let editor = try #require(HostEditorModel(item: .host(alias: "web", occurrence: 0), store: app.store, homeDirectory: tmp.url))
+        for value in ["x #", "x #b", "x #bc"] {
+            editor.otherOptions[0].value = value
+            editor.commit()
+        }
+        #expect(editor.issues == [.valueStartsComment("LocalCommand")])
+        #expect(editor.hasBlockingIssues)
+        #expect(app.store.document.render() == "Host web\n  LocalCommand x\n")
+
+        editor.otherOptions[0].value = "x \"#bc\""
+        #expect(editor.commit())
+        #expect(app.store.document.render() == "Host web\n  LocalCommand x \"#bc\"\n")
     }
 }

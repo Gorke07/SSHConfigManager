@@ -8,12 +8,13 @@ struct KnownHostsStoreTests {
     static let ed = KnownHostsDocumentTests.ed
     static let text = "a.example.com ssh-ed25519 \(ed)\r\n# note\r\nb.example.com ssh-ed25519 \(ed)\r\nc.example.com ssh-ed25519 \(ed)"
 
-    func makeStore(_ tmp: TempDir, contents: String? = text) throws -> KnownHostsStore {
+    func makeStore(_ tmp: TempDir, contents: String? = text, inBackground: Bool = false) throws -> KnownHostsStore {
         if let contents { try tmp.file("known_hosts", contents, permissions: 0o644) }
         return KnownHostsStore(
             fileURL: tmp.url.appending(path: "known_hosts"),
             writer: SafeFileWriter(backups: BackupManager(rootDirectory: tmp.url.appending(path: "Backups"))),
-            watchForChanges: false)
+            watchForChanges: false,
+            loadsInBackground: inBackground)
     }
 
     @Test func loadsTheFile() throws {
@@ -180,5 +181,64 @@ struct KnownHostsStoreTests {
         #expect(try tmp.read("real/known_hosts").hasPrefix("# note"))
         let link = try FileManager.default.destinationOfSymbolicLink(atPath: tmp.url.appending(path: "known_hosts").path)
         #expect(link == real.path)
+    }
+
+    @Test func backgroundLoadPublishesWhenDone() async throws {
+        let tmp = try TempDir()
+        let store = try makeStore(tmp, inBackground: true)
+        #expect(store.isLoading)
+        #expect(store.revision == 0)   // nothing published yet
+        #expect(throws: KnownHostsStoreError.notEditable) { try store.remove(lines: [0], ifRevision: store.revision) }
+        await store.waitForLoad()
+        #expect(!store.isLoading)
+        #expect(store.revision == 1)
+        #expect(store.loadState == .loaded)
+        #expect(store.document.entries.count == 3)
+        try store.remove(lines: [0], ifRevision: store.revision)
+        #expect(try tmp.read("known_hosts").hasPrefix("# note"))
+    }
+
+    /// A background read that started before a newer load must not overwrite it, whichever file it read.
+    @Test func aStaleBackgroundReadNeverOverwritesANewerLoad() async throws {
+        let tmp = try TempDir()
+        let store = try makeStore(tmp)
+        let start = store.revision
+        store.reload()
+        try tmp.file("known_hosts", "only.example.com ssh-ed25519 \(Self.ed)\n", permissions: 0o644)
+        store.load()
+        #expect(!store.isLoading)
+        await store.waitForLoad()
+        try await Task.sleep(for: .milliseconds(100))   // let a dropped read finish if it was still running
+        #expect(store.revision == start + 1)
+        #expect(store.document.entries.count == 1)
+    }
+
+    @Test func backgroundFileChangeReloadsOnlyWhenTheFileChanged() async throws {
+        let tmp = try TempDir()
+        let store = try makeStore(tmp, inBackground: true)
+        await store.waitForLoad()
+        let revision = store.revision
+        store.fileDidChange()   // nothing changed on disk
+        await store.waitForLoad()
+        #expect(store.revision == revision)
+        try tmp.file("known_hosts", "only.example.com ssh-ed25519 \(Self.ed)\n", permissions: 0o644)
+        store.fileDidChange()
+        await store.waitForLoad()
+        #expect(store.revision == revision + 1)
+        #expect(store.document.entries.count == 1)
+        try FileManager.default.removeItem(at: tmp.url.appending(path: "known_hosts"))
+        store.fileDidChange()
+        await store.waitForLoad()
+        #expect(store.loadState == .missing)
+    }
+
+    /// A watcher event during the first read must not turn it into a "publish only if changed" read.
+    @Test func aFileChangeDuringTheFirstReadStillPublishes() async throws {
+        let tmp = try TempDir()
+        let store = try makeStore(tmp, contents: nil, inBackground: true)
+        store.fileDidChange()
+        await store.waitForLoad()
+        #expect(store.revision == 1)
+        #expect(store.loadState == .missing)
     }
 }

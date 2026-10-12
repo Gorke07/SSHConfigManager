@@ -58,9 +58,24 @@ final class KnownHostsModel {
         }
     }
 
+    /// Rows of one store revision. Building them hashes every key (SHA-256), so they are built once per
+    /// revision rather than on every render, search keystroke or selection click.
+    @ObservationIgnored private var rowsCache: (store: KnownHostsStore, revision: Int, rows: [KnownHostRow])?
+    /// The search result for one revision and query, with its ids for selection checks.
+    @ObservationIgnored private var filterCache: (store: KnownHostsStore, revision: Int, query: String, rows: [KnownHostRow], ids: Set<Int>)?
+
     var allRows: [KnownHostRow] {
-        let document = app.knownHosts.document
-        return document.lines.enumerated().compactMap { index, line in
+        let store = app.knownHosts
+        // Read (and observe) the revision even on a cache hit; every new document comes with a new one.
+        let revision = store.revision
+        if let cache = rowsCache, cache.store === store, cache.revision == revision { return cache.rows }
+        let built = Self.rows(for: store.document)
+        rowsCache = (store, revision, built)
+        return built
+    }
+
+    static func rows(for document: KnownHostsDocument) -> [KnownHostRow] {
+        document.lines.enumerated().compactMap { index, line in
             switch line.kind {
             case .entry(let entry): Self.row(for: entry)
             case .unparsable:
@@ -71,12 +86,27 @@ final class KnownHostsModel {
         }
     }
 
-    var rows: [KnownHostRow] {
+    var rows: [KnownHostRow] { filtered.rows }
+
+    /// The visible rows, computed once per (store, revision, search text).
+    private var filtered: (rows: [KnownHostRow], ids: Set<Int>) {
+        let store = app.knownHosts
+        let revision = store.revision
         let query = searchText.trimmingCharacters(in: .whitespaces)
-        guard !query.isEmpty else { return allRows }
+        if let cache = filterCache, cache.store === store, cache.revision == revision, cache.query == query {
+            return (cache.rows, cache.ids)
+        }
+        let result = Self.filter(allRows, query: query)
+        let ids = Set(result.map(\.id))
+        filterCache = (store, revision, query, result, ids)
+        return (result, ids)
+    }
+
+    static func filter(_ rows: [KnownHostRow], query: String) -> [KnownHostRow] {
+        guard !query.isEmpty else { return rows }
         let needle = query.lowercased()
         let lookup = HostMatcher.lookupName(forQuery: query)
-        return allRows.filter { row in
+        return rows.filter { row in
             // ssh's own form (`host`, `[host]:port`) finds hashed and plain names alike.
             if let lookup, row.names.contains(where: { HostMatcher.matches($0, lookupName: lookup) }) { return true }
             // Mixed lines are searched by their plain names; fully hashed ones only by the lookup form.
@@ -89,16 +119,29 @@ final class KnownHostsModel {
     /// Only rows that are both selected and visible: a row hidden by the search is never deleted.
     var visibleSelectedRows: [KnownHostRow] {
         let selected = selection
+        guard !selected.isEmpty else { return [] }
         return rows.filter { selected.contains($0.id) }
+    }
+
+    /// The file is loaded (not still being read in the background) and can be edited.
+    private var isEditable: Bool {
+        let store = app.knownHosts
+        return store.loadState == .loaded && !store.isLoading
+    }
+
+    /// The first read of the file is still running: nothing to show yet.
+    var isLoadingFirstTime: Bool {
+        let store = app.knownHosts
+        return store.isLoading && store.revision == 0
     }
 
     /// Delete is possible: the file is loaded and a selected row is visible.
     var canRemoveSelection: Bool {
-        app.knownHosts.loadState == .loaded && !visibleSelectedRows.isEmpty
+        isEditable && !selection.isDisjoint(with: filtered.ids)
     }
 
     func requestRemoveSelection() {
-        guard app.knownHosts.loadState == .loaded else { return }
+        guard isEditable else { return }
         let chosen = visibleSelectedRows
         guard !chosen.isEmpty else { return }
         pendingRevision = selectionRevision

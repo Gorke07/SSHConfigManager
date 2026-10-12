@@ -102,7 +102,10 @@ struct BackupsModelTests {
         try await saveEdit(app, port: "1")
         let backups = BackupsModel(model: app)
         let backup = try #require(backups.backups.first)
+        app.select(.host(alias: "a", occurrence: 0))
+        app.groupDraft = "Prod"   // typed, not applied; the restore confirmation discards it
         try backups.restore(backup)
+        #expect(app.groupDraft == nil)
         #expect(app.store.document.render() == "Host a\n")
         #expect(app.store.hasUnsavedChanges)
         #expect(try tmp.read(".ssh/config") == "Host a\n    Port 1\n")   // disk untouched until Save

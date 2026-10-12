@@ -8,7 +8,7 @@ struct MessagesTests {
     static let issues: [DraftIssue] = [
         .controlCharacter("User"), .emptyAlias, .aliasHasWhitespace, .duplicateAlias("web"), .duplicateAliasCaseOnly("Web"),
         .invalidPort("99999"), .invalidDirectiveKey("Bad Key"), .forbiddenDirectiveKey("Host"),
-        .emptyDirectiveValue("User"), .identityFileMissing("~/.ssh/x"),
+        .emptyDirectiveValue("User"), .identityFileMissing("~/.ssh/x"), .valueStartsComment("LocalCommand"),
     ]
 
     static let storeErrors: [ConfigStoreError] = [

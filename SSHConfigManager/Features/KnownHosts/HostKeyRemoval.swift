@@ -61,6 +61,9 @@ extension AppModel {
         var otherFile: String?
         do {
             let host = try await resolver.resolve(alias: alias)
+            // A background read still running would leave an old (or, at launch, empty) document: match the fresh one.
+            // The store can be switched while waiting, and the new one may be loading too.
+            while knownHosts.isLoading { await knownHosts.waitForLoad() }
             revision = knownHosts.revision
             store = knownHosts
             checkHostIP = host.checkHostIP

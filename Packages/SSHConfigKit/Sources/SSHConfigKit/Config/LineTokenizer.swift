@@ -97,11 +97,35 @@ enum LineTokenizer {
     }
 
     /// Rebuilds a line with a new value while keeping indent, separator, comment and line ending.
+    /// A value that starts a comment itself replaces the old comment (only the line ending is kept),
+    /// so repeated edits never stack comments.
     static func replacingValue(in parts: LineParts, with newValue: String) -> String {
         let separator = parts.separator.isEmpty ? " " : parts.separator
         var trailing = parts.trailing
-        if trailing.unicodeScalars.first == "#" { trailing = " " + trailing }
+        if startsComment(newValue) {
+            trailing = trailing.unicodeScalars.last == "\r" ? "\r" : ""
+        } else if trailing.unicodeScalars.first == "#" {
+            trailing = " " + trailing
+        }
         return parts.indent + parts.key + separator + newValue + trailing
+    }
+
+    /// True when `value`, written after a key, would be cut short by a comment: an unquoted `#`
+    /// that starts a word (ssh and `classify` drop everything from there on).
+    static func startsComment(_ value: String) -> Bool {
+        var inQuote = false
+        var atWordStart = true
+        for c in value.unicodeScalars {
+            if !inQuote && c == "#" && atWordStart { return true }
+            if c == "\"" { inQuote.toggle() }
+            atWordStart = !inQuote && isSpace(c)
+        }
+        return false
+    }
+
+    /// Wraps an argument containing whitespace in double quotes, so `arguments(of:)` reads it back as one.
+    static func quotedIfNeeded(_ argument: String) -> String {
+        argument.unicodeScalars.contains(where: isSpace) ? "\"" + argument + "\"" : argument
     }
 
     static func isSpace(_ c: Unicode.Scalar) -> Bool { c == " " || c == "\t" }

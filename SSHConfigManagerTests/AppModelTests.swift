@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SSHConfigKit
 import Testing
@@ -17,6 +18,38 @@ struct AppModelTests {
         let reloaded = AppSettings(defaults: UserDefaults(suiteName: tmp.defaultsSuiteName)!, homeDirectory: tmp.url)
         #expect(reloaded.configPath == "~/dotfiles/ssh/config")
         #expect(reloaded.backupCount == 50)
+    }
+
+    @Test func appearanceDefaultsToSystemAndPersists() throws {
+        let tmp = try TempDir()
+        #expect(AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url).appearance == .system)
+        AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url).setAppearance(.dark)
+        #expect(AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url).appearance == .dark)
+        tmp.defaults.set("sepia", forKey: "appearance")   // unknown value from a newer or older build
+        #expect(AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url).appearance == .system)
+    }
+
+    @Test func dockIconIsShownByDefaultAndTheChoicePersists() throws {
+        let tmp = try TempDir()
+        #expect(AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url).showsInDock)
+        AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url).setShowsInDock(false)
+        #expect(!AppSettings(defaults: tmp.defaults, homeDirectory: tmp.url).showsInDock)
+    }
+
+    @Test func darkBackgroundIsASoftBlackAndLightKeepsTheSystemColor() throws {
+        let dark = try #require(NSAppearance(named: .darkAqua))
+        var components: (r: CGFloat, g: CGFloat, b: CGFloat) = (0, 0, 0)
+        dark.performAsCurrentDrawingAppearance {
+            let color = NSColor.appBackground.usingColorSpace(.sRGB)!
+            components = (color.redComponent, color.greenComponent, color.blueComponent)
+        }
+        // Lighter than pure black, still dark, and a touch cool (blue above red).
+        #expect(components.r > 0.1 && components.r < 0.16)
+        #expect(components.b > components.r)
+        let light = try #require(NSAppearance(named: .aqua))
+        light.performAsCurrentDrawingAppearance {
+            #expect(NSColor.appBackground.usingColorSpace(.sRGB) == NSColor.windowBackgroundColor.usingColorSpace(.sRGB))
+        }
     }
 
     @Test func expandAndDisplayPaths() throws {
@@ -62,7 +95,7 @@ struct AppModelTests {
         let a = SidebarItem.host(alias: "a", occurrence: 0)
         model.select(a)
         let editor = try #require(model.editor(for: a))
-        editor.fields["Port"] = "abc"
+        editor.fields["Port"] = "99999"
         #expect(!editor.commit())
         #expect(model.hasPendingFormEdits)
         #expect(!model.store.hasUnsavedChanges)
@@ -154,7 +187,7 @@ struct AppModelTests {
         model.select(a)
         let token = model.editorToken
         let editor = try #require(model.editor(for: a))
-        editor.fields["Port"] = "abc"
+        editor.fields["Port"] = "99999"
         #expect(!editor.commit())
         #expect(model.hasPendingFormEdits)
 
@@ -174,6 +207,20 @@ struct AppModelTests {
         #expect(model.editorToken != token)
     }
 
+    @Test func reloadFromDiskRebuildsTheEditorWithoutAView() throws {
+        let tmp = try TempDir()
+        let model = makeTestModel(tmp, config: "Host a\n  User old\n")
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        model.select(a)
+        let first = try #require(model.editor(for: a))
+        // Main window closed (no view observes diskText); the file changes and the store reloads.
+        _ = try tmp.file(".ssh/config", "Host a\n  User new\n")
+        model.store.load()
+        let reopened = try #require(model.editor(for: a))
+        #expect(reopened !== first)
+        #expect(reopened.fields["User"] == "new")
+    }
+
     @Test func editorSurvivesWindowCloseAndKeepsPendingEdits() throws {
         let tmp = try TempDir()
         let model = makeTestModel(tmp, config: "Host a\nHost b\n")
@@ -181,7 +228,7 @@ struct AppModelTests {
         model.select(a)
         let first = try #require(model.editor(for: a))
         #expect(model.editor(for: a) === first)
-        first.fields["Port"] = "abc"
+        first.fields["Port"] = "99999"
         #expect(!first.commit())
 
         // Window closed and reopened: the view asks again with the same token.
@@ -189,7 +236,7 @@ struct AppModelTests {
         #expect(again === first)
         #expect(again.hasPendingChanges)
         #expect(model.hasPendingFormEdits)
-        #expect(again.fields["Port"] == "abc")
+        #expect(again.fields["Port"] == "99999")
     }
 
     @Test func selectingOrResettingDropsTheEditor() throws {
@@ -199,7 +246,7 @@ struct AppModelTests {
         let b = SidebarItem.host(alias: "b", occurrence: 0)
         model.select(a)
         let first = try #require(model.editor(for: a))
-        first.fields["Port"] = "abc"
+        first.fields["Port"] = "99999"
         _ = first.commit()
         model.select(b)
         #expect(model.activeEditor == nil)
@@ -579,6 +626,16 @@ struct AppModelTests {
         #expect(model.store.document.hosts.count == 1)
     }
 
+    @Test func unencryptedKeysAreRowHintsNotHostWarnings() throws {
+        let tmp = try TempDir()
+        _ = try tmp.file(".ssh/id_a", "x")
+        let model = makeTestModel(tmp, config: "Host a\n  IdentityFile ~/.ssh/id_a\n  IdentityFile ~/.ssh/missing\n")
+        model.keyEncryptionReader = { _ in .unencrypted }
+        let a = SidebarItem.host(alias: "a", occurrence: 0)
+        #expect(model.unencryptedIdentityFiles(for: a) == ["~/.ssh/id_a"])
+        #expect(model.lintIssues(for: a).filter(\.isHostWarning) == [.missingIdentityFile("~/.ssh/missing")])
+    }
+
     @Test func invalidateLintForcesAFreshRead() throws {
         let tmp = try TempDir()
         let model = makeTestModel(tmp, config: "Host a\n  IdentityFile ~/.ssh/id_a\n")
@@ -707,7 +764,7 @@ struct AppModelTests {
     private func blockedEditor(_ model: AppModel, _ item: SidebarItem) throws {
         model.select(item)
         let editor = try #require(model.editor(for: item))
-        editor.fields["Port"] = "abc"
+        editor.fields["Port"] = "99999"
         #expect(!editor.commit())
         #expect(model.hasPendingFormEdits)
     }

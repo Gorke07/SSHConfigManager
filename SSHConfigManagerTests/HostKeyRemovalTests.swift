@@ -86,6 +86,24 @@ struct HostKeyRemovalTests {
         #expect(model.errorMessage == String(localized: "knownHosts.staleSelection"))
     }
 
+    /// A background read still running when ssh -G answers: the lookup uses the file as it is now.
+    @Test func aBackgroundReadIsAwaitedBeforeMatching() async throws {
+        let tmp = try TempDir()
+        let model = make(tmp, sshG: "hostname web.example.com\nport 22\n")
+        try tmp.file(".ssh/known_hosts", "new.example.com ssh-ed25519 \(Self.ed)\n" + Self.knownHosts)
+        model.knownHosts.reload()
+        await model.requestHostKeyRemoval(alias: "web")
+        #expect(!model.knownHosts.isLoading)
+        guard case .confirm(let entries) = model.hostKeyRemoval?.phase else { Issue.record("expected confirm"); return }
+        #expect(entries.map(\.lineIndex) == [1])
+        #expect(model.hostKeyRemoval?.revision == model.knownHosts.revision)
+        model.confirmHostKeyRemoval()
+        #expect(model.errorMessage == nil)
+        let text = try tmp.read(".ssh/known_hosts")
+        #expect(text.hasPrefix("new.example.com"))
+        #expect(!text.contains("web.example.com ssh-ed25519"))
+    }
+
     @Test func unsavedAliasesAreRefused() async throws {
         let tmp = try TempDir()
         let model = make(tmp, sshG: "hostname x\nport 22\n")

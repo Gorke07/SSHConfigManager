@@ -34,7 +34,8 @@ final class HostEditorModel {
         self.store = store
         self.item = item
         baseline = HostDraft(entry)
-        aliasText = entry.patterns.joined(separator: " ")
+        // Quoted like the file, so a `Host "my host"` pattern survives unrelated edits.
+        aliasText = HostDraft.aliasText(for: entry.patterns)
         var fields: [String: String] = [:]
         for key in Self.fieldKeys { fields[key] = entry.value(for: key) ?? "" }
         self.fields = fields
@@ -59,7 +60,7 @@ final class HostEditorModel {
     }
 
     var draft: HostDraft {
-        let patterns = aliasText.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
+        let patterns = HostDraft.patterns(fromAliasText: aliasText)
         var directives: [DraftDirective] = []
         for key in Self.fieldKeys {
             let value = (fields[key] ?? "").trimmingCharacters(in: .whitespaces)

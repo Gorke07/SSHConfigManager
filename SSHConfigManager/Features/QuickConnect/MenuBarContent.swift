@@ -15,12 +15,12 @@ struct MenuBarContent: View {
             openMainWindow: { appDelegate.openMainWindow?() },
             openSettings: { openSettings(); NSApp.activate() },
             openKnownHosts: {
-                NSApp.setActivationPolicy(.regular)
+                DockIcon.showForWindow(appDelegate.model.settings)
                 openWindow(id: "knownHosts")
                 NSApp.activate()
             },
             openKeys: {
-                NSApp.setActivationPolicy(.regular)
+                DockIcon.showForWindow(appDelegate.model.settings)
                 openWindow(id: "keys")
                 NSApp.activate()
             })

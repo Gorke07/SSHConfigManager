@@ -42,8 +42,8 @@ targets:
         CFBundleDisplayName: SSH Config Manager
         CFBundleDevelopmentRegion: en
         CFBundleLocalizations: [en, tr]
-        CFBundleShortVersionString: "0.1.0"
-        CFBundleVersion: "1"
+        CFBundleShortVersionString: "0.2.0"
+        CFBundleVersion: "2"
         LSApplicationCategoryType: public.app-category.developer-tools
         LSMinimumSystemVersion: "26.0"
         # Localized (en, tr) by SSHConfigManager/Shared/Localization/InfoPlist.xcstrings, built from the sources above.

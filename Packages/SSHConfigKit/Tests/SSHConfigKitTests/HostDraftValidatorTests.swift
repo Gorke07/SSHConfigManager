@@ -35,7 +35,7 @@ struct HostDraftValidatorTests {
         #expect(issues(HostDraft(patterns: ["*.prod"])).isEmpty)
     }
 
-    @Test(arguments: ["0", "65536", "abc", "22 23", "", "+22", " 22"])
+    @Test(arguments: ["0", "65536", "9abc", "-ssh", "s+h", "22 23", "", "+22", " 22"])
     func invalidPorts(port: String) {
         let found = issues(HostDraft(patterns: ["n"], directives: [DraftDirective(key: "port", value: port)]))
         #expect(found.contains(.invalidPort(port)))
@@ -136,5 +136,33 @@ struct HostDraftValidatorTests {
         ])
         #expect(issues(draft) == [.duplicateFieldKey("User")])
         #expect(!DraftIssue.duplicateFieldKey("User").isBlocking)
+    }
+
+    @Test(arguments: ["x #bc", "#x", "a \"b\" #c"])
+    func valueStartingACommentBlocks(value: String) {
+        let found = issues(HostDraft(patterns: ["n"], directives: [DraftDirective(key: "LocalCommand", value: value)]))
+        #expect(found == [.valueStartsComment("LocalCommand")])
+        #expect(found.allSatisfy { $0.isBlocking })
+    }
+
+    @Test func hashInsideAWordOrAQuotedSingleValueIsFine() {
+        let draft = HostDraft(patterns: ["n"], directives: [
+            DraftDirective(key: "LocalCommand", value: "echo a#b"),
+            DraftDirective(key: "IdentityFile", value: "~/.ssh/id #2"),   // written quoted
+        ])
+        #expect(!issues(draft).contains(.valueStartsComment("LocalCommand")))
+        #expect(!issues(draft).contains(.valueStartsComment("IdentityFile")))
+    }
+
+    @Test(arguments: ["ssh", "my-svc", "svc_2"])
+    func servicePortNamesAreAccepted(port: String) {
+        #expect(issues(HostDraft(patterns: ["n"], directives: [DraftDirective(key: "Port", value: port)])).isEmpty)
+    }
+
+    @Test func existingQuotedPatternWithSpaceDoesNotBlockEditing() {
+        let doc = ConfigDocument(parsing: "Host \"my host\"\n  User u\n")
+        let draft = HostDraft(patterns: ["my host"], directives: [DraftDirective(key: "User", value: "v")])
+        #expect(validator.issues(for: draft, in: doc, editing: 0).isEmpty)
+        #expect(validator.issues(for: HostDraft(patterns: ["my host", "b c"]), in: doc, editing: 0) == [.aliasHasWhitespace])
     }
 }

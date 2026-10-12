@@ -7,8 +7,9 @@ struct SSHConfigManagerApp: App {
     var body: some Scene {
         Window(String(localized: "app.title"), id: "main") {
             MainWindow(model: appDelegate.model)
-                .frame(minWidth: 760, minHeight: 480)
+                .frame(minWidth: 760, minHeight: 560)
                 .registersMainWindowOpener(appDelegate)
+                .themedBackground()
         }
         .commands {
             HostCommandMenu(model: appDelegate.model, openMainWindow: { appDelegate.openMainWindow?() })
@@ -19,18 +20,22 @@ struct SSHConfigManagerApp: App {
         Settings {
             SettingsView(model: appDelegate.model)
                 .registersMainWindowOpener(appDelegate)
+                .themedBackground()
         }
         Window(String(localized: "settings.backups"), id: "backups") {
             BackupsView(model: appDelegate.model)
                 .registersMainWindowOpener(appDelegate)
+                .themedBackground()
         }
         Window(String(localized: "knownHosts.title"), id: "knownHosts") {
             KnownHostsWindow(app: appDelegate.model)
                 .registersMainWindowOpener(appDelegate)
+                .themedBackground()
         }
         Window(String(localized: "keys.title"), id: "keys") {
             KeysWindow(app: appDelegate.model)
                 .registersMainWindowOpener(appDelegate)
+                .themedBackground()
         }
         MenuBarExtra(isInserted: .constant(!TestEnvironment.isRunningTests)) {
             MenuBarContent(appDelegate: appDelegate)

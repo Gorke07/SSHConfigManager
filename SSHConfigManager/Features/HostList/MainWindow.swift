@@ -78,6 +78,12 @@ struct MainWindow: View {
                 Button { openWindow(id: "keys") } label: { Label(String(localized: "toolbar.keys"), systemImage: "key") }
             }
             ToolbarItem(placement: .primaryAction) {
+                SettingsLink {
+                    Label(String(localized: "toolbar.settings"), systemImage: "gearshape")
+                }
+                .help(String(localized: "toolbar.settings.help"))
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button {
                     // An unapplied group draft is applied first; only blocked form edits need the warning.
                     model.applyPendingGroupDraft()

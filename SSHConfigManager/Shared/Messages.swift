@@ -13,6 +13,7 @@ enum Messages {
         case .invalidDirectiveKey(let key): String(localized: "issue.invalidDirectiveKey \(key)")
         case .forbiddenDirectiveKey(let key): String(localized: "issue.forbiddenDirectiveKey \(key)")
         case .emptyDirectiveValue(let key): String(localized: "issue.emptyDirectiveValue \(key)")
+        case .valueStartsComment(let key): String(localized: "issue.valueStartsComment \(key)")
         case .duplicateAliasCaseOnly(let alias): String(localized: "issue.lint.duplicateCaseOnly \(alias)")
         case .identityFileMissing(let path): String(localized: "issue.identityFileMissing \(path)")
         case .duplicateFieldKey(let key): String(localized: "issue.duplicateFieldKey \(key)")
