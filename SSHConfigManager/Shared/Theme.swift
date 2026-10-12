@@ -30,32 +30,20 @@ enum AppAppearance: String, CaseIterable, Sendable {
         }
     }
 
-    /// `animated` cross-fades every visible window from the old look to the new one (skipped with Reduce Motion).
     @MainActor
-    func apply(animated: Bool = false) {
-        guard animated, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
-            NSApp.appearance = nsAppearance
-            return
-        }
-        // The fade must be on the window's frame view (title bar included) and in the same transaction as the
-        // redraw, or Core Animation fades between two copies of the old look.
-        CATransaction.begin()
-        let windows = NSApp.windows.filter(\.isVisible)
-        for window in windows {
-            guard let frameView = window.contentView?.superview else { continue }
-            frameView.wantsLayer = true
-            let fade = CATransition()
-            fade.type = .fade
-            fade.duration = Self.transitionDuration
-            fade.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            frameView.layer?.add(fade, forKey: "appearance")
-        }
+    func apply() {
         NSApp.appearance = nsAppearance
-        windows.forEach { $0.displayIfNeeded() }
-        CATransaction.commit()
     }
 
-    static let transitionDuration: CFTimeInterval = 0.35
+    /// Cross-fades every visible window to this appearance (`AppearanceTransition`); applies at once with Reduce Motion.
+    @MainActor
+    func applyWithTransition() async {
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            apply()
+        } else {
+            await AppearanceTransition.perform { apply() }
+        }
+    }
 }
 
 extension NSColor {
